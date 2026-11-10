@@ -668,8 +668,9 @@ class Application:
     def nouvelle_conversation(self):
         self.sauver_zones()
         self.numero += 1
-        self.conversations.append(Conversation(self.t("nom_conversation", n=self.numero), self.t.langue))
-        self.courante = len(self.conversations) - 1
+        # La plus récente en haut de la liste
+        self.conversations.insert(0, Conversation(self.t("nom_conversation", n=self.numero), self.t.langue))
+        self.courante = 0
         self.charger_zones()
         self.onglets.select(0)
         self.message(self.t("msg_conversation_creee", c=self.conv.nom))
@@ -1043,6 +1044,7 @@ class Application:
         liste_motifs.pack(fill="both", expand=True)
         liste_motifs.remplir(motifs)
         retour_motif.pack(anchor="w", pady=(8, 0))
+        self.lien(o, t("opt_motifs_site"), "https://regex101.com/?flavor=python")
         ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer_motifs).pack(anchor="e", pady=(8, 0))
 
         # Consigne pour l'IA
@@ -1317,9 +1319,9 @@ def capture(app, chemin):
         lambda: (app.onglets.select(0), gros_log()), lambda: photo(app.root, "gros-log.png"),
         lambda: theme("clair"), lambda: langue("fr"),
         lambda: photo(app.root, "clair-anonymiser.png"),
-        lambda: conversation(0, 1), lambda: photo(app.root, "clair-restaurer.png"),
-        lambda: conversation(0, 0), lambda: photo(app.root, "clair-relance.png"),
-        lambda: conversation(0, 2), lambda: photo(app.root, "clair-elements.png"),
+        lambda: conversation(1, 1), lambda: photo(app.root, "clair-restaurer.png"),
+        lambda: conversation(1, 0), lambda: photo(app.root, "clair-relance.png"),
+        lambda: conversation(1, 2), lambda: photo(app.root, "clair-elements.png"),
         lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
         lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-motifs.png"),
         lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-consigne.png"),
@@ -1327,10 +1329,10 @@ def capture(app, chemin):
         lambda: app.fenetre_options.destroy(),
         app.ouvrir_a_propos, lambda: photo(app.fenetre_a_propos, "a-propos.png"),
         lambda: app.fenetre_a_propos.destroy(),
-        lambda: (theme("sombre"), conversation(1, 0)), lambda: photo(app.root, "sombre-anonymiser.png"),
-        lambda: conversation(0, 1), lambda: photo(app.root, "sombre-restaurer.png"),
-        lambda: langue("en"), lambda: conversation(0, 1), lambda: photo(app.root, "en-sombre-restaurer.png"),
-        lambda: (theme("clair"), conversation(1, 0)), lambda: photo(app.root, "en-clair-anonymiser.png"),
+        lambda: (theme("sombre"), conversation(0, 0)), lambda: photo(app.root, "sombre-anonymiser.png"),
+        lambda: conversation(1, 1), lambda: photo(app.root, "sombre-restaurer.png"),
+        lambda: langue("en"), lambda: conversation(1, 1), lambda: photo(app.root, "en-sombre-restaurer.png"),
+        lambda: (theme("clair"), conversation(0, 0)), lambda: photo(app.root, "en-clair-anonymiser.png"),
         app.root.destroy,
     ]
 

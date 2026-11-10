@@ -22,7 +22,7 @@ Chaque [release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases) co
 
 ### Une conversation par discussion avec l'IA
 
-La colonne de gauche liste vos conversations. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. L'onglet **3. Éléments masqués** liste tous les éléments déjà masqués dans la conversation, y compris ceux des messages précédents.
+La colonne de gauche liste vos conversations, la plus récente en haut. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. L'onglet **3. Éléments masqués** liste tous les éléments déjà masqués dans la conversation, y compris ceux des messages précédents.
 
 **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Un jeton inconnu de cette conversation apparaît en rouge.
 
@@ -51,7 +51,7 @@ Pour laisser un élément en clair, faites un clic droit dessus → **Ne pas mas
 
 - **Détection** : cochez les types de données à masquer automatiquement.
 - **Termes permanents** : la liste des termes toujours masqués.
-- **Motifs personnalisés** : vos expressions régulières. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours.
+- **Motifs personnalisés** : vos expressions régulières. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours. Pour en créer un facilement, utilisez [regex101.com](https://regex101.com/?flavor=python) en choisissant « Python » : collez un extrait de log, écrivez le motif, et le site surligne ce qu'il trouve.
 - **Consigne pour l'IA** : un texte ajouté au début de ce que vous copiez, qui demande à l'IA de garder les jetons tels quels. Vous pouvez le modifier, le désactiver ou rétablir le texte par défaut.
 - **Général** :
   - la langue (automatique, français ou anglais) ;
