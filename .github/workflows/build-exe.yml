@@ -1,14 +1,18 @@
-name: Build Windows exe
+# Teste le moteur, compile IA-Anonymiser.exe sur Windows, puis publie une release
+# quand un tag "v*" est poussé ou quand le workflow est lancé à la main avec un numéro de version.
+
+name: Construction et release
 
 on:
+  push:
+    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version à publier, ex. v1.0.0"
-        required: true
-        default: "v1.0.0"
-  push:
-    tags: ["v*"]
+        description: "Version à publier (ex. v1.1.0) ; vide = simple construction"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -16,6 +20,8 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      VERSION: ${{ github.event.inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,23 +29,27 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install PyInstaller
-        run: pip install pyinstaller
+      - name: Tests du moteur
+        run: python -m unittest discover -s tests -v
 
-      - name: Build exe
-        run: pyinstaller --onefile --windowed --name Anonymiseur clip_anon.py
+      - name: Compiler l'exe
+        shell: bash
+        run: |
+          echo "VERSION = \"${VERSION:-dev-${GITHUB_SHA::7}}\"" > version.py
+          pip install pyinstaller
+          pyinstaller --onefile --windowed --name IA-Anonymiser anonymiseur.py
+          cd dist && sha256sum IA-Anonymiser.exe > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Anonymiseur-windows
-          path: dist/Anonymiseur.exe
+          name: IA-Anonymiser
+          path: dist/*
 
-      - name: Publish release with exe
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+      - name: Publier la release
+        if: env.VERSION != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ github.event.inputs.version || github.ref_name }}
         shell: bash
         run: |
-          gh release create "$VERSION" dist/Anonymiseur.exe \
-            --target "$GITHUB_SHA" --title "Anonymiseur $VERSION" --generate-notes
+          gh release create "$VERSION" dist/IA-Anonymiser.exe dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "IA-Anonymiser $VERSION" --generate-notes

@@ -1,0 +1,35 @@
+# Lance l'application sur Windows avec un exemple fictif, photographie les deux onglets
+# et dépose les images sur la branche « captures » (relecture et README).
+
+name: Captures d'écran
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  captures:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Photographier la fenêtre
+        run: |
+          pip install pillow
+          python anonymiseur.py --capture captures
+          Get-ChildItem captures
+
+      - name: Déposer sur la branche captures
+        shell: bash
+        run: |
+          cd captures
+          git init -q -b captures
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "Captures ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" captures
