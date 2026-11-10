@@ -39,7 +39,11 @@ jobs:
           pip install pyinstaller sv-ttk
           pyinstaller --onefile --windowed --name IA-Anonymiser --icon assets/icone.ico \
             --add-data "assets;assets" --collect-data sv_ttk anonymiseur.py
-          cd dist && sha256sum IA-Anonymiser.exe > SHA256SUMS.txt && cat SHA256SUMS.txt
+          cd dist
+          # Comme PhishGuard : un exe avec le numéro de version, et le même sans numéro pour le lien
+          # permanent …/releases/latest/download/IA-Anonymiser.exe
+          if [ -n "$VERSION" ]; then cp IA-Anonymiser.exe "IA-Anonymiser-$VERSION.exe"; fi
+          sha256sum IA-Anonymiser*.exe > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -52,5 +56,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release create "$VERSION" dist/IA-Anonymiser.exe dist/SHA256SUMS.txt \
-            --target "$GITHUB_SHA" --title "IA-Anonymiser $VERSION" --generate-notes
+          fichiers=(dist/IA-Anonymiser.exe "dist/IA-Anonymiser-$VERSION.exe" dist/SHA256SUMS.txt)
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            # Release déjà publiée : ses fichiers sont remplacés
+            gh release upload "$VERSION" "${fichiers[@]}" --clobber
+          else
+            gh release create "$VERSION" "${fichiers[@]}" \
+              --target "$GITHUB_SHA" --title "IA-Anonymiser $VERSION" --generate-notes
+          fi

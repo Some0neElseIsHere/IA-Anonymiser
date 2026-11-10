@@ -6,7 +6,9 @@ Masquez vos données personnelles avant de les envoyer à une IA (Claude, ChatGP
 
 ## Télécharger
 
-Téléchargez **IA-Anonymiser.exe** dans la [dernière release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases/latest). Aucune installation n'est nécessaire : lancez simplement le fichier.
+Téléchargez **[IA-Anonymiser.exe](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases/latest/download/IA-Anonymiser.exe)**, la dernière version. Aucune installation n'est nécessaire : lancez simplement le fichier.
+
+Chaque [release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases) contient deux fois le même programme : `IA-Anonymiser.exe`, dont le lien ci-dessus mène toujours à la dernière version, et `IA-Anonymiser-vX.Y.Z.exe`, qui porte son numéro de version.
 
 > Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur », car l'exe n'est pas signé. Cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
 
@@ -68,7 +70,7 @@ Chaque release contient un fichier `SHA256SUMS.txt`. Dans PowerShell :
 Get-FileHash .\IA-Anonymiser.exe -Algorithm SHA256
 ```
 
-L'empreinte affichée doit correspondre à celle du fichier.
+L'empreinte affichée doit correspondre à celle indiquée dans le fichier, qui contient les deux exe.
 
 ## Publier une nouvelle version
 
