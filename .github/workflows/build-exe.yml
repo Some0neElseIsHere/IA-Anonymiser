@@ -5,6 +5,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -25,3 +28,10 @@ jobs:
         with:
           name: Anonymiseur-windows
           path: dist/Anonymiseur.exe
+
+      - name: Publish release with exe
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release create "${GITHUB_REF_NAME}" dist/Anonymiseur.exe --title "Anonymiseur ${GITHUB_REF_NAME}" --generate-notes
