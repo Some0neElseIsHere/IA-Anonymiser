@@ -254,14 +254,14 @@ class Application:
         self.icones()
         self.dimensionner()
         self.polices()
-        reprises = self.reprendre_conversations()
+        self.reprendre_conversations()
         self.construire()
         self.appliquer_theme()
         if not self.conversations:
             self.nouvelle_conversation()
         else:
             self.charger_zones()
-        self.message(self.t("msg_reprise", n=reprises) if reprises else self.t("msg_accueil"))
+        self.message(self.t("msg_accueil"))
         root.protocol("WM_DELETE_WINDOW", self.quitter)
         root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
         root.after(THEME_MS, self.suivre_theme_windows)
@@ -287,13 +287,14 @@ class Application:
 
     # --- apparence --------------------------------------------------------
     def icones(self):
-        self.icone_entete = None
+        self.icone_entete = self.icone_petite = None
         try:
             if sys.platform == "win32":
                 self.root.iconbitmap(default=ressource("icone.ico"))
             self.icone_fenetre = tk.PhotoImage(file=ressource("icone.png"))
             self.root.iconphoto(True, self.icone_fenetre)
             self.icone_entete = tk.PhotoImage(file=ressource("icone-64.png"))
+            self.icone_petite = self.icone_entete.subsample(2, 2)
         except (tk.TclError, OSError):
             pass
 
@@ -325,6 +326,7 @@ class Application:
             tkfont.nametofont(nom).configure(family=f, size=10)
         style.configure("Titre.TLabel", font=(f, 11, "bold"))
         style.configure("Entete.TLabel", font=(f, 17, "bold"))
+        style.configure("Marque.TLabel", font=(f, 14, "bold"))
         style.configure("Section.TLabel", font=(f, 12, "bold"))
         style.configure("Aide.TLabel", foreground=p["aide"])
         style.configure("Statut.TLabel", foreground=p["aide"])
@@ -376,25 +378,11 @@ class Application:
         self.textes_tk = []
         root.title(f"IA-Anonymiser {VERSION}")
 
-        entete = ttk.Frame(root, padding=(18, 14, 18, 10))
-        entete.pack(fill="x")
-        if self.icone_entete:
-            ttk.Label(entete, image=self.icone_entete).pack(side="left", padx=(0, 12))
-        titres = ttk.Frame(entete)
-        titres.pack(side="left")
-        ttk.Label(titres, text="IA-Anonymiser", style="Entete.TLabel").pack(anchor="w")
-        ttk.Label(titres, text=t("sous_titre"), style="Aide.TLabel").pack(anchor="w")
-        ttk.Button(entete, text=t("a_propos"), command=self.ouvrir_a_propos).pack(side="right")
-        ttk.Button(entete, text=t("options"), command=self.ouvrir_options).pack(side="right", padx=(0, 8))
-        self.resume_options = ttk.Label(entete, style="Aide.TLabel")
-        self.resume_options.pack(side="right", padx=(0, 16))
-        ttk.Separator(root).pack(fill="x")
-
         self.statut = ttk.Label(root, style="Statut.TLabel", padding=(18, 6, 18, 10), anchor="w")
         self.statut.pack(side="bottom", fill="x")
 
         self.lateral = lateral = ttk.Panedwindow(root, orient="horizontal")
-        lateral.pack(fill="both", expand=True, padx=18, pady=(14, 0))
+        lateral.pack(fill="both", expand=True, padx=18, pady=(12, 0))
         lateral.add(self.construire_conversations(lateral), weight=0)
         self.principal = principal = ttk.Panedwindow(lateral, orient="vertical")
         lateral.add(principal, weight=1)
@@ -440,7 +428,6 @@ class Application:
         self.menu = tk.Menu(root, tearoff=0)
         self.source.texte.bind("<Button-3>", self.menu_contextuel)
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
-        self.maj_resume_options()
         self.proportion(self.lateral, lambda l, h: min(int(250 * self.echelle), l // 3))
         self.proportion(self.principal, lambda l, h: int(h * 0.6))
         self.proportion(self.p1, lambda l, h: l // 2)
@@ -467,6 +454,19 @@ class Application:
     def construire_conversations(self, parent):
         t = self.t
         cadre = ttk.Frame(parent, padding=(0, 0, 14, 0))
+        marque = ttk.Frame(cadre)
+        marque.pack(fill="x", pady=(0, 14))
+        if self.icone_petite:
+            ttk.Label(marque, image=self.icone_petite).pack(side="left", padx=(0, 8))
+        ttk.Label(marque, text="IA-Anonymiser", style="Marque.TLabel").pack(side="left")
+
+        bas = ttk.Frame(cadre)
+        bas.pack(side="bottom", fill="x", pady=(10, 0))
+        ttk.Button(bas, text=t("options"), command=self.ouvrir_options).pack(side="left", fill="x", expand=True)
+        ttk.Button(bas, text=t("a_propos"), command=self.ouvrir_a_propos).pack(
+            side="left", fill="x", expand=True, padx=(8, 0))
+        ttk.Separator(cadre).pack(side="bottom", fill="x", pady=(10, 0))
+
         ttk.Label(cadre, text=t("conversations"), style="Section.TLabel").pack(anchor="w", pady=(0, 8))
         ttk.Button(cadre, text=t("nouvelle_conversation"), command=self.nouvelle_conversation,
                    style="Accent.TButton").pack(fill="x", pady=(0, 8))
@@ -524,9 +524,8 @@ class Application:
         t = self.t
         cadre = ttk.Frame(parent, padding=(10, 0, 0, 0))
         self.titre_termes = ttk.Label(cadre, style="Titre.TLabel")
-        self.titre_termes.pack(anchor="w", pady=(0, 2))
-        self.aide_termes = ttk.Label(cadre, style="Aide.TLabel")
-        self.aide_termes.pack(anchor="w", pady=(0, 8))
+        self.titre_termes.pack(anchor="w", pady=(0, 8))
+
         self.termes = ListeTermes(self, cadre, self.ajouter_terme, self.supprimer_termes, hauteur=4)
         self.termes.pack(fill="both", expand=True)
         pied = ttk.Frame(cadre)
@@ -551,12 +550,6 @@ class Application:
     # --- mises à jour -----------------------------------------------------
     def message(self, texte):
         self.statut.configure(text=texte)
-
-    def maj_resume_options(self):
-        n = len(self.options.permanents)
-        self.resume_options.configure(text=self.t("resume_options", t=len(self.options.types),
-                                                  total=len(TYPES_AUTO), n=n))
-        self.aide_termes.configure(text=self.t("aide_termes_conv", n=n))
 
     def modifie(self, widget, action):
         if not widget.edit_modified():
@@ -895,7 +888,6 @@ class Application:
             self.options.sauver()
         except OSError as e:
             self.message(self.t("msg_erreur_options", e=e))
-        self.maj_resume_options()
 
     def ouvrir_options(self):
         t, e = self.t, self.echelle
@@ -1174,7 +1166,6 @@ def capture(app, chemin):
         app.source.ecrire(serveurs)
         app.actualiser()
         app.maj_conversations()
-        app.maj_resume_options()
 
     def photo(fenetre, nom):
         from PIL import ImageGrab

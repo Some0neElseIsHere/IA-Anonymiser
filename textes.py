@@ -2,7 +2,6 @@
 
 TEXTES = {
     "fr": {
-        "sous_titre": "Masquez vos données avant de les confier à une IA, retrouvez-les dans sa réponse.",
         "options": "Options",
         "a_propos": "À propos",
         "conversations": "Conversations",
@@ -31,12 +30,10 @@ TEXTES = {
         "en_clair": " (en clair)",
         "aide_elements": "« Ici » : nombre de fois dans le texte actuel. Double-cliquez pour masquer ou laisser en clair.",
         "termes_conv": "Termes de cette conversation ({n})",
-        "aide_termes_conv": "+ {n} terme(s) toujours masqué(s), dans Options",
         "ajouter": "Ajouter",
         "supprimer": "Supprimer",
         "toujours_masquer": "Toujours masquer",
         "aide_clic_droit": "Clic droit sur un mot → Masquer (Ctrl+M)",
-        "resume_options": "{t}/{total} types · {n} terme(s) permanent(s)",
         # types
         "type_EMAIL": "E-mail",
         "type_TEL": "Téléphone",
@@ -69,7 +66,6 @@ TEXTES = {
         "msg_options_ok": "Options enregistrées.",
         "msg_erreur_options": "Impossible d'enregistrer les options : {e}",
         "msg_erreur_sauvegarde": "Impossible d'enregistrer les conversations : {e}",
-        "msg_reprise": "{n} conversation(s) reprise(s) depuis la dernière fois.",
         "menu_masquer_conv": "Masquer « {t} » dans cette conversation",
         "menu_toujours": "Toujours masquer « {t} »",
         "menu_copier": "Copier",
@@ -135,7 +131,6 @@ TEXTES = {
         "ap_support_copie": "Informations copiées (aucune donnée personnelle).",
     },
     "en": {
-        "sous_titre": "Mask your data before handing it to an AI, get it back in its answer.",
         "options": "Settings",
         "a_propos": "About",
         "conversations": "Conversations",
@@ -164,12 +159,10 @@ TEXTES = {
         "en_clair": " (unmasked)",
         "aide_elements": "\"Here\": times found in the current text. Double-click to mask or unmask.",
         "termes_conv": "Terms for this conversation ({n})",
-        "aide_termes_conv": "+ {n} term(s) always masked, in Settings",
         "ajouter": "Add",
         "supprimer": "Remove",
         "toujours_masquer": "Always mask",
         "aide_clic_droit": "Right-click a word → Mask (Ctrl+M)",
-        "resume_options": "{t}/{total} types · {n} permanent term(s)",
         "type_EMAIL": "Email",
         "type_TEL": "Phone",
         "type_IBAN": "IBAN",
@@ -200,7 +193,6 @@ TEXTES = {
         "msg_options_ok": "Settings saved.",
         "msg_erreur_options": "Could not save the settings: {e}",
         "msg_erreur_sauvegarde": "Could not save the conversations: {e}",
-        "msg_reprise": "{n} conversation(s) restored from last time.",
         "menu_masquer_conv": "Mask \"{t}\" in this conversation",
         "menu_toujours": "Always mask \"{t}\"",
         "menu_copier": "Copy",
