@@ -36,7 +36,7 @@ Les conversations sont conservées d'un lancement à l'autre : vous pouvez resta
 
 ![Onglet Éléments masqués](docs/clair-elements.png)
 
-Double-cliquez sur une ligne du tableau des éléments masqués pour laisser cet élément en clair, ou pour le masquer à nouveau.
+Pour laisser un élément en clair, faites un clic droit dessus → **Ne pas masquer**. Ça marche dans les trois onglets : sur la valeur surlignée dans votre texte, sur un jeton, ou sur une ligne du tableau des éléments masqués. Le même clic droit permet de le masquer à nouveau.
 
 ## Options
 
@@ -62,7 +62,7 @@ En anglais, les jetons sont aussi traduits : `[NAME_1]`, `[PHONE_1]`, `[CARD_1]`
 
 ## Limites
 
-La détection repose sur des motifs. Elle ne reconnaît pas un nom qui ne figure pas dans vos termes, une adresse postale doit être ajoutée comme terme, et un nom de machine sans point (`SRV-PAIE01`) aussi. À l'inverse, la détection des FQDN peut masquer des mots comme `ASP.NET` : double-cliquez sur la ligne pour les laisser en clair. **Relisez toujours le texte de droite avant de l'envoyer.**
+La détection repose sur des motifs. Elle ne reconnaît pas un nom qui ne figure pas dans vos termes, une adresse postale doit être ajoutée comme terme, et un nom de machine sans point (`SRV-PAIE01`) aussi. À l'inverse, la détection des FQDN peut masquer des mots comme `ASP.NET` : faites un clic droit → **Ne pas masquer** pour les laisser en clair. **Relisez toujours le texte de droite avant de l'envoyer.**
 
 ## Vérifier le téléchargement
 
