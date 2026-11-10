@@ -249,6 +249,8 @@ class Application:
         self.resultat = None
         self.attentes = {}
         self.theme_applique = None
+        self.erreurs_vues = set()
+        self.resultat_reponse = None
         self.textes_tk = []
 
         self.icones()
@@ -378,11 +380,9 @@ class Application:
         self.textes_tk = []
         root.title(f"IA-Anonymiser {VERSION}")
 
-        self.statut = ttk.Label(root, style="Statut.TLabel", padding=(18, 6, 18, 10), anchor="w")
-        self.statut.pack(side="bottom", fill="x")
 
         self.lateral = lateral = ttk.Panedwindow(root, orient="horizontal")
-        lateral.pack(fill="both", expand=True, padx=18, pady=(12, 0))
+        lateral.pack(fill="both", expand=True, padx=18, pady=12)
         lateral.add(self.construire_conversations(lateral), weight=0)
 
         self.onglets = ttk.Notebook(lateral)
@@ -396,7 +396,7 @@ class Application:
         self.source.bouton(t("effacer"), lambda: self.vider(self.source))
         self.source.bouton(t("coller"), lambda: self.coller(self.source))
         self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(10, 0, 0, 0))
-        self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
+        self.bouton_copier_ia = self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
         p1.add(self.source, weight=1)
         p1.add(self.sortie, weight=1)
 
@@ -408,7 +408,7 @@ class Application:
         self.reponse.bouton(t("effacer"), lambda: self.vider(self.reponse))
         self.reponse.bouton(t("coller"), lambda: self.coller(self.reponse))
         self.restauree = Zone(self, p2, t("reponse_restauree"), lecture_seule=True, marge=(10, 0, 0, 0))
-        self.restauree.bouton(t("copier"), self.copier_restauree, accent=True)
+        self.bouton_copier = self.restauree.bouton(t("copier"), self.copier_restauree, accent=True)
         p2.add(self.reponse, weight=1)
         p2.add(self.restauree, weight=1)
 
@@ -425,7 +425,11 @@ class Application:
         self.sortie.texte.bind("<<Copy>>", lambda e: self.valider(), add="+")
         self.menu = tk.Menu(root, tearoff=0)
         self.menu_conv = tk.Menu(root, tearoff=0)
-        self.source.texte.bind("<Button-3>", self.menu_contextuel)
+        for zone, spans in ((self.source, lambda: self.resultat and self.resultat.spans_source),
+                            (self.sortie, lambda: self.resultat and self.resultat.spans_sortie),
+                            (self.reponse, lambda: self.resultat_reponse and self.resultat_reponse.spans_source),
+                            (self.restauree, lambda: self.resultat_reponse and self.resultat_reponse.spans_sortie)):
+            zone.texte.bind("<Button-3>", lambda e, z=zone, s=spans: self.menu_contextuel(e, z, s() or []))
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
         self.proportion(self.lateral, lambda l, h: min(int(250 * self.echelle), l // 3))
         self.proportion(self.p3, lambda l, h: int(l * 0.62))
@@ -461,9 +465,8 @@ class Application:
 
         bas = ttk.Frame(cadre)
         bas.pack(side="bottom", fill="x", pady=(10, 0))
-        ttk.Button(bas, text=t("options"), command=self.ouvrir_options).pack(side="left", fill="x", expand=True)
-        ttk.Button(bas, text=t("a_propos"), command=self.ouvrir_a_propos).pack(
-            side="left", fill="x", expand=True, padx=(8, 0))
+        ttk.Button(bas, text=t("a_propos"), command=self.ouvrir_a_propos).pack(side="bottom", fill="x")
+        ttk.Button(bas, text=t("options"), command=self.ouvrir_options).pack(side="bottom", fill="x", pady=(0, 8))
         ttk.Separator(cadre).pack(side="bottom", fill="x", pady=(10, 0))
 
         ttk.Label(cadre, text=t("conversations"), style="Section.TLabel").pack(anchor="w", pady=(0, 8))
@@ -478,8 +481,6 @@ class Application:
         self.arbre_conv.bind("<F2>", lambda e: self.renommer_conversation())
         self.arbre_conv.bind("<Delete>", lambda e: self.fermer_conversation())
         self.arbre_conv.bind("<Button-3>", self.menu_conversation)
-        ttk.Label(cadre, style="Aide.TLabel", wraplength=int(210 * self.echelle), justify="left",
-                  text=t("aide_conversations")).pack(anchor="w", pady=(10, 0))
         return cadre
 
     def construire_elements(self, parent):
@@ -511,6 +512,7 @@ class Application:
         self.arbre.pack(side="left", fill="both", expand=True)
         self.arbre.bind("<<TreeviewSelect>>", lambda e: self.selection_element())
         self.arbre.bind("<Double-1>", lambda e: self.basculer_element())
+        self.arbre.bind("<Button-3>", self.menu_element)
         ttk.Label(cadre, style="Aide.TLabel", text=t("aide_elements")).pack(anchor="w", pady=(6, 0))
         self.arbre_elements_couleurs()
         return cadre
@@ -544,7 +546,18 @@ class Application:
 
     # --- mises à jour -----------------------------------------------------
     def message(self, texte):
-        self.statut.configure(text=texte)
+        """Plus de barre d'état : les actions se voient directement dans la fenêtre."""
+
+    def erreur(self, texte):
+        """Erreur d'enregistrement : affichée une seule fois, pour ne pas répéter la même fenêtre."""
+        if texte not in self.erreurs_vues:
+            self.erreurs_vues.add(texte)
+            messagebox.showwarning("IA-Anonymiser", texte, parent=self.root)
+
+    def confirmer(self, bouton, cle):
+        """Retour visuel sur un bouton : « Copié ! » pendant un instant."""
+        bouton.configure(text=self.t("copie_ok"))
+        self.root.after(1500, lambda: bouton.winfo_exists() and bouton.configure(text=self.t(cle)))
 
     def modifie(self, widget, action):
         if not widget.edit_modified():
@@ -567,7 +580,7 @@ class Application:
 
     def actualiser_reponse(self):
         self.attentes.pop(self.actualiser_reponse, None)
-        res = self.moteur.restaurer(self.reponse.lire())
+        res = self.resultat_reponse = self.moteur.restaurer(self.reponse.lire())
         self.reponse.surligner(res.spans_source, "jeton")
         self.reponse.surligner(res.inconnus, "inconnu")
         self.restauree.ecrire(res.texte, res.spans_sortie, "jeton")
@@ -744,7 +757,7 @@ class Application:
                 "version": 1, "courante": self.courante, "numero": self.numero,
                 "conversations": [c.etat() for c in self.conversations]})
         except Exception as e:
-            self.message(self.t("msg_erreur_sauvegarde", e=e))
+            self.erreur(self.t("msg_erreur_sauvegarde", e=e))
 
     def sauvegarde_periodique(self):
         self.sauvegarder()
@@ -761,11 +774,12 @@ class Application:
         self.root.destroy()
 
     # --- éléments et termes -----------------------------------------------
-    def basculer_element(self):
-        selection = self.arbre.selection()
-        if not selection:
-            return
-        jeton = selection[0]
+    def basculer_element(self, jeton=None):
+        if jeton is None:
+            selection = self.arbre.selection()
+            if not selection:
+                return
+            jeton = selection[0]
         if jeton in self.moteur.exclus:
             self.moteur.exclus.discard(jeton)
         else:
@@ -822,20 +836,62 @@ class Application:
             return
         self.ajouter_terme(selection, permanent=permanent)
 
-    def menu_contextuel(self, evenement):
-        t, texte = self.t, self.source.texte
-        self.menu.delete(0, "end")
-        selection = self.selection_source()
-        if len(selection) >= 2:
+    def jeton_sous(self, zone, spans, evenement):
+        """Jeton (ou valeur masquée) sous le pointeur, ou None."""
+        if not spans:
+            return None
+        index = zone.texte.index(f"@{evenement.x},{evenement.y}")
+        position = len(zone.texte.get("1.0", index))
+        i = bisect.bisect_right([d for d, _, _ in spans], position) - 1
+        if i >= 0 and spans[i][0] <= position < spans[i][1]:
+            return spans[i][2]
+        return None
+
+    def ajouter_bascule(self, menu, jeton):
+        """Entrée « Ne pas masquer » (ou « Masquer à nouveau ») pour un élément de la conversation."""
+        info = self.moteur.info(jeton)
+        if not info:
+            return False
+        valeur = normaliser(info[1])
+        court = valeur if len(valeur) <= 40 else valeur[:37] + "…"
+        cle = "menu_masquer_a_nouveau" if jeton in self.moteur.exclus else "menu_ne_pas_masquer"
+        menu.add_command(label=self.t(cle, t=court, j=jeton), command=lambda: self.basculer_element(jeton))
+        return True
+
+    def menu_contextuel(self, evenement, zone, spans):
+        t, texte, menu = self.t, zone.texte, self.menu
+        menu.delete(0, "end")
+        separer = False
+        jeton = self.jeton_sous(zone, spans, evenement)
+        if jeton:
+            separer = self.ajouter_bascule(menu, jeton)
+        try:
+            selection = normaliser(texte.get("sel.first", "sel.last"))
+        except tk.TclError:
+            selection = ""
+        if zone is self.source and len(selection) >= 2:
             court = selection if len(selection) <= 40 else selection[:37] + "…"
-            self.menu.add_command(label=t("menu_masquer_conv", t=court), command=self.masquer_selection)
-            self.menu.add_command(label=t("menu_toujours", t=court),
-                                  command=lambda: self.masquer_selection(permanent=True))
-            self.menu.add_separator()
-            self.menu.add_command(label=t("menu_copier"), command=lambda: texte.event_generate("<<Copy>>"))
-        self.menu.add_command(label=t("menu_coller"), command=lambda: texte.event_generate("<<Paste>>"))
-        self.menu.add_command(label=t("menu_tout"), command=lambda: texte.tag_add("sel", "1.0", "end-1c"))
-        self.menu.tk_popup(evenement.x_root, evenement.y_root)
+            menu.add_command(label=t("menu_masquer_conv", t=court), command=self.masquer_selection)
+            menu.add_command(label=t("menu_toujours", t=court),
+                             command=lambda: self.masquer_selection(permanent=True))
+            separer = True
+        if separer:
+            menu.add_separator()
+        if selection:
+            menu.add_command(label=t("menu_copier"), command=lambda: texte.event_generate("<<Copy>>"))
+        if not zone.lecture_seule:
+            menu.add_command(label=t("menu_coller"), command=lambda: texte.event_generate("<<Paste>>"))
+        menu.add_command(label=t("menu_tout"), command=lambda: texte.tag_add("sel", "1.0", "end-1c"))
+        menu.tk_popup(evenement.x_root, evenement.y_root)
+
+    def menu_element(self, evenement):
+        ligne = self.arbre.identify_row(evenement.y)
+        if not ligne:
+            return
+        self.arbre.selection_set(ligne)
+        self.menu.delete(0, "end")
+        if self.ajouter_bascule(self.menu, ligne):
+            self.menu.tk_popup(evenement.x_root, evenement.y_root)
 
     # --- presse-papiers ---------------------------------------------------
     def vider(self, zone):
@@ -865,7 +921,7 @@ class Application:
         if self.options.consigne and self.resultat and self.resultat.compte:
             texte = self.consigne() + texte
         self.ecrire_presse_papiers(texte)
-        self.message(self.t("msg_copie_ia"))
+        self.confirmer(self.bouton_copier_ia, "copier_ia")
 
     def copier_restauree(self):
         texte = self.restauree.lire()
@@ -873,7 +929,7 @@ class Application:
             self.message(self.t("msg_rien_restaurer"))
             return
         self.ecrire_presse_papiers(texte)
-        self.message(self.t("msg_copie_restauree"))
+        self.confirmer(self.bouton_copier, "copier")
 
     # --- fenêtres ---------------------------------------------------------
     def fenetre(self, titre):
@@ -898,7 +954,7 @@ class Application:
         try:
             self.options.sauver()
         except OSError as e:
-            self.message(self.t("msg_erreur_options", e=e))
+            self.erreur(self.t("msg_erreur_options", e=e))
 
     def ouvrir_options(self):
         t, e = self.t, self.echelle
