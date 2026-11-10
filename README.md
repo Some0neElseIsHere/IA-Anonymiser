@@ -30,9 +30,16 @@ Les conversations sont conservées d'un lancement à l'autre : vous pouvez resta
 
 ### Ce qui est masqué
 
-- **Automatiquement** : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale, adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`). Les noms de fichiers comme `rapport.pdf` ne sont pas pris pour des domaines.
+- **Automatiquement** :
+  - données personnelles : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale ;
+  - réseau : adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`) ;
+  - **secrets** : `password=…`, `pwd:`, `token=`, `api_key=`, chaînes de connexion, `Authorization: Bearer …`, identifiants dans une URL (`https://user:motdepasse@…`), clés AWS, GitHub, GitLab, Slack, OpenAI, Anthropic et Google, jetons JWT, clés privées. Seule la valeur est masquée (`password=[SECRET_1]`), pour que l'IA comprenne encore de quoi il s'agit ;
+  - **comptes et annuaire** : `ACME\mlefevre`, le nom d'utilisateur dans `C:\Users\…` et `/home/…`, les DN Active Directory (`CN=…,OU=…,DC=…`), les SID Windows.
+- **Motifs personnalisés** : vos conventions de nommage, sous forme d'expressions régulières, dans **Options → Motifs personnalisés**. Par exemple `PC-\d{4}` pour les postes, `INC-\d{4}-\d+` pour les tickets, `SRV-[A-Z]+\d*` pour les serveurs.
 - **Termes permanents** : le nom de votre entreprise, de vos clients, de vos collègues… Ils se règlent dans **Options**, sont enregistrés et s'appliquent à toutes les conversations.
 - **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans l'onglet **3. Éléments masqués**, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** en fait un terme permanent.
+
+Ce qui reste volontairement en clair : les noms de fichiers (`rapport.pdf`, `backup.tar.gz`), les numéros de version, les noms de classes et les clés de configuration (`java.lang.NullPointerException`, `spring.datasource.url`), les comptes système (`NT AUTHORITY\SYSTEM`, `BUILTIN\Administrators`), les chemins de registre (`HKLM\…`) et les SID système (`S-1-5-18`).
 
 ![Onglet Éléments masqués](docs/clair-elements.png)
 
@@ -44,6 +51,7 @@ Pour laisser un élément en clair, faites un clic droit dessus → **Ne pas mas
 
 - **Détection** : cochez les types de données à masquer automatiquement.
 - **Termes permanents** : la liste des termes toujours masqués.
+- **Motifs personnalisés** : vos expressions régulières. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours.
 - **Consigne pour l'IA** : un texte ajouté au début de ce que vous copiez, qui demande à l'IA de garder les jetons tels quels. Vous pouvez le modifier, le désactiver ou rétablir le texte par défaut.
 - **Général** :
   - la langue (automatique, français ou anglais) ;
@@ -62,7 +70,12 @@ En anglais, les jetons sont aussi traduits : `[NAME_1]`, `[PHONE_1]`, `[CARD_1]`
 
 ## Limites
 
-La détection repose sur des motifs. Elle ne reconnaît pas un nom qui ne figure pas dans vos termes, une adresse postale doit être ajoutée comme terme, et un nom de machine sans point (`SRV-PAIE01`) aussi. À l'inverse, la détection des FQDN peut masquer des mots comme `ASP.NET` : faites un clic droit → **Ne pas masquer** pour les laisser en clair. **Relisez toujours le texte de droite avant de l'envoyer.**
+La détection repose sur des motifs : elle ne peut pas être parfaite.
+
+- Un nom de personne n'est masqué que s'il figure dans vos termes. Une adresse postale doit aussi être ajoutée comme terme.
+- Un nom de machine sans point (`SRV-PAIE01`) n'est masqué que par un motif personnalisé.
+- Un mot de passe n'est reconnu que s'il a une forme reconnaissable (`password=…`, une clé connue…). Écrit seul au milieu d'une phrase, il ne se distingue pas d'un mot ordinaire.
+- À l'inverse, un élément peut être masqué à tort : faites un clic droit → **Ne pas masquer** pour le laisser en clair. **Relisez toujours le texte de droite avant de l'envoyer.**
 
 ## Vérifier le téléchargement
 
