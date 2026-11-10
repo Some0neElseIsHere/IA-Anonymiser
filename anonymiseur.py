@@ -1152,7 +1152,7 @@ def capture(app, chemin):
         app.onglets_options.select(onglet)
 
     etapes = [
-        lambda: theme("clair"), remplir,
+        lambda: theme("clair"), lambda: langue("fr"),
         lambda: photo(app.root, "clair-anonymiser.png"),
         lambda: conversation(0, 1), lambda: photo(app.root, "clair-restaurer.png"),
         lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
