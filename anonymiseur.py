@@ -113,8 +113,7 @@ class Application:
         self.dernier_presse_papiers = None
 
         root.title(f"IA-Anonymiser {VERSION}")
-        root.geometry("1320x860")
-        root.minsize(980, 640)
+        self.dimensionner()
         self.styles()
         self.construire()
         self.maj_liste()
@@ -123,6 +122,21 @@ class Application:
         self.sonder()
 
     # --- apparence --------------------------------------------------------
+    def dimensionner(self):
+        """Grande fenêtre centrée, adaptée à l'écran et à sa mise à l'échelle."""
+        echelle = max(1.0, self.root.winfo_fpixels("1i") / 96)
+        ecran_l, ecran_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        largeur = min(int(1320 * echelle), int(ecran_l * 0.92))
+        hauteur = min(int(860 * echelle), int(ecran_h * 0.88))
+        x, y = (ecran_l - largeur) // 2, max(0, (ecran_h - hauteur) // 2 - int(20 * echelle))
+        self.root.geometry(f"{largeur}x{hauteur}+{x}+{y}")
+        self.root.minsize(min(largeur, int(900 * echelle)), min(hauteur, int(600 * echelle)))
+        if largeur < 1100 * echelle:
+            try:
+                self.root.state("zoomed")  # petit écran : plein écran (Windows)
+            except tk.TclError:
+                pass
+
     def styles(self):
         style = ttk.Style()
         for theme in ("vista", "clam"):
