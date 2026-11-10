@@ -18,28 +18,37 @@ Téléchargez **IA-Anonymiser.exe** dans la [dernière release](https://github.c
 
 ![Onglet Restaurer](docs/onglet2.png)
 
+### Plusieurs conversations
+
+La colonne de gauche liste vos conversations. Créez-en une par discussion avec l'IA : chacune garde ses propres jetons, donc `[NOM_1]` peut désigner une personne différente dans deux conversations. **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Double-cliquez sur une conversation pour la renommer.
+
 ### Ce qui est masqué
 
-- **Automatiquement** : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale, adresses IP.
-- **Vos termes** : noms, entreprises, adresses, numéros de dossier… Ajoutez-les dans la liste « Termes à masquer », ou sélectionnez un mot dans le texte puis faites clic droit → **Masquer** (ou **Ctrl+M**). La liste est enregistrée et resservira à chaque lancement.
+- **Automatiquement** : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale, adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`). Les noms de fichiers comme `rapport.pdf` ne sont pas pris pour des domaines.
+- **Termes toujours masqués** : le nom de votre entreprise, de vos clients, de vos collègues… Ils se règlent dans **Options**, sont enregistrés et s'appliquent à toutes les conversations.
+- **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans le panneau du bas, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** le fait passer dans les termes permanents.
 
 Le tableau « Éléments masqués » montre chaque élément remplacé. Double-cliquez sur une ligne pour le laisser en clair, ou pour le masquer à nouveau.
 
 ### Options
 
+![Options](docs/options.png)
+
+- **Masquer automatiquement** : cochez les types de données à détecter. Les termes sont toujours masqués, même si un type est décoché.
+- **Termes toujours masqués** : voir plus haut.
 - **Ajouter une consigne pour l'IA en copiant** : ajoute une phrase demandant à l'IA de garder les jetons tels quels. Elle est activée par défaut, ce qui rend la restauration plus fiable.
-- **Mode automatique du presse-papiers** : tout texte que vous copiez est anonymisé, et toute réponse contenant des jetons est restaurée, directement dans le presse-papiers. Attention : ce mode s'applique à *tout* ce que vous copiez tant qu'il est activé.
-- **Nouvelle conversation** : oublie les correspondances en cours et fait repartir les jetons de 1. Vos termes sont conservés.
+
+Dans la barre du haut, le **mode automatique du presse-papiers** anonymise tout texte que vous copiez et restaure toute réponse contenant des jetons, avec la conversation sélectionnée. Attention : il s'applique à *tout* ce que vous copiez tant qu'il est activé.
 
 ## Confidentialité
 
 - Tout se passe sur votre ordinateur : l'application n'envoie rien sur Internet.
-- Les correspondances entre jetons et vraies valeurs restent en mémoire et disparaissent à la fermeture. Gardez l'application ouverte pendant toute la conversation avec l'IA.
-- Seule la liste de vos termes est enregistrée, dans `%APPDATA%\IA-Anonymiser\termes.txt`.
+- Les correspondances entre jetons et vraies valeurs restent en mémoire et disparaissent à la fermeture, ou quand vous fermez une conversation. Gardez l'application ouverte pendant toute la discussion avec l'IA.
+- Seules les options et les termes toujours masqués sont enregistrés, dans `%APPDATA%\IA-Anonymiser\options.json`.
 
 ## Limites
 
-La détection repose sur des motifs. Elle ne reconnaît pas un nom qui ne figure pas dans vos termes, et une adresse postale doit être ajoutée comme terme. **Relisez toujours le texte de droite avant de l'envoyer.**
+La détection repose sur des motifs. Elle ne reconnaît pas un nom qui ne figure pas dans vos termes, une adresse postale doit être ajoutée comme terme, et un nom de machine sans point (`SRV-PAIE01`) aussi. À l'inverse, la détection des FQDN peut masquer des mots comme `ASP.NET` : double-cliquez sur la ligne pour les laisser en clair. **Relisez toujours le texte de droite avant de l'envoyer.**
 
 Si l'IA modifie un jeton au point de le rendre méconnaissable, ou si elle en invente un, il reste tel quel et apparaît en rouge dans l'onglet Restaurer.
 

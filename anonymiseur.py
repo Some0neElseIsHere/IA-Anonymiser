@@ -414,7 +414,7 @@ class Application:
             text=f"{len(self.options.types)}/{len(TYPES_AUTO)} types détectés · {n} terme(s) toujours masqué(s)")
         if hasattr(self, "aide_termes"):
             self.aide_termes.configure(
-                text=f"Les {n} terme(s) permanents (entreprise…) se règlent dans Options.")
+                text=f"+ {n} terme(s) toujours masqué(s), voir Options")
 
     def modifie(self, widget, action):
         if not widget.edit_modified():
