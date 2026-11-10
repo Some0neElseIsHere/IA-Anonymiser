@@ -238,9 +238,9 @@ class Application:
         self.arbre = ttk.Treeview(zone, columns=colonnes, show="headings", selectmode="browse")
         for col, titre, largeur, etire, ancre in (
             ("jeton", "Jeton", 120, False, "w"),
-            ("type", "Type", 170, False, "w"),
-            ("valeur", "Valeur d'origine", 300, True, "w"),
-            ("nb", "Fois", 60, False, "center"),
+            ("type", "Type", 150, False, "w"),
+            ("valeur", "Valeur d'origine", 200, True, "w"),
+            ("nb", "Fois", 50, False, "center"),
         ):
             self.arbre.heading(col, text=titre, anchor=ancre)
             self.arbre.column(col, width=largeur, minwidth=50, stretch=etire, anchor=ancre)
@@ -263,6 +263,8 @@ class Application:
 
         ligne = ttk.Frame(cadre)
         ligne.pack(fill="x", pady=(0, 6))
+        ttk.Label(cadre, style="Aide.TLabel", text="Noms, entreprises, adresses, numéros de dossier…").pack(
+            anchor="w", pady=(0, 4), before=ligne)
         self.champ = ttk.Entry(ligne, font=self.police)
         self.champ.pack(side="left", fill="x", expand=True)
         self.champ.bind("<Return>", lambda e: self.ajouter_terme())
@@ -358,7 +360,7 @@ class Application:
         self.liste.delete(0, "end")
         for terme in self.termes:
             self.liste.insert("end", terme)
-        self.titre_termes.configure(text=f"Termes à masquer ({len(self.termes)}) : noms, entreprises, adresses…")
+        self.titre_termes.configure(text=f"Termes à masquer ({len(self.termes)})")
 
     # --- actions ----------------------------------------------------------
     def basculer_element(self):
