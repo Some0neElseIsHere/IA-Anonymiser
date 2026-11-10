@@ -10,14 +10,18 @@ from dataclasses import dataclass, field
 # Préfixe des jetons selon la langue de l'interface : [NOM_1] en français, [NAME_1] en anglais.
 PREFIXES = {
     "fr": {"EMAIL": "EMAIL", "TEL": "TEL", "IBAN": "IBAN", "CARTE": "CARTE", "SECU": "SECU",
-           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "NOM": "NOM"},
+           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "COMPTE",
+           "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NOM"},
     "en": {"EMAIL": "EMAIL", "TEL": "PHONE", "IBAN": "IBAN", "CARTE": "CARD", "SECU": "SSN",
-           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "NOM": "NAME"},
+           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "ACCOUNT",
+           "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NAME"},
 }
 TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()}, key=len, reverse=True)
 
-# Types détectés automatiquement (les termes personnalisés sont à part).
-TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN"]
+# Types détectés automatiquement (les termes et les motifs personnalisés sont à part).
+TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
+# Types de la version 1.3 : les types ajoutés depuis sont activés pour les utilisateurs existants.
+TYPES_V13 = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN"]
 
 EXEMPLES = {
     "EMAIL": "jean.dupont@exemple.fr",
@@ -28,6 +32,10 @@ EXEMPLES = {
     "IP": "192.168.1.10",
     "MAC": "00:1A:2B:3C:4D:5E",
     "FQDN": "srv-paie01.acme.local, intranet.acme.fr",
+    "SECRET": "password=…, AKIA…, ghp_…, eyJ… (JWT), BEGIN PRIVATE KEY",
+    "COMPTE": r"ACME\mlefevre, C:\Users\mlefevre, /home/mlefevre",
+    "DN": "CN=Marc Lefevre,OU=Compta,DC=acme,DC=local",
+    "SID": "S-1-5-21-3623811015-3361044348-30300820-1013",
 }
 
 # Un « domaine » qui se termine par une extension de fichier est un nom de fichier (rapport.pdf).
@@ -35,10 +43,50 @@ EXTENSIONS_FICHIERS = set(
     "pdf doc docx docm xls xlsx xlsm csv ppt pptx odt ods odp rtf txt md log ini cfg conf json xml yml "
     "yaml toml html htm css js ts jsx tsx py java cs cpp go rs rb php sql sh bat cmd ps1 vbs exe dll msi "
     "jar apk zip rar 7z gz tar iso png jpg jpeg gif bmp svg webp ico mp3 mp4 wav mov avi mkv eml msg "
-    "tmp bak old dat db sqlite lnk".split())
+    "tmp bak old dat db sqlite lnk git".split())
+
+# Extensions de domaine acceptées : tous les codes pays (2 lettres), les plus courantes, et les suffixes
+# internes. Sans cette liste, « spring.datasource.password » ou « java.lang.NullPointerException »
+# seraient pris pour des noms de domaine.
+EXTENSIONS_DOMAINE = set(
+    "com net org info biz gov edu mil int arpa io ai app dev cloud tech online site xyz eu asia mobi name "
+    "pro aero coop museum jobs travel tel cat paris bzh alsace corsica africa shop store blog news media "
+    "email digital solutions services agency company group global network systems software security host "
+    "page web website live space zone club"
+    " local lan corp internal intranet intra home ad priv private localdomain test example invalid localhost "
+    "domain office srv".split())
+
+# Secrets : seule la valeur est masquée (groupe « v »), la clé reste lisible : password=[SECRET_1].
+_CLES_SECRETES = (
+    r"pass(?:word|wd|phrase)?|pwd|mdp|mot[ _-]?de[ _-]?passe|secret|client[_-]?secret"
+    r"|(?:access|refresh|auth|api|bearer|sas|session)?[_-]?token|api[_-]?key|apikey|auth[_-]?key"
+    r"|private[_-]?key|account[_-]?key|shared[_-]?access[_-]?key|community"
+)
+_VALEUR = r"""(?P<q>["'])?(?P<v>(?(q)[^"'\n]+|[^\s;,"'<>&]+))(?(q)(?P=q))"""
 
 # Ordre important : les motifs les plus spécifiques passent en premier.
 MOTIFS = [
+    ("SECRET", re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----[\s\S]+?-----END (?:[A-Z0-9]+ )*PRIVATE KEY-----")),
+    ("SECRET", re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s:/@]+:(?P<v>[^\s@/]+)@", re.IGNORECASE)),
+    ("SECRET", re.compile(r"\b(?:bearer|basic)\s+(?P<v>[A-Za-z0-9\-._~+/]{12,}=*)", re.IGNORECASE)),
+    ("SECRET", re.compile(r"<(?P<k>password|pwd|secret|token|apikey|api_key)>(?P<v>[^<]+)</(?P=k)>",
+                          re.IGNORECASE)),
+    ("SECRET", re.compile(r"(?<![\w.-])(?:[\w.-]*[_.-])?(?:" + _CLES_SECRETES + r")[\"']?\s*[:=]\s*" + _VALEUR,
+                          re.IGNORECASE)),
+    ("SECRET", re.compile(
+        r"(?<![\w-])(?:"
+        r"(?:AKIA|ASIA)[0-9A-Z]{16}"                      # AWS
+        r"|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}"  # GitHub
+        r"|glpat-[A-Za-z0-9_-]{20,}"                      # GitLab
+        r"|xox[abprs]-[A-Za-z0-9-]{10,}"                  # Slack
+        r"|sk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}"          # OpenAI, Anthropic
+        r"|AIza[0-9A-Za-z_-]{35}"                         # Google
+        r"|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"  # JWT
+        r")(?![\w-])")),
+    ("DN", re.compile(
+        r"(?<![\w=])(?:CN|OU|DC|O|L|ST|C|UID)=[^,=\n+\"<>;()]+(?:\s*,\s*(?:CN|OU|DC|O|L|ST|C|UID)=[^,=\n+\"<>;()]+)+",
+        re.IGNORECASE)),
+    ("SID", re.compile(r"\bS-1-5-21-\d+-\d+-\d+(?:-\d+)?\b")),
     ("EMAIL", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
     ("IBAN", re.compile(r"\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}(?:\s?[A-Z0-9]{1,3})?\b")),
     ("SECU", re.compile(
@@ -49,18 +97,52 @@ MOTIFS = [
         r"(?<![\w+])(?:(?:\+|00)33\s?(?:\(0\)\s?)?|0)[1-9](?:[\s.-]?\d{2}){4}(?!\w)"  # France
         r"|(?<![\w+])\+\d{1,3}[\s.-]?\d{1,4}(?:[\s.-]?\d{2,4}){2,4}(?!\w)"           # international
     )),
+    # Comptes : DOMAINE\utilisateur (domaine NetBIOS en majuscules), et l'utilisateur dans un chemin de profil
+    ("COMPTE", re.compile(r"(?<![\w\\/.-])(?P<d>[A-Z][A-Z0-9-]{1,14})\\[A-Za-z0-9][\w.$-]{1,63}(?![\w\\])")),
+    ("COMPTE", re.compile(
+        r"\b[a-z]:\\(?:users|documents and settings)\\(?P<v>[^\\/\n:*?\"<>|]+(?=\\)|[^\\/\s:*?\"<>|]+)",
+        re.IGNORECASE)),
+    ("COMPTE", re.compile(r"(?<![\w./-])/(?:home|Users)/(?P<v>[A-Za-z0-9._-]+)")),
     ("IP", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
     ("MAC", re.compile(r"(?<![\w:-])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![\w:-])")),
     ("FQDN", re.compile(
-        r"(?<![\w@.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63})(?![\w-]|\.\w)",
+        r"(?<![\w.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?P<tld>[a-z]{2,63})(?![\w-]|\.\w)",
         re.IGNORECASE)),
 ]
 
+DOMAINES_SYSTEME = {"BUILTIN", "NT", "AUTHORITY", "SERVICE", "APPPOOL", "WORKGROUP", "HKLM", "HKCU", "HKCR",
+                    "HKU", "HKCC", "SYSTEM", "LOCAL"}
+PROFILS_GENERIQUES = {"public", "default", "default user", "all users", "shared", "guest"}
 
-def _accepte(type_, m):
+
+def _accepte(type_, m, valeur):
     if type_ == "FQDN":
-        return m.group(1).lower() not in EXTENSIONS_FICHIERS
+        tld = m.group("tld").lower()
+        return tld not in EXTENSIONS_FICHIERS and (len(tld) == 2 or tld in EXTENSIONS_DOMAINE)
+    if type_ == "COMPTE":
+        domaine = m.groupdict().get("d")
+        if domaine and (domaine in DOMAINES_SYSTEME or domaine.startswith("HKEY")):
+            return False
+        return valeur.strip().lower() not in PROFILS_GENERIQUES
     return True
+
+
+def _plage(m):
+    """Partie à masquer : le groupe « v » s'il existe, sinon tout ; sans espaces en bout."""
+    debut, fin = m.span("v") if "v" in m.re.groupindex and m.group("v") else m.span()
+    texte = m.string
+    while fin > debut and texte[fin - 1].isspace():
+        fin -= 1
+    return debut, fin
+
+
+def compiler_motif(motif):
+    """Motif personnalisé (expression régulière), insensible à la casse. Lève re.error s'il est invalide."""
+    rx = re.compile(motif, re.IGNORECASE)
+    if rx.match(""):
+        raise re.error("le motif ne doit pas accepter un texte vide")
+    return rx
+
 
 # Tolère les variantes qu'une IA peut produire : [nom_1], [ NOM_1 ], [NOM 1], \[NOM\_1\] (Markdown)…
 JETON_RE = re.compile(
@@ -81,6 +163,8 @@ def _cle(valeur, type_=None):
         else:
             return ("+" if compact.startswith("+") else "") + chiffres
         return "0" + chiffres.lstrip("0")  # +33 6…, 0033 6…, +33 (0)6… → 06…
+    if type_ == "SECRET":
+        return valeur  # un secret est comparé à l'identique
     if type_ in ("IBAN", "CARTE", "SECU"):
         return re.sub(r"[\s.-]", "", valeur).upper()
     if type_ == "MAC":
@@ -156,8 +240,8 @@ class Anonymiseur:
         self.exclus.discard(jeton)
 
     # --- traitements ------------------------------------------------------
-    def anonymiser(self, texte, termes=(), types=None):
-        """types : ensemble des types détectés automatiquement (None = tous)."""
+    def anonymiser(self, texte, termes=(), types=None, motifs=()):
+        """types : types détectés automatiquement (None = tous) ; motifs : expressions personnalisées."""
         # Les jetons d'un aperçu non copié sont recalculés à chaque fois : taper
         # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
         self._apercu, self._apercu_index = {}, {}
@@ -180,8 +264,19 @@ class Anonymiseur:
             if types is not None and type_ not in types:
                 continue
             for m in motif.finditer(texte):
-                if _accepte(type_, m) and prendre(*m.span()):
-                    trouves.append((m.start(), m.end(), type_, m.group(0)))
+                d, f = _plage(m)
+                if f > d and _accepte(type_, m, texte[d:f]) and prendre(d, f):
+                    trouves.append((d, f, type_, texte[d:f]))
+
+        for brut in motifs:
+            try:
+                motif = compiler_motif(brut)
+            except re.error:
+                continue
+            for m in motif.finditer(texte):
+                d, f = _plage(m)
+                if f > d and prendre(d, f):
+                    trouves.append((d, f, "PERSO", texte[d:f]))
 
         propres = {" ".join(t.split()) for t in termes}
         for terme in sorted((t for t in propres if len(t) >= 2), key=len, reverse=True):
@@ -224,6 +319,9 @@ class Anonymiseur:
                 res.inconnus.append((m.start(), m.end(), m.group(0)))
                 continue
             valeur = info[1]
+            brut = m.group(0)
+            if brut.startswith("\\") and not brut.endswith("\\]"):
+                valeur = "\\" + valeur  # C:\Users\[COMPTE_1] : l'antislash fait partie du chemin
             avant = texte[pos:m.start()]
             morceaux.append(avant)
             taille += len(avant)

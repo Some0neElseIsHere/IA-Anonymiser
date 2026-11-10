@@ -34,6 +34,24 @@ class Stockage(unittest.TestCase):
             o2 = stockage.Options(d)
             self.assertEqual((o2.theme, o2.langue, o2.consigne_texte), ("sombre", "en", "Keep tokens."))
 
+    def test_nouveaux_types_actives(self):
+        import json
+        with tempfile.TemporaryDirectory() as d:
+            # Options enregistrées par la v1.3 : 8 types connus, le téléphone désactivé
+            with open(os.path.join(d, "options.json"), "w", encoding="utf-8") as f:
+                json.dump({"types": ["EMAIL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN"]}, f)
+            o = stockage.Options(d)
+            self.assertNotIn("TEL", o.types)          # choix de l'utilisateur conservé
+            for nouveau in ("SECRET", "COMPTE", "DN", "SID"):
+                self.assertIn(nouveau, o.types)        # nouveaux types activés
+            o.types.discard("SID")
+            o.motifs = ["PC-\\d{4}", "PC-(", ""]
+            o.motifs = stockage.motifs_valides(o.motifs)
+            o.sauver()
+            o2 = stockage.Options(d)
+            self.assertNotIn("SID", o2.types)         # désactivé après coup : reste désactivé
+            self.assertEqual(o2.motifs, ["PC-\\d{4}"])
+
 
 if __name__ == "__main__":
     unittest.main()

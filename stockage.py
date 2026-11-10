@@ -9,7 +9,7 @@ import locale
 import os
 import sys
 
-from moteur import TYPES_AUTO
+from moteur import TYPES_AUTO, TYPES_V13, compiler_motif
 
 ENTETE_DPAPI = b"IAA1"
 ENTETE_CLAIR = b"IAA0"  # hors Windows uniquement (développement)
@@ -99,12 +99,26 @@ def trier(termes):
     return sorted(sortie, key=str.casefold)
 
 
+def motifs_valides(motifs):
+    sortie = []
+    for m in motifs:
+        m = str(m).strip()
+        if m and m not in sortie:
+            try:
+                compiler_motif(m)
+            except Exception:
+                continue
+            sortie.append(m)
+    return sortie
+
+
 class Options:
     def __init__(self, dossier=None):
         self.dossier = dossier or dossier_config()
         self.chemin = os.path.join(self.dossier, "options.json")
         self.types = set(TYPES_AUTO)
         self.permanents = []
+        self.motifs = []             # expressions régulières personnalisées
         self.consigne = True
         self.consigne_texte = None   # None : texte par défaut, dans la langue de l'interface
         self.langue = "auto"         # auto, fr, en
@@ -130,7 +144,10 @@ class Options:
             except OSError:
                 pass
             return
-        self.types = {t for t in d.get("types", TYPES_AUTO) if t in TYPES_AUTO}
+        # Les types apparus depuis le dernier enregistrement sont activés
+        connus = set(d.get("types_connus", TYPES_V13))
+        self.types = {t for t in d.get("types", TYPES_AUTO) if t in TYPES_AUTO} | (set(TYPES_AUTO) - connus)
+        self.motifs = motifs_valides(d.get("motifs", []))
         self.permanents = trier(d.get("permanents", []))
         self.consigne = bool(d.get("consigne", True))
         texte = d.get("consigne_texte")
@@ -141,7 +158,8 @@ class Options:
 
     def sauver(self):
         with open(self.chemin, "w", encoding="utf-8") as f:
-            json.dump({"types": sorted(self.types), "permanents": self.permanents,
+            json.dump({"types": sorted(self.types), "types_connus": TYPES_AUTO, "permanents": self.permanents,
+                       "motifs": self.motifs,
                        "consigne": self.consigne, "consigne_texte": self.consigne_texte,
                        "langue": self.langue, "theme": self.theme, "conserver": self.conserver},
                       f, ensure_ascii=False, indent=2)

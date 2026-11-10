@@ -16,7 +16,7 @@ from tkinter import font as tkfont
 from tkinter import messagebox, simpledialog, ttk
 
 import stockage
-from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur
+from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif
 from textes import CONSIGNES, Traducteur
 
 try:
@@ -570,7 +570,8 @@ class Application:
 
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
-        res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types)
+        res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types,
+                                     self.options.motifs)
         self.resultat = res
         self.source.surligner(res.spans_source, "masque")
         self.sortie.ecrire(res.texte, res.spans_sortie, "jeton")
@@ -1008,6 +1009,42 @@ class Application:
         liste.remplir(permanents)
         ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer).pack(anchor="e", pady=(8, 0))
 
+        # Motifs personnalisés
+        o = ttk.Frame(onglets, padding=18)
+        onglets.add(o, text=t("opt_motifs"))
+        ttk.Label(o, text=t("opt_motifs_titre"), style="Section.TLabel").pack(anchor="w")
+        ttk.Label(o, text=t("opt_motifs_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", pady=(2, 10))
+        motifs = list(self.options.motifs)
+        retour_motif = ttk.Label(o, style="Aide.TLabel", wraplength=largeur_texte, justify="left")
+
+        def ajouter_motif():
+            motif = liste_motifs.champ.get().strip()
+            if not motif:
+                return
+            try:
+                rx = compiler_motif(motif)
+            except Exception as exc:
+                retour_motif.configure(text=t("opt_motif_invalide", e=exc))
+                return
+            liste_motifs.champ.delete(0, "end")
+            if motif not in motifs:
+                motifs.append(motif)
+            liste_motifs.remplir(motifs)
+            n = sum(1 for _ in rx.finditer(self.source.lire()))
+            retour_motif.configure(text=t("opt_motif_trouve", m=motif, n=n))
+
+        def supprimer_motifs():
+            retires = set(liste_motifs.selection())
+            motifs[:] = [x for x in motifs if x not in retires]
+            liste_motifs.remplir(motifs)
+
+        liste_motifs = ListeTermes(self, o, ajouter_motif, supprimer_motifs, hauteur=7)
+        liste_motifs.pack(fill="both", expand=True)
+        liste_motifs.remplir(motifs)
+        retour_motif.pack(anchor="w", pady=(8, 0))
+        ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer_motifs).pack(anchor="e", pady=(8, 0))
+
         # Consigne pour l'IA
         o = ttk.Frame(onglets, padding=18)
         onglets.add(o, text=t("opt_consigne"))
@@ -1054,6 +1091,7 @@ class Application:
             ancienne_langue = self.t.langue
             self.options.types = {k for k, v in cases.items() if v.get()}
             self.options.permanents = stockage.trier(permanents)
+            self.options.motifs = stockage.motifs_valides(motifs)
             self.options.consigne = avec_consigne.get()
             texte = zone_consigne.lire().strip()
             self.options.consigne_texte = None if not texte or texte == CONSIGNES[t.langue] else texte
@@ -1193,8 +1231,9 @@ DEMO = {
         "impayée. Merci d'effectuer le virement sur [IBAN_1].\n\nCordialement,\n[NOM_3]",
         "Relance facture", "Panne serveur paie",
         "Le serveur srv-paie01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) ne répond plus depuis la mise à "
-        "jour. Le proxy proxy.acme.local redirige vers intranet.acme.fr.\nLe fichier de log est joint : "
-        "erreur.log. Peux-tu m'aider ?\n\nMerci, Claire Martin",
+        "jour (INC-2026-4471). Compte ACME\\svc-paie, profil C:\\Users\\svc-paie\\AppData, "
+        "chaîne de connexion Server=sql01;User Id=paie;Password=Paie2026!;\n"
+        "Le fichier de log est joint : erreur.log. Peux-tu m'aider ?\n\nMerci, Claire Martin",
     ),
     "en": (
         "Hello,\n\nCould you write a reminder for John Smith (Acme Ltd)? He hasn't paid invoice F-2026-118. "
@@ -1204,8 +1243,9 @@ DEMO = {
         "Please make the transfer to [IBAN_1].\n\nBest regards,\n[NAME_3]",
         "Invoice reminder", "Payroll server down",
         "Server srv-pay01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) stopped responding after the update. "
-        "The proxy proxy.acme.local redirects to intranet.acme.com.\nThe log file is attached: error.log. "
-        "Can you help?\n\nThanks, Claire Martin",
+        "(INC-2026-4471). Account ACME\\svc-pay, profile C:\\Users\\svc-pay\\AppData, "
+        "connection string Server=sql01;User Id=pay;Password=Pay2026!;\n"
+        "The log file is attached: error.log. Can you help?\n\nThanks, Claire Martin",
     ),
 }
 
@@ -1218,6 +1258,7 @@ def capture(app, chemin):
     def remplir():
         texte, reponse, nom1, nom2, serveurs = DEMO[app.t.langue]
         app.options.permanents = ["Acme SAS", "Acme Ltd", "Claire Martin"]
+        app.options.motifs = [r"PC-\d{4}", r"INC-\d{4}-\d+"]
         app.conversations, app.numero = [], 0
         app.nouvelle_conversation()
         app.conv.nom = nom1
@@ -1280,8 +1321,9 @@ def capture(app, chemin):
         lambda: conversation(0, 0), lambda: photo(app.root, "clair-relance.png"),
         lambda: conversation(0, 2), lambda: photo(app.root, "clair-elements.png"),
         lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
-        lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-consigne.png"),
-        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-general.png"),
+        lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-motifs.png"),
+        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-consigne.png"),
+        lambda: app.onglets_options.select(4), lambda: photo(app.fenetre_options, "options-general.png"),
         lambda: app.fenetre_options.destroy(),
         app.ouvrir_a_propos, lambda: photo(app.fenetre_a_propos, "a-propos.png"),
         lambda: app.fenetre_a_propos.destroy(),
