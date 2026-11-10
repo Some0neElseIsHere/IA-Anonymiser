@@ -1,0 +1,27 @@
+name: Build Windows exe
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build exe
+        run: pyinstaller --onefile --windowed --name Anonymiseur clip_anon.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Anonymiseur-windows
+          path: dist/Anonymiseur.exe
