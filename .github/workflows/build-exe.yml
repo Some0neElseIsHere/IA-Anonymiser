@@ -36,8 +36,9 @@ jobs:
         shell: bash
         run: |
           echo "VERSION = \"${VERSION:-dev-${GITHUB_SHA::7}}\"" > version.py
-          pip install pyinstaller
-          pyinstaller --onefile --windowed --name IA-Anonymiser anonymiseur.py
+          pip install pyinstaller sv-ttk
+          pyinstaller --onefile --windowed --name IA-Anonymiser --icon assets/icone.ico \
+            --add-data "assets;assets" --collect-data sv_ttk anonymiseur.py
           cd dist && sha256sum IA-Anonymiser.exe > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4

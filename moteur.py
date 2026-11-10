@@ -6,17 +6,14 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-LIBELLES = {
-    "EMAIL": "E-mail",
-    "TEL": "Téléphone",
-    "IBAN": "IBAN",
-    "CARTE": "Carte bancaire",
-    "SECU": "N° de sécurité sociale",
-    "IP": "Adresse IP",
-    "MAC": "Adresse MAC",
-    "FQDN": "Nom de domaine (FQDN)",
-    "NOM": "Terme personnalisé",
+# Préfixe des jetons selon la langue de l'interface : [NOM_1] en français, [NAME_1] en anglais.
+PREFIXES = {
+    "fr": {"EMAIL": "EMAIL", "TEL": "TEL", "IBAN": "IBAN", "CARTE": "CARTE", "SECU": "SECU",
+           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "NOM": "NOM"},
+    "en": {"EMAIL": "EMAIL", "TEL": "PHONE", "IBAN": "IBAN", "CARTE": "CARD", "SECU": "SSN",
+           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "NOM": "NAME"},
 }
+TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()}, key=len, reverse=True)
 
 # Types détectés automatiquement (les termes personnalisés sont à part).
 TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN"]
@@ -66,7 +63,7 @@ def _accepte(type_, m):
 
 # Tolère les variantes qu'une IA peut produire : [nom_1], [ NOM_1 ], [NOM 1], \[NOM\_1\] (Markdown)…
 JETON_RE = re.compile(
-    r"\\?\[\s*(" + "|".join(LIBELLES) + r")\s*(?:\\?_|-|\s)?\s*(\d+)\s*\\?\]",
+    r"\\?\[\s*(" + "|".join(TOUS_PREFIXES) + r")\s*(?:\\?_|-|\s)?\s*(\d+)\s*\\?\]",
     re.IGNORECASE,
 )
 
@@ -87,7 +84,8 @@ class Resultat:
 
 
 class Anonymiseur:
-    def __init__(self):
+    def __init__(self, langue="fr"):
+        self.langue = langue
         self.reinitialiser()
 
     def reinitialiser(self):
@@ -104,13 +102,27 @@ class Anonymiseur:
         if jeton:
             return jeton
         n = 1 + sum(1 for t, _ in (*self.valide.values(), *self._apercu.values()) if t == type_)
-        jeton = f"[{type_}_{n}]"
+        jeton = f"[{PREFIXES.get(self.langue, PREFIXES['fr'])[type_]}_{n}]"
         self._apercu[jeton] = (type_, valeur)
         self._apercu_index[cle] = jeton
         return jeton
 
     def info(self, jeton):
         return self.valide.get(jeton) or self._apercu.get(jeton)
+
+    def jetons(self):
+        """Tous les jetons de la conversation, dans l'ordre de création."""
+        return list(self.valide) + [j for j in self._apercu if j not in self.valide]
+
+    def etat(self):
+        return {"valide": {j: list(v) for j, v in self.valide.items()}, "exclus": sorted(self.exclus)}
+
+    def charger_etat(self, etat):
+        self.reinitialiser()
+        for jeton, (type_, valeur) in etat.get("valide", {}).items():
+            self.valide[jeton] = (type_, valeur)
+            self.index[(type_, _cle(valeur))] = jeton
+        self.exclus = set(etat.get("exclus", [])) & set(self.valide)
 
     def valider(self):
         """Fige les jetons du texte en cours (à appeler quand il est copié pour l'IA)."""

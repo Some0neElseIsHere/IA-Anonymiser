@@ -21,7 +21,7 @@ jobs:
 
       - name: Photographier la fenêtre
         run: |
-          pip install pillow
+          pip install pillow sv-ttk
           python anonymiseur.py --capture captures
           Get-ChildItem captures
 

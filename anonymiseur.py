@@ -1,38 +1,58 @@
 """IA-Anonymiser : interface graphique.
 
-À gauche : les conversations ouvertes, chacune avec ses propres jetons.
-Onglet 1 : texte original / version anonymisée. Onglet 2 : réponse de l'IA / vraies valeurs.
-En bas : les éléments masqués et les termes de la conversation.
-Options : types détectés, termes toujours masqués (nom de l'entreprise…), consigne pour l'IA.
+À gauche : les conversations. Onglet 1 : texte original / version anonymisée.
+Onglet 2 : réponse de l'IA / vraies valeurs. En bas : éléments masqués et termes de la conversation.
 """
 import json
 import os
+import platform
 import sys
+import threading
 import tkinter as tk
+import urllib.request
+import webbrowser
 from tkinter import font as tkfont
 from tkinter import messagebox, simpledialog, ttk
 
-from moteur import EXEMPLES, JETON_RE, LIBELLES, TYPES_AUTO, Anonymiseur
+import stockage
+from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur
+from textes import CONSIGNES, Traducteur
+
+try:
+    import sv_ttk  # thème Sun Valley (style Windows 11), clair et sombre
+except ImportError:
+    sv_ttk = None
 
 try:
     from version import VERSION
 except ImportError:
     VERSION = "dev"
 
-CONSIGNE = (
-    "Consigne : ce texte contient des jetons comme [NOM_1] ou [EMAIL_1] qui remplacent des "
-    "données confidentielles. Reprends-les exactement tels quels dans ta réponse, sans les "
-    "modifier, les traduire ni les compléter.\n\n"
-)
+DEPOT = "https://github.com/Some0neElseIsHere/IA-Anonymiser"
+API_DERNIERE = "https://api.github.com/repos/Some0neElseIsHere/IA-Anonymiser/releases/latest"
 DELAI_MS = 250
-SONDE_MS = 700
+SAUVEGARDE_MS = 15000
+THEME_MS = 4000
 
-COULEURS = {
-    "masque": "#fff1a8",
-    "actif": "#ffc94d",
-    "jeton": "#d3f2dc",
-    "inconnu": "#ffd4d4",
+PALETTES = {
+    "clair": {
+        "fond": "#ffffff", "fond_lecture": "#f7f7f8", "texte": "#1b1b1b", "bordure": "#d4d4d8",
+        "focus": "#005fb8", "selection": "#b9d6f2", "aide": "#5f6368", "lien": "#005fb8",
+        "masque": ("#fff0a6", "#1b1b1b"), "actif": ("#ffc94d", "#1b1b1b"),
+        "jeton": ("#d2f0dc", "#0f5132"), "inconnu": ("#ffd6d6", "#8b0000"), "absent": "#8a8a8a",
+    },
+    "sombre": {
+        "fond": "#262626", "fond_lecture": "#1f1f1f", "texte": "#e8e8e8", "bordure": "#3d3d3d",
+        "focus": "#57c8ff", "selection": "#1f4e79", "aide": "#a3a3a3", "lien": "#57c8ff",
+        "masque": ("#5a4a00", "#fff2b3"), "actif": ("#8f6c00", "#ffffff"),
+        "jeton": ("#1d4a32", "#c9f2d6"), "inconnu": ("#5c2020", "#ffd6d6"), "absent": "#7a7a7a",
+    },
 }
+
+
+def ressource(nom):
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, "assets", nom)
 
 
 def activer_dpi():
@@ -45,98 +65,94 @@ def activer_dpi():
             pass
 
 
-def dossier_config():
-    base = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), ".config")
-    dossier = os.path.join(base, "IA-Anonymiser")
-    os.makedirs(dossier, exist_ok=True)
-    return dossier
+def barre_de_titre(fenetre, sombre):
+    """Barre de titre Windows sombre ou claire, assortie au thème."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        fenetre.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(fenetre.winfo_id())
+        valeur = ctypes.c_int(1 if sombre else 0)
+        for attribut in (20, 19):  # DWMWA_USE_IMMERSIVE_DARK_MODE (Windows 11 / anciennes versions de 10)
+            if ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attribut, ctypes.byref(valeur),
+                                                          ctypes.sizeof(valeur)) == 0:
+                break
+    except Exception:
+        pass
 
 
 def normaliser(terme):
     return " ".join(terme.split())
 
 
-def trier(termes):
-    vus, sortie = set(), []
-    for t in termes:
-        t = normaliser(t)
-        if len(t) >= 2 and t.casefold() not in vus:
-            vus.add(t.casefold())
-            sortie.append(t)
-    return sorted(sortie, key=str.casefold)
-
-
-class Options:
-    """Réglages enregistrés dans %APPDATA%\\IA-Anonymiser\\options.json."""
-
-    def __init__(self):
-        self.chemin = os.path.join(dossier_config(), "options.json")
-        self.types = set(TYPES_AUTO)
-        self.permanents = []
-        self.consigne = True
-        self.charger()
-
-    def charger(self):
-        try:
-            with open(self.chemin, encoding="utf-8") as f:
-                d = json.load(f)
-            self.types = {t for t in d.get("types", TYPES_AUTO) if t in TYPES_AUTO}
-            self.permanents = trier(d.get("permanents", []))
-            self.consigne = bool(d.get("consigne", True))
-        except (OSError, ValueError):
-            # Reprise de la liste de termes de la version 1.1
-            try:
-                with open(os.path.join(dossier_config(), "termes.txt"), encoding="utf-8") as f:
-                    self.permanents = trier(f)
-            except OSError:
-                pass
-
-    def sauver(self):
-        with open(self.chemin, "w", encoding="utf-8") as f:
-            json.dump({"types": sorted(self.types), "permanents": self.permanents,
-                       "consigne": self.consigne}, f, ensure_ascii=False, indent=2)
+def version_tuple(v):
+    try:
+        return tuple(int(x) for x in v.lstrip("vV").split("."))
+    except ValueError:
+        return None
 
 
 class Conversation:
-    def __init__(self, nom):
+    def __init__(self, nom, langue):
         self.nom = nom
-        self.moteur = Anonymiseur()
+        self.moteur = Anonymiseur(langue)
         self.termes = []
         self.source = ""
         self.reponse = ""
+
+    def etat(self):
+        return {"nom": self.nom, "termes": self.termes, "source": self.source, "reponse": self.reponse,
+                "moteur": self.moteur.etat()}
+
+    @classmethod
+    def depuis_etat(cls, d, langue):
+        c = cls(str(d.get("nom") or "?"), langue)
+        c.termes = stockage.trier(d.get("termes", []))
+        c.source = str(d.get("source", ""))
+        c.reponse = str(d.get("reponse", ""))
+        c.moteur.charger_etat(d.get("moteur", {}))
+        return c
 
 
 class Zone(ttk.Frame):
     """Zone de texte avec un titre, des boutons et une barre de défilement."""
 
-    def __init__(self, parent, titre, police, lecture_seule=False, marge=(0, 0, 0, 0)):
+    def __init__(self, app, parent, titre, lecture_seule=False, marge=(0, 0, 0, 0)):
         super().__init__(parent, padding=marge)
         self.entete = ttk.Frame(self)
-        self.entete.pack(fill="x", pady=(0, 6))
+        self.entete.pack(fill="x", pady=(0, 8))
         ttk.Label(self.entete, text=titre, style="Titre.TLabel").pack(side="left")
-
         cadre = ttk.Frame(self)
         cadre.pack(fill="both", expand=True)
-        self.texte = tk.Text(cadre, wrap="word", font=police, undo=not lecture_seule,
-                             relief="solid", borderwidth=1, padx=10, pady=8,
-                             highlightthickness=0, spacing1=2, spacing3=2)
+        self.texte = tk.Text(cadre, wrap="word", font=app.police, undo=not lecture_seule, relief="flat",
+                             borderwidth=0, padx=14, pady=10, highlightthickness=1, spacing1=3, spacing3=3)
         barre = ttk.Scrollbar(cadre, command=self.texte.yview)
         self.texte.configure(yscrollcommand=barre.set)
-        barre.pack(side="right", fill="y")
+        barre.pack(side="right", fill="y", padx=(4, 0))
         self.texte.pack(side="left", fill="both", expand=True)
-        for nom, couleur in COULEURS.items():
-            self.texte.tag_configure(nom, background=couleur)
-        self.texte.tag_raise("sel")
-
         self.lecture_seule = lecture_seule
         if lecture_seule:
-            self.texte.configure(state="disabled", background="#f6f7f9")
+            self.texte.configure(state="disabled")
+        app.textes_tk.append(self)
 
-    def bouton(self, texte, commande):
+    def bouton(self, texte, commande, accent=False):
         """Ajoute un bouton à droite du titre (le premier ajouté est le plus à droite)."""
-        b = ttk.Button(self.entete, text=texte, command=commande)
-        b.pack(side="right", padx=(6, 0))
+        b = ttk.Button(self.entete, text=texte, command=commande, style="Accent.TButton" if accent else "TButton")
+        b.pack(side="right", padx=(8, 0))
         return b
+
+    def colorer(self, p):
+        self.texte.configure(background=p["fond_lecture"] if self.lecture_seule else p["fond"],
+                             foreground=p["texte"], insertbackground=p["texte"],
+                             selectbackground=p["selection"], selectforeground=p["texte"],
+                             inactiveselectbackground=p["selection"],
+                             highlightbackground=p["bordure"], highlightcolor=p["focus"])
+        for nom in ("masque", "actif", "jeton", "inconnu"):
+            fond, texte = p[nom]
+            self.texte.tag_configure(nom, background=fond, foreground=texte)
+        self.texte.tag_raise("actif")
+        self.texte.tag_raise("sel")
 
     def lire(self):
         return self.texte.get("1.0", "end-1c")
@@ -161,34 +177,35 @@ class Zone(ttk.Frame):
 
 
 class ListeTermes(ttk.Frame):
-    """Champ de saisie + liste de termes + boutons."""
+    """Champ de saisie, bouton Ajouter et liste de termes."""
 
-    def __init__(self, parent, police, ajouter, supprimer):
+    def __init__(self, app, parent, ajouter, supprimer, hauteur=6):
         super().__init__(parent)
         ligne = ttk.Frame(self)
-        ligne.pack(fill="x", pady=(0, 6))
-        self.champ = ttk.Entry(ligne, font=police)
+        ligne.pack(fill="x", pady=(0, 8))
+        self.champ = ttk.Entry(ligne, font=app.police)
         self.champ.pack(side="left", fill="x", expand=True)
         self.champ.bind("<Return>", lambda e: ajouter())
-        ttk.Button(ligne, text="Ajouter", command=ajouter).pack(side="left", padx=(6, 0))
-
+        ttk.Button(ligne, text=app.t("ajouter"), command=ajouter).pack(side="left", padx=(8, 0))
         zone = ttk.Frame(self)
         zone.pack(fill="both", expand=True)
-        self.liste = tk.Listbox(zone, font=police, selectmode="extended", activestyle="none",
-                                relief="solid", borderwidth=1, highlightthickness=0, exportselection=False)
-        barre = ttk.Scrollbar(zone, command=self.liste.yview)
-        self.liste.configure(yscrollcommand=barre.set)
-        barre.pack(side="right", fill="y")
-        self.liste.pack(side="left", fill="both", expand=True)
-        self.liste.bind("<Delete>", lambda e: supprimer())
+        self.arbre = ttk.Treeview(zone, show="tree", selectmode="extended", height=hauteur)
+        self.arbre.column("#0", width=200)
+        barre = ttk.Scrollbar(zone, command=self.arbre.yview)
+        self.arbre.configure(yscrollcommand=barre.set)
+        barre.pack(side="right", fill="y", padx=(4, 0))
+        self.arbre.pack(side="left", fill="both", expand=True)
+        self.arbre.bind("<Delete>", lambda e: supprimer())
+        self.termes = []
 
     def remplir(self, termes):
-        self.liste.delete(0, "end")
-        for t in termes:
-            self.liste.insert("end", t)
+        self.termes = list(termes)
+        self.arbre.delete(*self.arbre.get_children())
+        for i, t in enumerate(self.termes):
+            self.arbre.insert("", "end", iid=f"t{i}", text=t)
 
     def selection(self):
-        return [self.liste.get(i) for i in self.liste.curselection()]
+        return [self.termes[int(i[1:])] for i in self.arbre.selection()]
 
     def saisie(self):
         texte = normaliser(self.champ.get())
@@ -199,22 +216,30 @@ class ListeTermes(ttk.Frame):
 class Application:
     def __init__(self, root):
         self.root = root
-        self.options = Options()
+        self.options = stockage.Options()
+        self.t = Traducteur(self.options.langue_effective())
         self.conversations = []
         self.courante = 0
         self.numero = 0
         self.resultat = None
         self.attentes = {}
-        self.dernier_presse_papiers = None
+        self.theme_applique = None
+        self.textes_tk = []
 
-        root.title(f"IA-Anonymiser {VERSION}")
+        self.icones()
         self.dimensionner()
-        self.styles()
+        self.polices()
+        reprises = self.reprendre_conversations()
         self.construire()
-        self.nouvelle_conversation()
-        self.message("Collez votre texte à gauche : la version anonymisée apparaît à droite.")
+        self.appliquer_theme()
+        if not self.conversations:
+            self.nouvelle_conversation()
+        else:
+            self.charger_zones()
+        self.message(self.t("msg_reprise", n=reprises) if reprises else self.t("msg_accueil"))
         root.protocol("WM_DELETE_WINDOW", self.quitter)
-        self.sonder()
+        root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
+        root.after(THEME_MS, self.suivre_theme_windows)
 
     @property
     def conv(self):
@@ -224,16 +249,35 @@ class Application:
     def moteur(self):
         return self.conv.moteur
 
+    @property
+    def palette(self):
+        return PALETTES[self.theme_applique or "clair"]
+
     def termes_actifs(self):
         return self.options.permanents + self.conv.termes
 
+    def consigne(self):
+        texte = self.options.consigne_texte or CONSIGNES[self.t.langue]
+        return texte.rstrip() + "\n\n"
+
     # --- apparence --------------------------------------------------------
+    def icones(self):
+        self.icone_entete = None
+        try:
+            if sys.platform == "win32":
+                self.root.iconbitmap(default=ressource("icone.ico"))
+            self.icone_fenetre = tk.PhotoImage(file=ressource("icone.png"))
+            self.root.iconphoto(True, self.icone_fenetre)
+            self.icone_entete = tk.PhotoImage(file=ressource("icone-64.png"))
+        except (tk.TclError, OSError):
+            pass
+
     def dimensionner(self):
         """Grande fenêtre centrée, adaptée à l'écran et à sa mise à l'échelle."""
         self.echelle = echelle = max(1.0, self.root.winfo_fpixels("1i") / 96)
         ecran_l, ecran_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        largeur = min(int(1440 * echelle), int(ecran_l * 0.92))
-        hauteur = min(int(880 * echelle), int(ecran_h * 0.88))
+        largeur = min(int(1480 * echelle), int(ecran_l * 0.92))
+        hauteur = min(int(900 * echelle), int(ecran_h * 0.88))
         x, y = (ecran_l - largeur) // 2, max(0, (ecran_h - hauteur) // 2 - int(20 * echelle))
         self.root.geometry(f"{largeur}x{hauteur}+{x}+{y}")
         self.root.minsize(min(largeur, int(1000 * echelle)), min(hauteur, int(620 * echelle)))
@@ -243,86 +287,127 @@ class Application:
             except tk.TclError:
                 pass
 
+    def polices(self):
+        familles = set(tkfont.families(self.root))
+        self.famille = next((f for f in ("Segoe UI Variable Text", "Segoe UI") if f in familles),
+                            tkfont.nametofont("TkDefaultFont").actual("family"))
+        self.police = tkfont.Font(family=self.famille, size=11)
+
     def styles(self):
+        p, f = self.palette, self.famille
         style = ttk.Style()
-        for theme in ("vista", "clam"):
-            if theme in style.theme_names():
-                style.theme_use(theme)
-                break
-        base = tkfont.nametofont("TkDefaultFont")
-        base.configure(size=10)
-        famille = "Segoe UI" if sys.platform == "win32" else base.actual("family")
-        base.configure(family=famille)
-        self.police = tkfont.Font(family=famille, size=11)
-        style.configure("Titre.TLabel", font=(famille, 11, "bold"))
-        style.configure("Aide.TLabel", foreground="#666")
-        style.configure("Statut.TLabel", foreground="#444")
-        style.configure("TNotebook.Tab", padding=(14, 6))
-        style.configure("Treeview", rowheight=self.police.metrics("linespace") + 10, font=self.police)
-        style.configure("Treeview.Heading", font=(famille, 10, "bold"))
+        for nom in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
+            tkfont.nametofont(nom).configure(family=f, size=10)
+        style.configure("Titre.TLabel", font=(f, 11, "bold"))
+        style.configure("Entete.TLabel", font=(f, 17, "bold"))
+        style.configure("Section.TLabel", font=(f, 12, "bold"))
+        style.configure("Aide.TLabel", foreground=p["aide"])
+        style.configure("Statut.TLabel", foreground=p["aide"])
+        style.configure("Lien.TLabel", foreground=p["lien"], font=(f, 10, "underline"))
+        style.configure("TNotebook.Tab", padding=(16, 6))
+        hauteur = self.police.metrics("linespace") + int(12 * self.echelle)
+        style.configure("Treeview", rowheight=hauteur, font=self.police)
+        style.configure("Treeview.Heading", font=(f, 10, "bold"))
+        self.arbre_elements_couleurs()
+
+    def arbre_elements_couleurs(self):
+        if hasattr(self, "arbre"):
+            self.arbre.tag_configure("exclu", foreground=self.palette["absent"])
+            self.arbre.tag_configure("absent", foreground=self.palette["absent"])
+
+    def appliquer_theme(self, force=False):
+        theme = self.options.theme_effectif()
+        if theme == self.theme_applique and not force:
+            return
+        self.theme_applique = theme
+        sombre = theme == "sombre"
+        if sv_ttk:
+            sv_ttk.set_theme("dark" if sombre else "light")
+        else:
+            style = ttk.Style()
+            for nom in ("vista", "clam"):
+                if nom in style.theme_names():
+                    style.theme_use(nom)
+                    break
+        self.styles()
+        p = self.palette
+        for zone in self.textes_tk:
+            if zone.winfo_exists():
+                zone.colorer(p)
+        if hasattr(self, "menu"):
+            self.menu.configure(background=p["fond"], foreground=p["texte"], activebackground=p["selection"],
+                                activeforeground=p["texte"], relief="flat", borderwidth=1)
+        for fenetre in [self.root] + [w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel)]:
+            barre_de_titre(fenetre, sombre)
+
+    def suivre_theme_windows(self):
+        if self.options.theme == "auto":
+            self.appliquer_theme()
+        self.root.after(THEME_MS, self.suivre_theme_windows)
 
     # --- construction -----------------------------------------------------
     def construire(self):
-        root = self.root
+        t, root = self.t, self.root
+        self.textes_tk = []
+        root.title(f"IA-Anonymiser {VERSION}")
 
-        barre = ttk.Frame(root, padding=(12, 10, 12, 4))
-        barre.pack(fill="x")
-        ttk.Button(barre, text="Options…", command=self.ouvrir_options).pack(side="left")
-        self.auto = tk.BooleanVar(value=False)
-        ttk.Checkbutton(barre, text="Mode automatique du presse-papiers", variable=self.auto,
-                        command=self.basculer_auto).pack(side="left", padx=(16, 0))
-        self.resume_options = ttk.Label(barre, style="Aide.TLabel")
-        self.resume_options.pack(side="right")
+        entete = ttk.Frame(root, padding=(18, 14, 18, 10))
+        entete.pack(fill="x")
+        if self.icone_entete:
+            ttk.Label(entete, image=self.icone_entete).pack(side="left", padx=(0, 12))
+        titres = ttk.Frame(entete)
+        titres.pack(side="left")
+        ttk.Label(titres, text="IA-Anonymiser", style="Entete.TLabel").pack(anchor="w")
+        ttk.Label(titres, text=t("sous_titre"), style="Aide.TLabel").pack(anchor="w")
+        ttk.Button(entete, text=t("a_propos"), command=self.ouvrir_a_propos).pack(side="right")
+        ttk.Button(entete, text=t("options"), command=self.ouvrir_options).pack(side="right", padx=(0, 8))
+        self.resume_options = ttk.Label(entete, style="Aide.TLabel")
+        self.resume_options.pack(side="right", padx=(0, 16))
+        ttk.Separator(root).pack(fill="x")
 
-        self.statut = ttk.Label(root, style="Statut.TLabel", padding=(12, 4, 12, 8), anchor="w")
+        self.statut = ttk.Label(root, style="Statut.TLabel", padding=(18, 6, 18, 10), anchor="w")
         self.statut.pack(side="bottom", fill="x")
 
         lateral = ttk.Panedwindow(root, orient="horizontal")
-        lateral.pack(fill="both", expand=True, padx=12, pady=(4, 0))
+        lateral.pack(fill="both", expand=True, padx=18, pady=(14, 0))
         lateral.add(self.construire_conversations(lateral), weight=0)
-
         principal = ttk.Panedwindow(lateral, orient="vertical")
         lateral.add(principal, weight=1)
 
         self.onglets = ttk.Notebook(principal)
         principal.add(self.onglets, weight=3)
 
-        # Onglet 1 : anonymiser
-        o1 = ttk.Frame(self.onglets, padding=10)
-        self.onglets.add(o1, text="1. Anonymiser mon texte")
+        o1 = ttk.Frame(self.onglets, padding=12)
+        self.onglets.add(o1, text=t("onglet_anonymiser"))
         p1 = ttk.Panedwindow(o1, orient="horizontal")
         p1.pack(fill="both", expand=True)
-        self.source = Zone(p1, "Texte original", self.police, marge=(0, 0, 8, 0))
-        self.source.bouton("Effacer", lambda: self.source.ecrire(""))
-        self.source.bouton("Coller", lambda: self.coller(self.source))
-        self.sortie = Zone(p1, "Texte à envoyer à l'IA", self.police, lecture_seule=True, marge=(8, 0, 0, 0))
-        self.sortie.bouton("Copier pour l'IA", self.copier_sortie)
+        self.source = Zone(self, p1, t("texte_original"), marge=(0, 0, 10, 0))
+        self.source.bouton(t("effacer"), lambda: self.vider(self.source))
+        self.source.bouton(t("coller"), lambda: self.coller(self.source))
+        self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(10, 0, 0, 0))
+        self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
         p1.add(self.source, weight=1)
         p1.add(self.sortie, weight=1)
 
-        # Onglet 2 : restaurer
-        o2 = ttk.Frame(self.onglets, padding=10)
-        self.onglets.add(o2, text="2. Restaurer la réponse de l'IA")
+        o2 = ttk.Frame(self.onglets, padding=12)
+        self.onglets.add(o2, text=t("onglet_restaurer"))
         p2 = ttk.Panedwindow(o2, orient="horizontal")
         p2.pack(fill="both", expand=True)
-        self.reponse = Zone(p2, "Réponse de l'IA (collez-la ici)", self.police, marge=(0, 0, 8, 0))
-        self.reponse.bouton("Effacer", lambda: self.reponse.ecrire(""))
-        self.reponse.bouton("Coller", lambda: self.coller(self.reponse))
-        self.restauree = Zone(p2, "Réponse avec les vraies valeurs", self.police, lecture_seule=True,
-                              marge=(8, 0, 0, 0))
-        self.restauree.bouton("Copier", self.copier_restauree)
+        self.reponse = Zone(self, p2, t("reponse_ia"), marge=(0, 0, 10, 0))
+        self.reponse.bouton(t("effacer"), lambda: self.vider(self.reponse))
+        self.reponse.bouton(t("coller"), lambda: self.coller(self.reponse))
+        self.restauree = Zone(self, p2, t("reponse_restauree"), lecture_seule=True, marge=(10, 0, 0, 0))
+        self.restauree.bouton(t("copier"), self.copier_restauree, accent=True)
         p2.add(self.reponse, weight=1)
         p2.add(self.restauree, weight=1)
 
-        # Bas : éléments masqués + termes de la conversation
-        bas = ttk.Frame(principal, padding=(0, 10, 0, 0))
+        bas = ttk.Frame(principal, padding=(0, 14, 0, 0))
         principal.add(bas, weight=2)
         pb = ttk.Panedwindow(bas, orient="horizontal")
         pb.pack(fill="both", expand=True)
         pb.add(self.construire_elements(pb), weight=3)
         pb.add(self.construire_termes(pb), weight=2)
 
-        # Événements
         self.source.texte.bind("<<Modified>>", lambda e: self.modifie(self.source.texte, self.actualiser))
         self.reponse.texte.bind("<<Modified>>",
                                 lambda e: self.modifie(self.reponse.texte, self.actualiser_reponse))
@@ -333,76 +418,88 @@ class Application:
         self.maj_resume_options()
 
     def construire_conversations(self, parent):
-        cadre = ttk.Frame(parent, padding=(0, 0, 10, 0), width=int(220 * self.echelle))
-        ttk.Label(cadre, text="Conversations", style="Titre.TLabel").pack(anchor="w", pady=(0, 6))
-        ttk.Button(cadre, text="+ Nouvelle conversation", command=self.nouvelle_conversation).pack(
-            fill="x", pady=(0, 6))
-        zone = ttk.Frame(cadre)
-        zone.pack(fill="both", expand=True)
-        self.liste_conv = tk.Listbox(zone, font=self.police, activestyle="none", exportselection=False,
-                                     relief="solid", borderwidth=1, highlightthickness=0, width=20)
-        self.liste_conv.pack(fill="both", expand=True)
-        self.liste_conv.bind("<<ListboxSelect>>", lambda e: self.changer_conversation())
-        self.liste_conv.bind("<Double-1>", lambda e: self.renommer_conversation())
+        t = self.t
+        cadre = ttk.Frame(parent, padding=(0, 0, 14, 0))
+        ttk.Label(cadre, text=t("conversations"), style="Section.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Button(cadre, text=t("nouvelle_conversation"), command=self.nouvelle_conversation,
+                   style="Accent.TButton").pack(fill="x", pady=(0, 8))
+        self.arbre_conv = ttk.Treeview(cadre, show="tree", selectmode="browse", columns=("n",))
+        self.arbre_conv.column("#0", width=int(170 * self.echelle), stretch=True)
+        self.arbre_conv.column("n", width=int(44 * self.echelle), stretch=False, anchor="e")
+        self.arbre_conv.pack(fill="both", expand=True)
+        self.arbre_conv.bind("<<TreeviewSelect>>", lambda e: self.changer_conversation())
+        self.arbre_conv.bind("<Double-1>", lambda e: self.renommer_conversation())
+        self.arbre_conv.bind("<F2>", lambda e: self.renommer_conversation())
         pied = ttk.Frame(cadre)
-        pied.pack(fill="x", pady=(6, 0))
-        ttk.Button(pied, text="Renommer", command=self.renommer_conversation).pack(
+        pied.pack(fill="x", pady=(8, 0))
+        ttk.Button(pied, text=t("renommer"), command=self.renommer_conversation).pack(
             side="left", fill="x", expand=True)
-        ttk.Button(pied, text="Fermer", command=self.fermer_conversation).pack(
-            side="left", fill="x", expand=True, padx=(6, 0))
-        ttk.Label(cadre, style="Aide.TLabel", wraplength=int(200 * self.echelle), justify="left",
-                  text="Une conversation par discussion avec l'IA : chacune garde ses propres jetons.").pack(
-            anchor="w", pady=(8, 0))
+        ttk.Button(pied, text=t("fermer"), command=self.fermer_conversation).pack(
+            side="left", fill="x", expand=True, padx=(8, 0))
+        ttk.Label(cadre, style="Aide.TLabel", wraplength=int(210 * self.echelle), justify="left",
+                  text=t("aide_conversations")).pack(anchor="w", pady=(10, 0))
         return cadre
 
     def construire_elements(self, parent):
-        cadre = ttk.Frame(parent, padding=(0, 0, 8, 0))
+        t = self.t
+        cadre = ttk.Frame(parent, padding=(0, 0, 10, 0))
         entete = ttk.Frame(cadre)
-        entete.pack(fill="x", pady=(0, 6))
-        self.titre_elements = ttk.Label(entete, text="Éléments masqués", style="Titre.TLabel")
+        entete.pack(fill="x", pady=(0, 8))
+        self.titre_elements = ttk.Label(entete, style="Titre.TLabel")
         self.titre_elements.pack(side="left")
-        self.bouton_basculer = ttk.Button(entete, text="Ne plus masquer", command=self.basculer_element,
+        self.bouton_basculer = ttk.Button(entete, text=t("ne_plus_masquer"), command=self.basculer_element,
                                           state="disabled")
         self.bouton_basculer.pack(side="right")
-
         zone = ttk.Frame(cadre)
         zone.pack(fill="both", expand=True)
-        colonnes = ("jeton", "type", "valeur", "nb")
-        self.arbre = ttk.Treeview(zone, columns=colonnes, show="headings", selectmode="browse")
+        self.arbre = ttk.Treeview(zone, columns=("jeton", "type", "valeur", "nb"), show="headings",
+                                  selectmode="browse")
+        e = self.echelle
         for col, titre, largeur, etire, ancre in (
-            ("jeton", "Jeton", 110, False, "w"),
-            ("type", "Type", 160, False, "w"),
-            ("valeur", "Valeur d'origine", 200, True, "w"),
-            ("nb", "Fois", 50, False, "center"),
+            ("jeton", t("col_jeton"), 110, False, "w"),
+            ("type", t("col_type"), 170, False, "w"),
+            ("valeur", t("col_valeur"), 200, True, "w"),
+            ("nb", t("col_fois"), 50, False, "center"),
         ):
             self.arbre.heading(col, text=titre, anchor=ancre)
-            self.arbre.column(col, width=largeur, minwidth=50, stretch=etire, anchor=ancre)
-        self.arbre.tag_configure("exclu", foreground="#9a9a9a")
+            self.arbre.column(col, width=int(largeur * e), minwidth=int(44 * e), stretch=etire, anchor=ancre)
         barre = ttk.Scrollbar(zone, command=self.arbre.yview)
         self.arbre.configure(yscrollcommand=barre.set)
-        barre.pack(side="right", fill="y")
+        barre.pack(side="right", fill="y", padx=(4, 0))
         self.arbre.pack(side="left", fill="both", expand=True)
         self.arbre.bind("<<TreeviewSelect>>", lambda e: self.selection_element())
         self.arbre.bind("<Double-1>", lambda e: self.basculer_element())
-        ttk.Label(cadre, style="Aide.TLabel",
-                  text="Double-cliquez sur une ligne pour masquer ou ne plus masquer cet élément.").pack(
-            anchor="w", pady=(6, 0))
+        ttk.Label(cadre, style="Aide.TLabel", text=t("aide_elements")).pack(anchor="w", pady=(6, 0))
+        self.arbre_elements_couleurs()
         return cadre
 
     def construire_termes(self, parent):
-        cadre = ttk.Frame(parent, padding=(8, 0, 0, 0))
-        self.titre_termes = ttk.Label(cadre, text="Termes de cette conversation", style="Titre.TLabel")
+        t = self.t
+        cadre = ttk.Frame(parent, padding=(10, 0, 0, 0))
+        self.titre_termes = ttk.Label(cadre, style="Titre.TLabel")
         self.titre_termes.pack(anchor="w", pady=(0, 2))
         self.aide_termes = ttk.Label(cadre, style="Aide.TLabel")
-        self.aide_termes.pack(anchor="w", pady=(0, 4))
-        self.termes = ListeTermes(cadre, self.police, self.ajouter_terme, self.supprimer_termes)
+        self.aide_termes.pack(anchor="w", pady=(0, 8))
+        self.termes = ListeTermes(self, cadre, self.ajouter_terme, self.supprimer_termes, hauteur=4)
         self.termes.pack(fill="both", expand=True)
         pied = ttk.Frame(cadre)
-        pied.pack(fill="x", pady=(6, 0))
-        ttk.Button(pied, text="Supprimer", command=self.supprimer_termes).pack(side="right")
-        ttk.Button(pied, text="Toujours masquer", command=self.rendre_permanents).pack(side="right", padx=(0, 6))
-        ttk.Label(pied, style="Aide.TLabel", text="Clic droit sur un mot → Masquer (Ctrl+M)").pack(side="left")
+        pied.pack(fill="x", pady=(8, 0))
+        ttk.Button(pied, text=t("supprimer"), command=self.supprimer_termes).pack(side="right")
+        ttk.Button(pied, text=t("toujours_masquer"), command=self.rendre_permanents).pack(side="right", padx=(0, 8))
+        ttk.Label(pied, style="Aide.TLabel", text=t("aide_clic_droit")).pack(side="left")
         return cadre
+
+    def reconstruire(self):
+        """Reconstruit l'interface (changement de langue), sans toucher aux conversations."""
+        self.sauver_zones()
+        for attente in self.attentes.values():
+            self.root.after_cancel(attente)
+        self.attentes = {}
+        for enfant in self.root.winfo_children():
+            enfant.destroy()
+        self.construire()
+        self.appliquer_theme(force=True)
+        self.charger_zones()
 
     # --- mises à jour -----------------------------------------------------
     def message(self, texte):
@@ -410,11 +507,9 @@ class Application:
 
     def maj_resume_options(self):
         n = len(self.options.permanents)
-        self.resume_options.configure(
-            text=f"{len(self.options.types)}/{len(TYPES_AUTO)} types détectés · {n} terme(s) toujours masqué(s)")
-        if hasattr(self, "aide_termes"):
-            self.aide_termes.configure(
-                text=f"+ {n} terme(s) toujours masqué(s), voir Options")
+        self.resume_options.configure(text=self.t("resume_options", t=len(self.options.types),
+                                                  total=len(TYPES_AUTO), n=n))
+        self.aide_termes.configure(text=self.t("aide_termes_conv", n=n))
 
     def modifie(self, widget, action):
         if not widget.edit_modified():
@@ -432,8 +527,7 @@ class Application:
         self.sortie.ecrire(res.texte, res.spans_sortie, "jeton")
         self.remplir_elements(res)
         if self.source.lire().strip():
-            self.message(f"{sum(res.compte.values())} remplacement(s), {len(res.compte)} élément(s) différent(s). "
-                         "Relisez le texte de droite, puis cliquez sur « Copier pour l'IA ».")
+            self.message(self.t("msg_compte", r=sum(res.compte.values()), e=len(res.compte)))
 
     def actualiser_reponse(self):
         self.attentes.pop(self.actualiser_reponse, None)
@@ -443,39 +537,45 @@ class Application:
         self.restauree.ecrire(res.texte, res.spans_sortie, "jeton")
         if not self.reponse.lire().strip():
             return
-        texte = f"{sum(res.compte.values())} jeton(s) restauré(s)."
+        texte = self.t("msg_restaure", n=sum(res.compte.values()))
         if res.inconnus:
-            texte += (f" {len(res.inconnus)} jeton(s) inconnu(s), en rouge : la réponse vient sans doute "
-                      "d'une autre conversation.")
+            texte += self.t("msg_inconnus", n=len(res.inconnus))
         self.message(texte)
 
+    def libelle(self, type_, valeur):
+        if type_ == "NOM" and valeur.casefold() in {p.casefold() for p in self.options.permanents}:
+            return self.t("type_permanent")
+        return self.t(f"type_{type_}")
+
     def remplir_elements(self, res):
+        """Tous les éléments masqués de la conversation, y compris ceux des messages précédents."""
         selection = self.arbre.selection()
         self.arbre.delete(*self.arbre.get_children())
-        permanents = {t.casefold() for t in self.options.permanents}
-        for jeton in res.ordre:
+        presents = set(res.ordre)
+        for jeton in res.ordre + [j for j in self.moteur.jetons() if j not in presents]:
             type_, valeur = self.moteur.info(jeton)
             exclu = jeton in self.moteur.exclus
-            libelle = "Terme permanent" if type_ == "NOM" and valeur.casefold() in permanents else LIBELLES[type_]
             nb = res.ignores[jeton] if exclu else res.compte[jeton]
-            self.arbre.insert("", "end", iid=jeton, tags=("exclu",) if exclu else (),
-                              values=(jeton, libelle + (" (en clair)" if exclu else ""),
-                                      normaliser(valeur), nb))
+            tags = ("exclu",) if exclu else () if nb else ("absent",)
+            self.arbre.insert("", "end", iid=jeton, tags=tags,
+                              values=(jeton, self.libelle(type_, valeur) + (self.t("en_clair") if exclu else ""),
+                                      normaliser(valeur), nb or "–"))
         garde = [s for s in selection if self.arbre.exists(s)]
         if garde:
             self.arbre.selection_set(garde)
-        self.titre_elements.configure(text=f"Éléments masqués ({len(res.compte)})")
+        self.titre_elements.configure(text=self.t("elements", n=len(self.moteur.jetons())))
         self.selection_element()
 
     def selection_element(self):
         selection = self.arbre.selection()
         self.source.texte.tag_remove("actif", "1.0", "end")
         if not selection:
-            self.bouton_basculer.configure(state="disabled", text="Ne plus masquer")
+            self.bouton_basculer.configure(state="disabled", text=self.t("ne_plus_masquer"))
             return
         jeton = selection[0]
         exclu = jeton in self.moteur.exclus
-        self.bouton_basculer.configure(state="normal", text="Masquer à nouveau" if exclu else "Ne plus masquer")
+        self.bouton_basculer.configure(state="normal",
+                                       text=self.t("masquer_a_nouveau" if exclu else "ne_plus_masquer"))
         spans = [s for s in (self.resultat.spans_source if self.resultat else []) if s[2] == jeton]
         self.source.surligner(spans, "actif")
         if spans:
@@ -483,16 +583,15 @@ class Application:
 
     def maj_termes(self):
         self.termes.remplir(self.conv.termes)
-        self.titre_termes.configure(text=f"Termes de cette conversation ({len(self.conv.termes)})")
+        self.titre_termes.configure(text=self.t("termes_conv", n=len(self.conv.termes)))
 
     def maj_conversations(self):
-        self.liste_conv.delete(0, "end")
-        for c in self.conversations:
+        self.arbre_conv.delete(*self.arbre_conv.get_children())
+        for i, c in enumerate(self.conversations):
             n = len(c.moteur.valide)
-            self.liste_conv.insert("end", f"{c.nom}  ·  {n} jeton(s)" if n else c.nom)
-        self.liste_conv.selection_clear(0, "end")
-        self.liste_conv.selection_set(self.courante)
-        self.liste_conv.see(self.courante)
+            self.arbre_conv.insert("", "end", iid=str(i), text=c.nom, values=(n or "",))
+        self.arbre_conv.selection_set(str(self.courante))
+        self.arbre_conv.see(str(self.courante))
 
     # --- conversations ----------------------------------------------------
     def sauver_zones(self):
@@ -515,35 +614,34 @@ class Application:
     def nouvelle_conversation(self):
         self.sauver_zones()
         self.numero += 1
-        self.conversations.append(Conversation(f"Conversation {self.numero}"))
+        self.conversations.append(Conversation(self.t("nom_conversation", n=self.numero), self.t.langue))
         self.courante = len(self.conversations) - 1
         self.charger_zones()
         self.onglets.select(0)
-        self.message(f"{self.conv.nom} créée : collez votre premier texte à gauche.")
+        self.message(self.t("msg_conversation_creee", c=self.conv.nom))
+        self.sauvegarder()
 
     def changer_conversation(self):
-        selection = self.liste_conv.curselection()
-        if not selection or selection[0] == self.courante:
+        selection = self.arbre_conv.selection()
+        if not selection or int(selection[0]) == self.courante:
             return
         self.sauver_zones()
-        self.courante = selection[0]
+        self.courante = int(selection[0])
         self.charger_zones()
-        self.message(f"{self.conv.nom} : les réponses collées seront restaurées avec ses jetons.")
+        self.message(self.t("msg_conversation_choisie", c=self.conv.nom))
 
     def renommer_conversation(self):
-        nom = simpledialog.askstring("Renommer", "Nom de la conversation :", initialvalue=self.conv.nom,
-                                     parent=self.root)
+        nom = simpledialog.askstring(self.t("renommer_titre"), self.t("renommer_question"),
+                                     initialvalue=self.conv.nom, parent=self.root)
         if nom and nom.strip():
             self.conv.nom = nom.strip()
             self.maj_conversations()
             self.root.title(f"IA-Anonymiser {VERSION} — {self.conv.nom}")
+            self.sauvegarder()
 
     def fermer_conversation(self):
         if self.moteur.valide and not messagebox.askyesno(
-            "Fermer la conversation",
-            f"Les correspondances de « {self.conv.nom} » seront oubliées : les réponses de l'IA à cette "
-            "conversation ne pourront plus être restaurées.\n\nContinuer ?",
-        ):
+                self.t("fermer_titre"), self.t("fermer_question", c=self.conv.nom), parent=self.root):
             return
         del self.conversations[self.courante]
         if not self.conversations:
@@ -552,10 +650,61 @@ class Application:
             return
         self.courante = min(self.courante, len(self.conversations) - 1)
         self.charger_zones()
+        self.sauvegarder()
 
     def valider(self):
         self.moteur.valider()
         self.maj_conversations()
+        if self.resultat:
+            self.remplir_elements(self.resultat)
+        self.sauvegarder()
+
+    # --- conservation -----------------------------------------------------
+    def reprendre_conversations(self):
+        if not self.options.conserver:
+            return 0
+        try:
+            donnees = stockage.charger_conversations()
+        except Exception as e:
+            messagebox.showwarning(self.t("illisible_titre"), self.t("illisible", e=e), parent=self.root)
+            return 0
+        if not donnees:
+            return 0
+        for d in donnees.get("conversations", []):
+            try:
+                self.conversations.append(Conversation.depuis_etat(d, self.t.langue))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        if not self.conversations:
+            return 0
+        self.courante = min(max(int(donnees.get("courante", 0)), 0), len(self.conversations) - 1)
+        self.numero = max(int(donnees.get("numero", 0)), len(self.conversations))
+        return len(self.conversations)
+
+    def sauvegarder(self):
+        if not self.options.conserver or not self.conversations:
+            return
+        self.sauver_zones()
+        try:
+            stockage.sauver_conversations({
+                "version": 1, "courante": self.courante, "numero": self.numero,
+                "conversations": [c.etat() for c in self.conversations]})
+        except Exception as e:
+            self.message(self.t("msg_erreur_sauvegarde", e=e))
+
+    def sauvegarde_periodique(self):
+        self.sauvegarder()
+        self.root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
+
+    def quitter(self):
+        if self.options.conserver:
+            self.sauvegarder()
+        else:
+            actives = [c for c in self.conversations if c.moteur.valide]
+            if actives and not messagebox.askyesno(self.t("quitter_titre"),
+                                                   self.t("quitter_question", n=len(actives)), parent=self.root):
+                return
+        self.root.destroy()
 
     # --- éléments et termes -----------------------------------------------
     def basculer_element(self):
@@ -572,23 +721,23 @@ class Application:
     def ajouter_terme(self, terme=None, permanent=False):
         terme = normaliser(self.termes.saisie() if terme is None else terme)
         if len(terme) < 2:
-            self.message("Un terme doit contenir au moins deux caractères.")
+            self.message(self.t("msg_terme_court"))
             return
         if permanent:
-            self.options.permanents = trier(self.options.permanents + [terme])
+            self.options.permanents = stockage.trier(self.options.permanents + [terme])
             self.sauver_options()
-            self.message(f"« {terme} » sera toujours masqué, dans toutes les conversations.")
+            self.message(self.t("msg_terme_permanent", t=terme))
         else:
-            self.conv.termes = trier(self.conv.termes + [terme])
+            self.conv.termes = stockage.trier(self.conv.termes + [terme])
             self.maj_termes()
-            self.message(f"« {terme} » sera masqué dans {self.conv.nom}.")
+            self.message(self.t("msg_terme_conv", t=terme, c=self.conv.nom))
         self.moteur.reinclure("NOM", terme)
         self.actualiser()
 
     def supprimer_termes(self):
         retires = set(self.termes.selection())
         if not retires:
-            self.message("Sélectionnez d'abord un ou plusieurs termes dans la liste.")
+            self.message(self.t("msg_selection_termes"))
             return
         self.conv.termes = [t for t in self.conv.termes if t not in retires]
         self.maj_termes()
@@ -597,14 +746,14 @@ class Application:
     def rendre_permanents(self):
         choisis = self.termes.selection()
         if not choisis:
-            self.message("Sélectionnez d'abord un ou plusieurs termes à toujours masquer.")
+            self.message(self.t("msg_selection_termes"))
             return
-        self.options.permanents = trier(self.options.permanents + choisis)
+        self.options.permanents = stockage.trier(self.options.permanents + choisis)
         self.conv.termes = [t for t in self.conv.termes if t not in choisis]
         self.sauver_options()
         self.maj_termes()
         self.actualiser()
-        self.message(f"{len(choisis)} terme(s) ajouté(s) aux termes toujours masqués (voir Options).")
+        self.message(self.t("msg_rendus_permanents", n=len(choisis)))
 
     def selection_source(self):
         try:
@@ -615,221 +764,367 @@ class Application:
     def masquer_selection(self, permanent=False):
         selection = self.selection_source()
         if not selection:
-            self.message("Sélectionnez d'abord un mot dans le texte original.")
+            self.message(self.t("msg_selection_mot"))
             return
         self.ajouter_terme(selection, permanent=permanent)
 
     def menu_contextuel(self, evenement):
+        t, texte = self.t, self.source.texte
         self.menu.delete(0, "end")
         selection = self.selection_source()
         if len(selection) >= 2:
             court = selection if len(selection) <= 40 else selection[:37] + "…"
-            self.menu.add_command(label=f"Masquer « {court} » dans cette conversation",
-                                  command=self.masquer_selection)
-            self.menu.add_command(label=f"Toujours masquer « {court} »",
+            self.menu.add_command(label=t("menu_masquer_conv", t=court), command=self.masquer_selection)
+            self.menu.add_command(label=t("menu_toujours", t=court),
                                   command=lambda: self.masquer_selection(permanent=True))
             self.menu.add_separator()
-            self.menu.add_command(label="Copier", command=lambda: self.source.texte.event_generate("<<Copy>>"))
-        self.menu.add_command(label="Coller", command=lambda: self.source.texte.event_generate("<<Paste>>"))
-        self.menu.add_command(label="Tout sélectionner",
-                              command=lambda: self.source.texte.tag_add("sel", "1.0", "end-1c"))
+            self.menu.add_command(label=t("menu_copier"), command=lambda: texte.event_generate("<<Copy>>"))
+        self.menu.add_command(label=t("menu_coller"), command=lambda: texte.event_generate("<<Paste>>"))
+        self.menu.add_command(label=t("menu_tout"), command=lambda: texte.tag_add("sel", "1.0", "end-1c"))
         self.menu.tk_popup(evenement.x_root, evenement.y_root)
 
-    # --- options ----------------------------------------------------------
-    def sauver_options(self):
-        try:
-            self.options.sauver()
-        except OSError as e:
-            self.message(f"Impossible d'enregistrer les options : {e}")
-        self.maj_resume_options()
-
-    def ouvrir_options(self):
-        fen = tk.Toplevel(self.root)
-        fen.title("Options")
-        fen.transient(self.root)
-        self.fenetre_options = fen
-        cadre = ttk.Frame(fen, padding=18)
-        cadre.pack(fill="both", expand=True)
-
-        colonnes = ttk.Frame(cadre)
-        colonnes.pack(fill="both", expand=True)
-
-        gauche = ttk.Frame(colonnes)
-        gauche.pack(side="left", fill="y", anchor="n")
-        ttk.Label(gauche, text="Masquer automatiquement", style="Titre.TLabel").pack(anchor="w")
-        ttk.Label(gauche, style="Aide.TLabel", text="Décochez ce que vous voulez laisser en clair.").pack(
-            anchor="w", pady=(0, 8))
-        cases = {}
-        for type_ in TYPES_AUTO:
-            cases[type_] = tk.BooleanVar(value=type_ in self.options.types)
-            ligne = ttk.Frame(gauche)
-            ligne.pack(fill="x", pady=2)
-            ttk.Checkbutton(ligne, text=LIBELLES[type_], variable=cases[type_]).pack(anchor="w")
-            ttk.Label(ligne, text=f"ex. {EXEMPLES[type_]}", style="Aide.TLabel").pack(
-                anchor="w", padx=(int(24 * self.echelle), 0))
-        ttk.Separator(gauche).pack(fill="x", pady=12)
-        consigne = tk.BooleanVar(value=self.options.consigne)
-        ttk.Checkbutton(gauche, text="Ajouter une consigne pour l'IA en copiant", variable=consigne).pack(anchor="w")
-        ttk.Label(gauche, style="Aide.TLabel", wraplength=int(320 * self.echelle), justify="left",
-                  text="Demande à l'IA de garder les jetons tels quels : la restauration est plus fiable.").pack(
-            anchor="w", padx=(int(24 * self.echelle), 0))
-
-        droite = ttk.Frame(colonnes, padding=(int(28 * self.echelle), 0, 0, 0))
-        droite.pack(side="left", fill="both", expand=True)
-        ttk.Label(droite, text="Termes toujours masqués", style="Titre.TLabel").pack(anchor="w")
-        ttk.Label(droite, style="Aide.TLabel", wraplength=int(340 * self.echelle), justify="left",
-                  text="Nom de l'entreprise, des clients, des collègues, adresses… Ils sont masqués dans "
-                       "toutes les conversations et restent enregistrés.").pack(anchor="w", pady=(0, 8))
-        permanents = list(self.options.permanents)
-
-        def ajouter():
-            t = liste.saisie()
-            if len(t) >= 2:
-                permanents[:] = trier(permanents + [t])
-                liste.remplir(permanents)
-
-        def supprimer():
-            retires = set(liste.selection())
-            permanents[:] = [t for t in permanents if t not in retires]
-            liste.remplir(permanents)
-
-        liste = ListeTermes(droite, self.police, ajouter, supprimer)
-        liste.pack(fill="both", expand=True)
-        liste.liste.configure(height=12, width=32)
-        liste.remplir(permanents)
-        ttk.Button(droite, text="Supprimer la sélection", command=supprimer).pack(anchor="e", pady=(6, 0))
-
-        def enregistrer():
-            self.options.types = {t for t, v in cases.items() if v.get()}
-            self.options.permanents = trier(permanents)
-            self.options.consigne = consigne.get()
-            self.sauver_options()
-            fen.destroy()
-            self.actualiser()
-            self.message("Options enregistrées.")
-
-        boutons = ttk.Frame(cadre)
-        boutons.pack(fill="x", pady=(16, 0))
-        ttk.Button(boutons, text="Enregistrer", command=enregistrer).pack(side="right")
-        ttk.Button(boutons, text="Annuler", command=fen.destroy).pack(side="right", padx=(0, 6))
-        fen.bind("<Escape>", lambda e: fen.destroy())
-
-        fen.update_idletasks()
-        x = self.root.winfo_rootx() + (self.root.winfo_width() - fen.winfo_reqwidth()) // 2
-        y = self.root.winfo_rooty() + (self.root.winfo_height() - fen.winfo_reqheight()) // 3
-        fen.geometry(f"+{max(0, x)}+{max(0, y)}")
-        fen.grab_set()
-        liste.champ.focus_set()
-
     # --- presse-papiers ---------------------------------------------------
+    def vider(self, zone):
+        zone.ecrire("")
+        zone.texte.edit_modified(True)
+
     def coller(self, zone):
-        texte = self.lire_presse_papiers()
-        if texte is None:
-            self.message("Le presse-papiers ne contient pas de texte.")
+        try:
+            texte = self.root.clipboard_get()
+        except tk.TclError:
+            self.message(self.t("msg_presse_papiers_vide"))
             return
         zone.ecrire(texte)
         zone.texte.edit_modified(True)
-
-    def copier_sortie(self):
-        texte = self.sortie.lire()
-        if not texte.strip():
-            self.message("Rien à copier : collez d'abord un texte à gauche.")
-            return
-        self.valider()
-        if self.options.consigne and self.resultat and self.resultat.compte:
-            texte = CONSIGNE + texte
-        self.ecrire_presse_papiers(texte)
-        self.message("Copié. Collez-le dans la conversation avec l'IA, puis collez sa réponse dans l'onglet 2.")
-
-    def copier_restauree(self):
-        texte = self.restauree.lire()
-        if not texte.strip():
-            self.message("Rien à copier : collez d'abord la réponse de l'IA à gauche.")
-            return
-        self.ecrire_presse_papiers(texte)
-        self.message("Réponse avec les vraies valeurs copiée.")
-
-    def lire_presse_papiers(self):
-        try:
-            return self.root.clipboard_get()
-        except tk.TclError:
-            return None
 
     def ecrire_presse_papiers(self, texte):
         self.root.clipboard_clear()
         self.root.clipboard_append(texte)
         self.root.update()
-        self.dernier_presse_papiers = texte
 
-    def basculer_auto(self):
-        self.dernier_presse_papiers = self.lire_presse_papiers()
-        if self.auto.get():
-            self.message("Mode automatique : tout texte copié est anonymisé, et toute réponse contenant des "
-                         "jetons est restaurée avec la conversation sélectionnée.")
-        else:
-            self.message("Mode automatique désactivé.")
-
-    def sonder(self):
-        if self.auto.get():
-            texte = self.lire_presse_papiers()
-            if texte and texte != self.dernier_presse_papiers:
-                if JETON_RE.search(texte):
-                    self.reponse.ecrire(texte)
-                    self.actualiser_reponse()
-                    self.onglets.select(1)
-                    self.ecrire_presse_papiers(self.restauree.lire())
-                    self.message(f"Réponse restaurée dans le presse-papiers ({self.conv.nom}).")
-                else:
-                    self.source.ecrire(texte)
-                    self.actualiser()
-                    self.onglets.select(0)
-                    self.copier_sortie()
-                    self.message(f"Texte anonymisé dans le presse-papiers ({self.conv.nom}) : collez-le dans l'IA.")
-        self.root.after(SONDE_MS, self.sonder)
-
-    def quitter(self):
-        actives = [c for c in self.conversations if c.moteur.valide]
-        if actives and not messagebox.askyesno(
-            "Quitter",
-            f"Les correspondances de {len(actives)} conversation(s) seront perdues : les réponses de l'IA "
-            "ne pourront plus être restaurées.\n\nQuitter quand même ?",
-        ):
+    def copier_sortie(self):
+        texte = self.sortie.lire()
+        if not texte.strip():
+            self.message(self.t("msg_rien_copier"))
             return
-        self.root.destroy()
+        self.valider()
+        if self.options.consigne and self.resultat and self.resultat.compte:
+            texte = self.consigne() + texte
+        self.ecrire_presse_papiers(texte)
+        self.message(self.t("msg_copie_ia"))
+
+    def copier_restauree(self):
+        texte = self.restauree.lire()
+        if not texte.strip():
+            self.message(self.t("msg_rien_restaurer"))
+            return
+        self.ecrire_presse_papiers(texte)
+        self.message(self.t("msg_copie_restauree"))
+
+    # --- fenêtres ---------------------------------------------------------
+    def fenetre(self, titre):
+        fen = tk.Toplevel(self.root)
+        fen.title(titre)
+        fen.transient(self.root)
+        fen.withdraw()
+        return fen
+
+    def afficher(self, fen, focus=None):
+        fen.update_idletasks()
+        x = self.root.winfo_rootx() + (self.root.winfo_width() - fen.winfo_reqwidth()) // 2
+        y = self.root.winfo_rooty() + (self.root.winfo_height() - fen.winfo_reqheight()) // 3
+        fen.geometry(f"+{max(0, x)}+{max(0, y)}")
+        fen.deiconify()
+        barre_de_titre(fen, self.theme_applique == "sombre")
+        fen.bind("<Escape>", lambda e: fen.destroy())
+        fen.grab_set()
+        (focus or fen).focus_set()
+
+    def sauver_options(self):
+        try:
+            self.options.sauver()
+        except OSError as e:
+            self.message(self.t("msg_erreur_options", e=e))
+        self.maj_resume_options()
+
+    def ouvrir_options(self):
+        t, e = self.t, self.echelle
+        fen = self.fenetre(t("opt_titre"))
+        self.fenetre_options = fen
+        cadre = ttk.Frame(fen, padding=20)
+        cadre.pack(fill="both", expand=True)
+        onglets = ttk.Notebook(cadre)
+        onglets.pack(fill="both", expand=True)
+        self.onglets_options = onglets
+        largeur_texte = int(520 * e)
+
+        # Détection
+        o = ttk.Frame(onglets, padding=18)
+        onglets.add(o, text=t("opt_detection"))
+        ttk.Label(o, text=t("opt_masquer_auto"), style="Section.TLabel").pack(anchor="w")
+        ttk.Label(o, text=t("opt_masquer_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", pady=(2, 10))
+        grille = ttk.Frame(o)
+        grille.pack(fill="x")
+        cases = {}
+        for i, type_ in enumerate(TYPES_AUTO):
+            cases[type_] = tk.BooleanVar(value=type_ in self.options.types)
+            case = ttk.Frame(grille, padding=(0, 4, 24, 4))
+            case.grid(row=i // 2, column=i % 2, sticky="w")
+            ttk.Checkbutton(case, text=t(f"type_{type_}"), variable=cases[type_]).pack(anchor="w")
+            ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
+                anchor="w", padx=(int(28 * e), 0))
+
+        # Termes permanents
+        o = ttk.Frame(onglets, padding=18)
+        onglets.add(o, text=t("opt_termes"))
+        ttk.Label(o, text=t("opt_termes_titre"), style="Section.TLabel").pack(anchor="w")
+        ttk.Label(o, text=t("opt_termes_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", pady=(2, 10))
+        permanents = list(self.options.permanents)
+
+        def ajouter():
+            terme = liste.saisie()
+            if len(terme) >= 2:
+                permanents[:] = stockage.trier(permanents + [terme])
+                liste.remplir(permanents)
+
+        def supprimer():
+            retires = set(liste.selection())
+            permanents[:] = [x for x in permanents if x not in retires]
+            liste.remplir(permanents)
+
+        liste = ListeTermes(self, o, ajouter, supprimer, hauteur=8)
+        liste.pack(fill="both", expand=True)
+        liste.remplir(permanents)
+        ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer).pack(anchor="e", pady=(8, 0))
+
+        # Consigne pour l'IA
+        o = ttk.Frame(onglets, padding=18)
+        onglets.add(o, text=t("opt_consigne"))
+        avec_consigne = tk.BooleanVar(value=self.options.consigne)
+        ttk.Checkbutton(o, text=t("opt_consigne_activer"), variable=avec_consigne).pack(anchor="w")
+        ttk.Label(o, text=t("opt_consigne_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", pady=(2, 10))
+        zone_consigne = Zone(self, o, "")
+        zone_consigne.entete.pack_forget()
+        zone_consigne.texte.configure(height=7, width=60)
+        zone_consigne.pack(fill="both", expand=True)
+        zone_consigne.colorer(self.palette)
+        zone_consigne.ecrire(self.options.consigne_texte or CONSIGNES[t.langue])
+        ttk.Button(o, text=t("opt_consigne_defaut"),
+                   command=lambda: zone_consigne.ecrire(CONSIGNES[t.langue])).pack(anchor="e", pady=(8, 0))
+
+        # Général
+        o = ttk.Frame(onglets, padding=18)
+        onglets.add(o, text=t("opt_general"))
+        ttk.Label(o, text=t("opt_langue"), style="Section.TLabel").pack(anchor="w")
+        langues = [("auto", t("opt_langue_auto")), ("fr", "Français"), ("en", "English")]
+        choix_langue = ttk.Combobox(o, state="readonly", values=[n for _, n in langues], width=34)
+        choix_langue.current([c for c, _ in langues].index(self.options.langue))
+        choix_langue.pack(anchor="w", pady=(6, 16))
+        ttk.Label(o, text=t("opt_theme"), style="Section.TLabel").pack(anchor="w")
+        theme = tk.StringVar(value=self.options.theme)
+        ligne = ttk.Frame(o)
+        ligne.pack(anchor="w", pady=(6, 16))
+        for valeur, cle in (("auto", "opt_theme_auto"), ("clair", "opt_theme_clair"), ("sombre", "opt_theme_sombre")):
+            ttk.Radiobutton(ligne, text=t(cle), value=valeur, variable=theme).pack(side="left", padx=(0, 18))
+        conserver = tk.BooleanVar(value=self.options.conserver)
+        ttk.Checkbutton(o, text=t("opt_conserver"), variable=conserver).pack(anchor="w")
+        ttk.Label(o, text=t("opt_conserver_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", padx=(int(28 * e), 0), pady=(2, 8))
+
+        def effacer():
+            stockage.effacer_conversations()
+            self.message(t("opt_effacees"))
+
+        ttk.Button(o, text=t("opt_effacer_conversations"), command=effacer).pack(
+            anchor="w", padx=(int(28 * e), 0))
+
+        def enregistrer():
+            ancienne_langue = self.t.langue
+            self.options.types = {k for k, v in cases.items() if v.get()}
+            self.options.permanents = stockage.trier(permanents)
+            self.options.consigne = avec_consigne.get()
+            texte = zone_consigne.lire().strip()
+            self.options.consigne_texte = None if not texte or texte == CONSIGNES[t.langue] else texte
+            self.options.langue = langues[choix_langue.current()][0]
+            self.options.theme = theme.get()
+            self.options.conserver = conserver.get()
+            self.sauver_options()
+            fen.destroy()
+            if self.options.conserver:
+                self.sauvegarder()
+            else:
+                stockage.effacer_conversations()
+            nouvelle_langue = self.options.langue_effective()
+            if nouvelle_langue != ancienne_langue:
+                self.t = Traducteur(nouvelle_langue)
+                for c in self.conversations:
+                    c.moteur.langue = nouvelle_langue
+                self.reconstruire()
+            else:
+                self.appliquer_theme()
+                self.actualiser()
+            self.message(self.t("msg_options_ok"))
+
+        boutons = ttk.Frame(cadre)
+        boutons.pack(fill="x", pady=(16, 0))
+        ttk.Button(boutons, text=t("enregistrer"), command=enregistrer, style="Accent.TButton").pack(side="right")
+        ttk.Button(boutons, text=t("annuler"), command=fen.destroy).pack(side="right", padx=(0, 8))
+        self.afficher(fen)
+
+    def lien(self, parent, texte, url):
+        etiquette = ttk.Label(parent, text=texte, style="Lien.TLabel", cursor="hand2")
+        etiquette.bind("<Button-1>", lambda e: webbrowser.open(url))
+        etiquette.pack(anchor="w", pady=2)
+        return etiquette
+
+    def ouvrir_a_propos(self):
+        t, e = self.t, self.echelle
+        fen = self.fenetre(t("ap_titre"))
+        self.fenetre_a_propos = fen
+        cadre = ttk.Frame(fen, padding=24)
+        cadre.pack(fill="both", expand=True)
+        largeur = int(500 * e)
+
+        haut = ttk.Frame(cadre)
+        haut.pack(fill="x")
+        if self.icone_entete:
+            ttk.Label(haut, image=self.icone_entete).pack(side="left", padx=(0, 14))
+        titres = ttk.Frame(haut)
+        titres.pack(side="left")
+        ttk.Label(titres, text="IA-Anonymiser", style="Entete.TLabel").pack(anchor="w")
+        ttk.Label(titres, text=t("ap_version", v=VERSION), style="Aide.TLabel").pack(anchor="w")
+        ttk.Label(cadre, text=t("ap_description"), wraplength=largeur, justify="left").pack(anchor="w", pady=(14, 14))
+
+        verif = ttk.Frame(cadre)
+        verif.pack(fill="x")
+        bouton = ttk.Button(verif, text=t("ap_verifier"))
+        bouton.pack(side="left")
+        resultat = ttk.Label(verif, style="Aide.TLabel")
+        resultat.pack(side="left", padx=(12, 0))
+        telecharger = ttk.Label(cadre, text=t("ap_telecharger"), style="Lien.TLabel", cursor="hand2")
+        ttk.Label(cadre, text=t("ap_verifier_aide"), style="Aide.TLabel", wraplength=largeur,
+                  justify="left").pack(anchor="w", pady=(6, 0))
+
+        def afficher_resultat(tag, url, erreur):
+            if not fen.winfo_exists():
+                return
+            bouton.configure(state="normal")
+            if erreur:
+                resultat.configure(text=t("ap_erreur", e=erreur))
+                return
+            installee, publiee = version_tuple(VERSION), version_tuple(tag)
+            if installee and publiee and publiee > installee:
+                resultat.configure(text=t("ap_nouvelle", v=tag))
+                telecharger.bind("<Button-1>", lambda ev: webbrowser.open(url))
+                telecharger.pack(anchor="w", pady=(6, 0), after=verif)
+            elif installee:
+                resultat.configure(text=t("ap_a_jour"))
+            else:
+                resultat.configure(text=t("ap_derniere", v=tag))
+
+        def verifier():
+            bouton.configure(state="disabled")
+            resultat.configure(text=t("ap_recherche"))
+
+            def tache():
+                tag = url = erreur = ""
+                try:
+                    requete = urllib.request.Request(API_DERNIERE, headers={
+                        "User-Agent": f"IA-Anonymiser/{VERSION}", "Accept": "application/vnd.github+json"})
+                    with urllib.request.urlopen(requete, timeout=10) as r:
+                        d = json.load(r)
+                    tag, url = d.get("tag_name", ""), d.get("html_url") or DEPOT + "/releases/latest"
+                except Exception as exc:
+                    erreur = str(getattr(exc, "reason", exc))
+                self.root.after(0, afficher_resultat, tag, url, erreur)
+
+            threading.Thread(target=tache, daemon=True).start()
+
+        bouton.configure(command=verifier)
+
+        for titre, contenu in ((t("ap_liens"), None), (t("ap_donnees"), t("ap_donnees_texte")),
+                               (t("ap_licence"), t("ap_licence_texte"))):
+            ttk.Label(cadre, text=titre, style="Section.TLabel").pack(anchor="w", pady=(18, 4))
+            if contenu:
+                ttk.Label(cadre, text=contenu, wraplength=largeur, justify="left").pack(anchor="w")
+            else:
+                self.lien(cadre, t("ap_source"), DEPOT)
+                self.lien(cadre, t("ap_releases"), DEPOT + "/releases")
+                self.lien(cadre, t("ap_probleme"), DEPOT + "/issues")
+
+        def support():
+            infos = (f"IA-Anonymiser {VERSION}\n{platform.platform()}\nPython {platform.python_version()}, "
+                     f"Tk {tk.TkVersion}\nLangue : {self.t.langue} ({self.options.langue}), "
+                     f"thème : {self.theme_applique} ({self.options.theme}), "
+                     f"Sun Valley : {'oui' if sv_ttk else 'non'}\n"
+                     f"Types : {', '.join(sorted(self.options.types))}\n"
+                     f"Conversations conservées : {'oui' if self.options.conserver else 'non'}")
+            self.ecrire_presse_papiers(infos)
+            info.configure(text=t("ap_support_copie"))
+
+        bas = ttk.Frame(cadre)
+        bas.pack(fill="x", pady=(22, 0))
+        ttk.Button(bas, text=t("ap_support"), command=support).pack(side="left")
+        info = ttk.Label(bas, style="Aide.TLabel")
+        info.pack(side="left", padx=(10, 0))
+        ttk.Button(bas, text=t("fermer"), command=fen.destroy, style="Accent.TButton").pack(side="right")
+        self.afficher(fen)
 
 
-DEMO = (
-    "Bonjour,\n\nPeux-tu rédiger une relance pour Jean Dupont (Acme SAS) ? Il n'a pas réglé la "
-    "facture F-2026-118. Ses coordonnées : jean.dupont@acme-sas.fr, 06 12 34 56 78.\n"
-    "Le virement est attendu sur FR76 3000 6000 0112 3456 7890 189.\n\nMerci, Claire Martin"
-)
-DEMO_SERVEURS = (
-    "Le serveur srv-paie01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) ne répond plus depuis la "
-    "mise à jour. Le proxy proxy.acme.local redirige vers intranet.acme.fr.\n"
-    "Le fichier de log est joint : erreur.log. Peux-tu m'aider à diagnostiquer ?\n\nMerci, Claire Martin"
-)
+# --- captures d'écran (intégration continue) -----------------------------------
+DEMO = {
+    "fr": (
+        "Bonjour,\n\nPeux-tu rédiger une relance pour Jean Dupont (Acme SAS) ? Il n'a pas réglé la facture "
+        "F-2026-118. Ses coordonnées : jean.dupont@acme-sas.fr, 06 12 34 56 78.\n"
+        "Le virement est attendu sur FR76 3000 6000 0112 3456 7890 189.\n\nMerci, Claire Martin",
+        "Voici une proposition :\n\nBonjour [NOM_1],\n\nSauf erreur de notre part, la facture F-2026-118 reste "
+        "impayée. Merci d'effectuer le virement sur [IBAN_1].\n\nCordialement,\n[NOM_3]",
+        "Relance facture", "Panne serveur paie",
+        "Le serveur srv-paie01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) ne répond plus depuis la mise à "
+        "jour. Le proxy proxy.acme.local redirige vers intranet.acme.fr.\nLe fichier de log est joint : "
+        "erreur.log. Peux-tu m'aider ?\n\nMerci, Claire Martin",
+    ),
+    "en": (
+        "Hello,\n\nCould you write a reminder for John Smith (Acme Ltd)? He hasn't paid invoice F-2026-118. "
+        "His details: john.smith@acme-ltd.com, +44 20 7946 0958.\n"
+        "Payment is expected on GB29 NWBK 6016 1331 9268 19.\n\nThanks, Claire Martin",
+        "Here is a draft:\n\nDear [NAME_1],\n\nAccording to our records, invoice F-2026-118 is still unpaid. "
+        "Please make the transfer to [IBAN_1].\n\nBest regards,\n[NAME_3]",
+        "Invoice reminder", "Payroll server down",
+        "Server srv-pay01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) stopped responding after the update. "
+        "The proxy proxy.acme.local redirects to intranet.acme.com.\nThe log file is attached: error.log. "
+        "Can you help?\n\nThanks, Claire Martin",
+    ),
+}
 
 
 def capture(app, chemin):
-    """Mode réservé à l'intégration continue : remplit la fenêtre d'exemples fictifs et la photographie."""
-    app.options.permanents = ["Acme SAS", "Claire Martin"]
-    app.options.sauver = lambda: None  # ne rien écrire sur la machine de capture
-    app.maj_resume_options()
-    app.conv.nom = "Relance facture"
-    app.conv.termes = ["Jean Dupont"]
-    app.maj_termes()
-    app.source.ecrire(DEMO)
-    app.actualiser()
-    app.valider()
-    app.reponse.ecrire("Voici une proposition :\n\nBonjour [NOM_1],\n\nSauf erreur de notre part, la facture "
-                       "F-2026-118 reste impayée. Merci d'effectuer le virement sur [IBAN_1].\n\n"
-                       "Cordialement,\n[NOM_3]")
-    app.actualiser_reponse()
-    app.nouvelle_conversation()
-    app.conv.nom = "Panne serveur paie"
-    app.source.ecrire(DEMO_SERVEURS)
-    app.actualiser()
-    app.maj_conversations()
+    """Remplit la fenêtre d'exemples fictifs et photographie les écrans principaux."""
+    app.sauvegarder = lambda: None
+    app.options.sauver = lambda: None
+
+    def remplir():
+        texte, reponse, nom1, nom2, serveurs = DEMO[app.t.langue]
+        app.options.permanents = ["Acme SAS", "Acme Ltd", "Claire Martin"]
+        app.conversations, app.numero = [], 0
+        app.nouvelle_conversation()
+        app.conv.nom = nom1
+        app.conv.termes = ["Jean Dupont" if app.t.langue == "fr" else "John Smith"]
+        app.charger_zones()
+        app.source.ecrire(texte)
+        app.actualiser()
+        app.valider()
+        app.reponse.ecrire(reponse)
+        app.actualiser_reponse()
+        app.nouvelle_conversation()
+        app.conv.nom = nom2
+        app.source.ecrire(serveurs)
+        app.actualiser()
+        app.maj_conversations()
+        app.maj_resume_options()
 
     def photo(fenetre, nom):
         from PIL import ImageGrab
@@ -838,31 +1133,60 @@ def capture(app, chemin):
         w, h = fenetre.winfo_width(), fenetre.winfo_height()
         ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(os.path.join(chemin, nom))
 
+    def conversation(i, onglet):
+        app.arbre_conv.selection_set(str(i))
+        app.changer_conversation()
+        app.onglets.select(onglet)
+
+    def theme(nom):
+        app.options.theme = nom
+        app.appliquer_theme()
+
+    def langue(code):
+        app.t = Traducteur(code)
+        app.reconstruire()
+        remplir()
+
+    def options(onglet):
+        app.ouvrir_options()
+        app.onglets_options.select(onglet)
+
     etapes = [
-        lambda: photo(app.root, "onglet1.png"),
-        lambda: (app.liste_conv.selection_clear(0, "end"), app.liste_conv.selection_set(0),
-                 app.changer_conversation(), app.onglets.select(1)),
-        lambda: photo(app.root, "onglet2.png"),
-        app.ouvrir_options,
-        lambda: photo(app.fenetre_options, "options.png"),
+        lambda: theme("clair"), remplir,
+        lambda: photo(app.root, "clair-anonymiser.png"),
+        lambda: conversation(0, 1), lambda: photo(app.root, "clair-restaurer.png"),
+        lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
+        lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-consigne.png"),
+        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-general.png"),
+        lambda: app.fenetre_options.destroy(),
+        app.ouvrir_a_propos, lambda: photo(app.fenetre_a_propos, "a-propos.png"),
+        lambda: app.fenetre_a_propos.destroy(),
+        lambda: (theme("sombre"), conversation(1, 0)), lambda: photo(app.root, "sombre-anonymiser.png"),
+        lambda: conversation(0, 1), lambda: photo(app.root, "sombre-restaurer.png"),
+        lambda: langue("en"), lambda: conversation(0, 1), lambda: photo(app.root, "en-sombre-restaurer.png"),
+        lambda: (theme("clair"), conversation(1, 0)), lambda: photo(app.root, "en-clair-anonymiser.png"),
         app.root.destroy,
     ]
 
     def suivante(i=0):
         etapes[i]()
         if i + 1 < len(etapes):
-            app.root.after(800, suivante, i + 1)
+            app.root.after(700, suivante, i + 1)
 
     app.root.after(1500, suivante)
 
 
 def main():
+    capture_dans = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == "--capture" else None
+    if capture_dans:
+        import tempfile
+        os.environ["APPDATA"] = tempfile.mkdtemp()  # ne rien lire ni écrire dans la vraie configuration
+        os.makedirs(capture_dans, exist_ok=True)
     activer_dpi()
     root = tk.Tk()
     app = Application(root)
-    if len(sys.argv) == 3 and sys.argv[1] == "--capture":
-        os.makedirs(sys.argv[2], exist_ok=True)
-        capture(app, sys.argv[2])
+    if capture_dans:
+        capture(app, capture_dans)
     root.mainloop()
 
 

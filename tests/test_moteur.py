@@ -117,5 +117,35 @@ class Restauration(unittest.TestCase):
         self.assertEqual(a.restaurer(r.texte).texte, texte)
 
 
+class Langues(unittest.TestCase):
+    def test_jetons_en_anglais(self):
+        a = Anonymiseur("en")
+        r = a.anonymiser("John Smith, 06 12 34 56 78, 4111 1111 1111 1111", ["John Smith"])
+        self.assertEqual(r.texte, "[NAME_1], [PHONE_1], [CARD_1]")
+        self.assertEqual(a.restaurer("Hi [name_1]").texte, "Hi John Smith")
+
+    def test_changement_de_langue_en_cours(self):
+        a = Anonymiseur("fr")
+        a.anonymiser("Jean Dupont", ["Jean Dupont"])
+        a.valider()
+        a.langue = "en"
+        r = a.anonymiser("Jean Dupont et Paul Martin", ["Jean Dupont", "Paul Martin"])
+        self.assertEqual(r.texte, "[NOM_1] et [NAME_2]")
+        self.assertEqual(a.restaurer("[NOM_1] [NAME_2]").texte, "Jean Dupont Paul Martin")
+
+
+class Etat(unittest.TestCase):
+    def test_sauvegarde_et_reprise(self):
+        a = Anonymiseur()
+        a.anonymiser("a@b.fr et 06 12 34 56 78", [])
+        a.valider()
+        a.exclus.add("[TEL_1]")
+        b = Anonymiseur()
+        b.charger_etat(a.etat())
+        self.assertEqual(b.restaurer("[EMAIL_1]").texte, "a@b.fr")
+        self.assertEqual(b.anonymiser("x@y.fr, 06 12 34 56 78", []).texte, "[EMAIL_2], 06 12 34 56 78")
+        self.assertEqual(b.jetons(), ["[EMAIL_1]", "[TEL_1]", "[EMAIL_2]"])
+
+
 if __name__ == "__main__":
     unittest.main()
