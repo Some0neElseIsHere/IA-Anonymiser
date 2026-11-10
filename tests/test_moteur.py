@@ -75,6 +75,18 @@ class Jetons(unittest.TestCase):
         r = a.anonymiser("x@y.fr puis a@b.fr", [])
         self.assertEqual(r.texte, "[EMAIL_2] puis [EMAIL_1]")
 
+    def test_meme_donnee_ecrite_autrement(self):
+        a = Anonymiseur()
+        a.anonymiser("+33 6 12 34 56 78, FR76 3000 6000 0112 3456 7890 189, 3C:52:82:1A:9F:07", [])
+        a.valider()
+        r = a.anonymiser("06.12.34.56.78 / 0033612345678 / +33 (0)6 12 34 56 78 / FR7630006000011234567890189 / "
+                         "3c-52-82-1a-9f-07", [])
+        self.assertEqual(r.texte, "[TEL_1] / [TEL_1] / [TEL_1] / [IBAN_1] / [MAC_1]")
+
+    def test_numeros_differents(self):
+        _, r = anon("06 12 34 56 78 et 06 12 34 56 79, +44 20 7946 0958")
+        self.assertEqual(r.texte, "[TEL_1] et [TEL_2], [TEL_3]")
+
     def test_frappe_progressive_ne_cree_pas_de_jetons(self):
         a = Anonymiseur()
         a.anonymiser("jean@ex.f", [])

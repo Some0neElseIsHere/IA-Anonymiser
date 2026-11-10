@@ -69,7 +69,22 @@ JETON_RE = re.compile(
 )
 
 
-def _cle(valeur):
+def _cle(valeur, type_=None):
+    """Clé de comparaison : les différentes écritures d'une même donnée donnent le même jeton."""
+    if type_ == "TEL":
+        compact = re.sub(r"[\s.()-]", "", valeur)
+        chiffres = re.sub(r"\D", "", valeur)
+        if compact.startswith("+33"):
+            chiffres = chiffres[2:]
+        elif compact.startswith("0033"):
+            chiffres = chiffres[4:]
+        else:
+            return ("+" if compact.startswith("+") else "") + chiffres
+        return "0" + chiffres.lstrip("0")  # +33 6…, 0033 6…, +33 (0)6… → 06…
+    if type_ in ("IBAN", "CARTE", "SECU"):
+        return re.sub(r"[\s.-]", "", valeur).upper()
+    if type_ == "MAC":
+        return re.sub(r"[:-]", "", valeur).upper()
     return " ".join(valeur.split()).casefold()
 
 
@@ -99,7 +114,7 @@ class Anonymiseur:
 
     # --- jetons -----------------------------------------------------------
     def _jeton(self, type_, valeur):
-        cle = (type_, _cle(valeur))
+        cle = (type_, _cle(valeur, type_))
         jeton = self.index.get(cle) or self._apercu_index.get(cle)
         if jeton:
             return jeton
@@ -124,7 +139,7 @@ class Anonymiseur:
         self.reinitialiser()
         for jeton, (type_, valeur) in etat.get("valide", {}).items():
             self.valide[jeton] = (type_, valeur)
-            self.index[(type_, _cle(valeur))] = jeton
+            self.index[(type_, _cle(valeur, type_))] = jeton
         self.exclus = set(etat.get("exclus", [])) & set(self.valide)
         self._compteurs = Counter(t for t, _ in self.valide.values())
 
@@ -136,7 +151,7 @@ class Anonymiseur:
         self._compteurs = Counter(t for t, _ in self.valide.values())
 
     def reinclure(self, type_, valeur):
-        cle = (type_, _cle(valeur))
+        cle = (type_, _cle(valeur, type_))
         jeton = self.index.get(cle) or self._apercu_index.get(cle)
         self.exclus.discard(jeton)
 
