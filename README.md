@@ -22,17 +22,19 @@ Chaque [release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases) co
 
 ### Une conversation par discussion avec l'IA
 
-La colonne de gauche liste vos conversations. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. Le tableau « Éléments masqués dans cette conversation » liste tous les éléments déjà masqués, y compris ceux des messages précédents.
+La colonne de gauche liste vos conversations. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. L'onglet **3. Éléments masqués** liste tous les éléments déjà masqués dans la conversation, y compris ceux des messages précédents.
 
 **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Un jeton inconnu de cette conversation apparaît en rouge.
 
-Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Double-cliquez sur une conversation pour la renommer.
+Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour la renommer ou la fermer.
 
 ### Ce qui est masqué
 
 - **Automatiquement** : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale, adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`). Les noms de fichiers comme `rapport.pdf` ne sont pas pris pour des domaines.
 - **Termes permanents** : le nom de votre entreprise, de vos clients, de vos collègues… Ils se règlent dans **Options**, sont enregistrés et s'appliquent à toutes les conversations.
-- **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans le panneau du bas, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** en fait un terme permanent.
+- **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans l'onglet **3. Éléments masqués**, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** en fait un terme permanent.
+
+![Onglet Éléments masqués](docs/clair-elements.png)
 
 Double-cliquez sur une ligne du tableau des éléments masqués pour laisser cet élément en clair, ou pour le masquer à nouveau.
 

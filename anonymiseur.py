@@ -261,7 +261,6 @@ class Application:
             self.nouvelle_conversation()
         else:
             self.charger_zones()
-        self.message(self.t("msg_accueil"))
         root.protocol("WM_DELETE_WINDOW", self.quitter)
         root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
         root.after(THEME_MS, self.suivre_theme_windows)
@@ -361,9 +360,10 @@ class Application:
         for zone in self.textes_tk:
             if zone.winfo_exists():
                 zone.colorer(p)
-        if hasattr(self, "menu"):
-            self.menu.configure(background=p["fond"], foreground=p["texte"], activebackground=p["selection"],
-                                activeforeground=p["texte"], relief="flat", borderwidth=1)
+        for menu in (getattr(self, "menu", None), getattr(self, "menu_conv", None)):
+            if menu:
+                menu.configure(background=p["fond"], foreground=p["texte"], activebackground=p["selection"],
+                               activeforeground=p["texte"], relief="flat", borderwidth=1)
         for fenetre in [self.root] + [w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel)]:
             barre_de_titre(fenetre, sombre)
 
@@ -384,11 +384,9 @@ class Application:
         self.lateral = lateral = ttk.Panedwindow(root, orient="horizontal")
         lateral.pack(fill="both", expand=True, padx=18, pady=(12, 0))
         lateral.add(self.construire_conversations(lateral), weight=0)
-        self.principal = principal = ttk.Panedwindow(lateral, orient="vertical")
-        lateral.add(principal, weight=1)
 
-        self.onglets = ttk.Notebook(principal)
-        principal.add(self.onglets, weight=3)
+        self.onglets = ttk.Notebook(lateral)
+        lateral.add(self.onglets, weight=1)
 
         o1 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o1, text=t("onglet_anonymiser"))
@@ -414,22 +412,23 @@ class Application:
         p2.add(self.reponse, weight=1)
         p2.add(self.restauree, weight=1)
 
-        bas = ttk.Frame(principal, padding=(0, 14, 0, 0))
-        principal.add(bas, weight=2)
-        pb = ttk.Panedwindow(bas, orient="horizontal")
-        pb.pack(fill="both", expand=True)
-        pb.add(self.construire_elements(pb), weight=3)
-        pb.add(self.construire_termes(pb), weight=2)
+        o3 = ttk.Frame(self.onglets, padding=12)
+        self.onglets.add(o3, text=t("onglet_elements", n=0))
+        self.p3 = p3 = ttk.Panedwindow(o3, orient="horizontal")
+        p3.pack(fill="both", expand=True)
+        p3.add(self.construire_elements(p3), weight=3)
+        p3.add(self.construire_termes(p3), weight=2)
 
         self.source.texte.bind("<<Modified>>", lambda e: self.modifie(self.source.texte, self.actualiser))
         self.reponse.texte.bind("<<Modified>>",
                                 lambda e: self.modifie(self.reponse.texte, self.actualiser_reponse))
         self.sortie.texte.bind("<<Copy>>", lambda e: self.valider(), add="+")
         self.menu = tk.Menu(root, tearoff=0)
+        self.menu_conv = tk.Menu(root, tearoff=0)
         self.source.texte.bind("<Button-3>", self.menu_contextuel)
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
         self.proportion(self.lateral, lambda l, h: min(int(250 * self.echelle), l // 3))
-        self.proportion(self.principal, lambda l, h: int(h * 0.6))
+        self.proportion(self.p3, lambda l, h: int(l * 0.62))
         self.proportion(self.p1, lambda l, h: l // 2)
         self.proportion(self.p2, lambda l, h: l // 2)
 
@@ -477,12 +476,8 @@ class Application:
         self.arbre_conv.bind("<<TreeviewSelect>>", lambda e: self.changer_conversation())
         self.arbre_conv.bind("<Double-1>", lambda e: self.renommer_conversation())
         self.arbre_conv.bind("<F2>", lambda e: self.renommer_conversation())
-        pied = ttk.Frame(cadre)
-        pied.pack(fill="x", pady=(8, 0))
-        ttk.Button(pied, text=t("renommer"), command=self.renommer_conversation).pack(
-            side="left", fill="x", expand=True)
-        ttk.Button(pied, text=t("fermer"), command=self.fermer_conversation).pack(
-            side="left", fill="x", expand=True, padx=(8, 0))
+        self.arbre_conv.bind("<Delete>", lambda e: self.fermer_conversation())
+        self.arbre_conv.bind("<Button-3>", self.menu_conversation)
         ttk.Label(cadre, style="Aide.TLabel", wraplength=int(210 * self.echelle), justify="left",
                   text=t("aide_conversations")).pack(anchor="w", pady=(10, 0))
         return cadre
@@ -604,7 +599,9 @@ class Application:
         garde = [s for s in selection if self.arbre.exists(s)]
         if garde:
             self.arbre.selection_set(garde)
-        self.titre_elements.configure(text=self.t("elements", n=len(self.moteur.jetons())))
+        n = len(self.moteur.jetons())
+        self.titre_elements.configure(text=self.t("elements", n=n))
+        self.onglets.tab(2, text=self.t("onglet_elements", n=n))
         self.selection_element()
 
     def selection_element(self):
@@ -672,6 +669,20 @@ class Application:
         self.courante = int(selection[0])
         self.charger_zones()
         self.message(self.t("msg_conversation_choisie", c=self.conv.nom))
+
+    def menu_conversation(self, evenement):
+        ligne = self.arbre_conv.identify_row(evenement.y)
+        if ligne:
+            self.arbre_conv.selection_set(ligne)
+            self.changer_conversation()
+        t, menu = self.t, self.menu_conv
+        menu.delete(0, "end")
+        if ligne:
+            menu.add_command(label=t("renommer"), command=self.renommer_conversation)
+            menu.add_command(label=t("fermer"), command=self.fermer_conversation)
+            menu.add_separator()
+        menu.add_command(label=t("nouvelle_conversation").lstrip("+ "), command=self.nouvelle_conversation)
+        menu.tk_popup(evenement.x_root, evenement.y_root)
 
     def renommer_conversation(self):
         nom = simpledialog.askstring(self.t("renommer_titre"), self.t("renommer_question"),
@@ -1211,6 +1222,7 @@ def capture(app, chemin):
         lambda: photo(app.root, "clair-anonymiser.png"),
         lambda: conversation(0, 1), lambda: photo(app.root, "clair-restaurer.png"),
         lambda: conversation(0, 0), lambda: photo(app.root, "clair-relance.png"),
+        lambda: conversation(0, 2), lambda: photo(app.root, "clair-elements.png"),
         lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
         lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-consigne.png"),
         lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-general.png"),
