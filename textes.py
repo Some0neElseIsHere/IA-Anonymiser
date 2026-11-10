@@ -36,7 +36,7 @@ TEXTES = {
         "supprimer": "Supprimer",
         "toujours_masquer": "Toujours masquer",
         "aide_clic_droit": "Clic droit sur un mot → Masquer (Ctrl+M)",
-        "resume_options": "{t}/{total} types détectés · {n} terme(s) permanent(s)",
+        "resume_options": "{t}/{total} types · {n} terme(s) permanent(s)",
         # types
         "type_EMAIL": "E-mail",
         "type_TEL": "Téléphone",
@@ -169,7 +169,7 @@ TEXTES = {
         "supprimer": "Remove",
         "toujours_masquer": "Always mask",
         "aide_clic_droit": "Right-click a word → Mask (Ctrl+M)",
-        "resume_options": "{t}/{total} types detected · {n} permanent term(s)",
+        "resume_options": "{t}/{total} types · {n} permanent term(s)",
         "type_EMAIL": "Email",
         "type_TEL": "Phone",
         "type_IBAN": "IBAN",
