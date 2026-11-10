@@ -1,8 +1,8 @@
 # IA-Anonymiser
 
-Masquez vos données personnelles avant de les envoyer à une IA (Claude, ChatGPT…), puis remettez les vraies valeurs dans sa réponse, en un clic.
+Masquez vos données personnelles avant de les envoyer à une IA (Claude, ChatGPT…), puis remettez les vraies valeurs dans sa réponse, en un clic. En français et en anglais, avec un thème clair ou sombre.
 
-![Onglet Anonymiser](docs/onglet1.png)
+![Onglet Anonymiser](docs/clair-relance.png)
 
 ## Télécharger
 
@@ -16,41 +16,49 @@ Téléchargez **IA-Anonymiser.exe** dans la [dernière release](https://github.c
 2. Cliquez sur **Copier pour l'IA** et collez le texte dans votre conversation.
 3. **Onglet « Restaurer la réponse de l'IA »** : collez la réponse de l'IA à gauche. À droite, les jetons comme `[NOM_1]` sont remplacés par les vraies valeurs. Cliquez sur **Copier**.
 
-![Onglet Restaurer](docs/onglet2.png)
+![Onglet Restaurer](docs/clair-restaurer.png)
 
-### Plusieurs conversations
+### Une conversation par discussion avec l'IA
 
-La colonne de gauche liste vos conversations. Créez-en une par discussion avec l'IA : chacune garde ses propres jetons, donc `[NOM_1]` peut désigner une personne différente dans deux conversations. **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Double-cliquez sur une conversation pour la renommer.
+La colonne de gauche liste vos conversations. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. Le tableau « Éléments masqués dans cette conversation » liste tous les éléments déjà masqués, y compris ceux des messages précédents.
+
+**Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Un jeton inconnu de cette conversation apparaît en rouge.
+
+Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Double-cliquez sur une conversation pour la renommer.
 
 ### Ce qui est masqué
 
 - **Automatiquement** : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale, adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`). Les noms de fichiers comme `rapport.pdf` ne sont pas pris pour des domaines.
-- **Termes toujours masqués** : le nom de votre entreprise, de vos clients, de vos collègues… Ils se règlent dans **Options**, sont enregistrés et s'appliquent à toutes les conversations.
-- **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans le panneau du bas, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** le fait passer dans les termes permanents.
+- **Termes permanents** : le nom de votre entreprise, de vos clients, de vos collègues… Ils se règlent dans **Options**, sont enregistrés et s'appliquent à toutes les conversations.
+- **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans le panneau du bas, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** en fait un terme permanent.
 
-Le tableau « Éléments masqués » montre chaque élément remplacé. Double-cliquez sur une ligne pour le laisser en clair, ou pour le masquer à nouveau.
+Double-cliquez sur une ligne du tableau des éléments masqués pour laisser cet élément en clair, ou pour le masquer à nouveau.
 
-### Options
+## Options
 
-![Options](docs/options.png)
+![Options](docs/options-detection.png)
 
-- **Masquer automatiquement** : cochez les types de données à détecter. Les termes sont toujours masqués, même si un type est décoché.
-- **Termes toujours masqués** : voir plus haut.
-- **Ajouter une consigne pour l'IA en copiant** : ajoute une phrase demandant à l'IA de garder les jetons tels quels. Elle est activée par défaut, ce qui rend la restauration plus fiable.
+- **Détection** : cochez les types de données à masquer automatiquement.
+- **Termes permanents** : la liste des termes toujours masqués.
+- **Consigne pour l'IA** : un texte ajouté au début de ce que vous copiez, qui demande à l'IA de garder les jetons tels quels. Vous pouvez le modifier, le désactiver ou rétablir le texte par défaut.
+- **Général** :
+  - la langue (automatique, français ou anglais) ;
+  - le thème (automatique comme Windows, clair ou sombre) ;
+  - la conservation des conversations après la fermeture.
 
-Dans la barre du haut, le **mode automatique du presse-papiers** anonymise tout texte que vous copiez et restaure toute réponse contenant des jetons, avec la conversation sélectionnée. Attention : il s'applique à *tout* ce que vous copiez tant qu'il est activé.
+En anglais, les jetons sont aussi traduits : `[NAME_1]`, `[PHONE_1]`, `[CARD_1]`… Les deux formes sont reconnues lors de la restauration.
+
+![Thème sombre](docs/sombre-anonymiser.png)
 
 ## Confidentialité
 
-- Tout se passe sur votre ordinateur : l'application n'envoie rien sur Internet.
-- Les correspondances entre jetons et vraies valeurs restent en mémoire et disparaissent à la fermeture, ou quand vous fermez une conversation. Gardez l'application ouverte pendant toute la discussion avec l'IA.
-- Seules les options et les termes toujours masqués sont enregistrés, dans `%APPDATA%\IA-Anonymiser\options.json`.
+- Tout se passe sur votre ordinateur : vos textes ne sont envoyés nulle part. Seul le bouton **Rechercher une nouvelle version**, dans À propos, contacte GitHub, et uniquement pour connaître le numéro de la dernière version.
+- Les options et les termes permanents sont enregistrés dans `%APPDATA%\IA-Anonymiser\options.json`.
+- Les conversations, qui contiennent les vraies valeurs, sont enregistrées dans `%APPDATA%\IA-Anonymiser\conversations.dat`, **chiffrées avec votre compte Windows** (DPAPI). Un autre compte, ou une copie du fichier sur un autre ordinateur, ne peut pas les lire. Vous pouvez désactiver cette conservation, ou effacer le fichier, dans **Options → Général**.
 
 ## Limites
 
 La détection repose sur des motifs. Elle ne reconnaît pas un nom qui ne figure pas dans vos termes, une adresse postale doit être ajoutée comme terme, et un nom de machine sans point (`SRV-PAIE01`) aussi. À l'inverse, la détection des FQDN peut masquer des mots comme `ASP.NET` : double-cliquez sur la ligne pour les laisser en clair. **Relisez toujours le texte de droite avant de l'envoyer.**
-
-Si l'IA modifie un jeton au point de le rendre méconnaissable, ou si elle en invente un, il reste tel quel et apparaît en rouge dans l'onglet Restaurer.
 
 ## Vérifier le téléchargement
 
@@ -64,4 +72,8 @@ L'empreinte affichée doit correspondre à celle du fichier.
 
 ## Publier une nouvelle version
 
-Dans l'onglet **Actions**, ouvrez **Construction et release**, cliquez sur **Run workflow** et saisissez le numéro de version (par exemple `v1.2.0`). Les tests sont lancés, puis l'exe est compilé et publié dans une release.
+Dans l'onglet **Actions**, ouvrez **Construction et release**, cliquez sur **Run workflow** et saisissez le numéro de version (par exemple `v1.4.0`). Les tests sont lancés, puis l'exe est compilé et publié dans une release.
+
+## Licence
+
+GNU GPL v3. IA-Anonymiser utilise Python (licence PSF), Tcl/Tk (licence BSD) et le thème [Sun Valley](https://github.com/rdbende/Sun-Valley-ttk-theme) (licence MIT).
