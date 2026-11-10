@@ -368,10 +368,10 @@ class Application:
         self.statut = ttk.Label(root, style="Statut.TLabel", padding=(18, 6, 18, 10), anchor="w")
         self.statut.pack(side="bottom", fill="x")
 
-        lateral = ttk.Panedwindow(root, orient="horizontal")
+        self.lateral = lateral = ttk.Panedwindow(root, orient="horizontal")
         lateral.pack(fill="both", expand=True, padx=18, pady=(14, 0))
         lateral.add(self.construire_conversations(lateral), weight=0)
-        principal = ttk.Panedwindow(lateral, orient="vertical")
+        self.principal = principal = ttk.Panedwindow(lateral, orient="vertical")
         lateral.add(principal, weight=1)
 
         self.onglets = ttk.Notebook(principal)
@@ -379,7 +379,7 @@ class Application:
 
         o1 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o1, text=t("onglet_anonymiser"))
-        p1 = ttk.Panedwindow(o1, orient="horizontal")
+        self.p1 = p1 = ttk.Panedwindow(o1, orient="horizontal")
         p1.pack(fill="both", expand=True)
         self.source = Zone(self, p1, t("texte_original"), marge=(0, 0, 10, 0))
         self.source.bouton(t("effacer"), lambda: self.vider(self.source))
@@ -391,7 +391,7 @@ class Application:
 
         o2 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o2, text=t("onglet_restaurer"))
-        p2 = ttk.Panedwindow(o2, orient="horizontal")
+        self.p2 = p2 = ttk.Panedwindow(o2, orient="horizontal")
         p2.pack(fill="both", expand=True)
         self.reponse = Zone(self, p2, t("reponse_ia"), marge=(0, 0, 10, 0))
         self.reponse.bouton(t("effacer"), lambda: self.vider(self.reponse))
@@ -416,6 +416,18 @@ class Application:
         self.source.texte.bind("<Button-3>", self.menu_contextuel)
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
         self.maj_resume_options()
+        self.root.after_idle(self.positionner_separateurs)
+
+    def positionner_separateurs(self):
+        """Proportions fixes : sinon, une interface reconstruite peut écraser les zones de texte."""
+        self.root.update_idletasks()
+        try:
+            self.lateral.sashpos(0, int(250 * self.echelle))
+            self.principal.sashpos(0, int(self.principal.winfo_height() * 0.6))
+            for pan in (self.p1, self.p2):
+                pan.sashpos(0, pan.winfo_width() // 2)
+        except tk.TclError:
+            pass
 
     def construire_conversations(self, parent):
         t = self.t
@@ -1155,6 +1167,7 @@ def capture(app, chemin):
         lambda: theme("clair"), lambda: langue("fr"),
         lambda: photo(app.root, "clair-anonymiser.png"),
         lambda: conversation(0, 1), lambda: photo(app.root, "clair-restaurer.png"),
+        lambda: conversation(0, 0), lambda: photo(app.root, "clair-relance.png"),
         lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
         lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-consigne.png"),
         lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-general.png"),
