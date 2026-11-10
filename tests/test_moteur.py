@@ -41,6 +41,27 @@ class Detection(unittest.TestCase):
         _, r = anon("contact@acme.fr", ["acme"])
         self.assertEqual(r.texte, "[EMAIL_1]")
 
+    def test_fqdn(self):
+        _, r = anon("Serveurs srv-paie01.acme.local et intranet.acme.fr.")
+        self.assertEqual(r.texte, "Serveurs [FQDN_1] et [FQDN_2].")
+
+    def test_fqdn_pas_les_fichiers(self):
+        _, r = anon("Voir rapport.pdf et config.yml, version 2.4.1")
+        self.assertEqual(r.texte, "Voir rapport.pdf et config.yml, version 2.4.1")
+
+    def test_fqdn_dans_url(self):
+        _, r = anon("https://intranet.acme.fr/rh")
+        self.assertEqual(r.texte, "https://[FQDN_1]/rh")
+
+    def test_mac(self):
+        _, r = anon("MAC 00:1A:2B:3C:4D:5E ou 00-1a-2b-3c-4d-5f")
+        self.assertEqual(r.texte, "MAC [MAC_1] ou [MAC_2]")
+
+    def test_types_choisis(self):
+        a = Anonymiseur()
+        r = a.anonymiser("a@b.fr, 10.0.0.1, srv.acme.fr, Acme", ["Acme"], types={"IP"})
+        self.assertEqual(r.texte, "a@b.fr, [IP_1], srv.[NOM_1].fr, [NOM_1]")
+
     def test_texte_sans_donnee(self):
         _, r = anon("Bonjour, version 2.0 du 12/03/2024.")
         self.assertEqual(r.texte, "Bonjour, version 2.0 du 12/03/2024.")

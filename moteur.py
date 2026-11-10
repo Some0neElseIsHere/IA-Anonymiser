@@ -13,8 +13,31 @@ LIBELLES = {
     "CARTE": "Carte bancaire",
     "SECU": "N° de sécurité sociale",
     "IP": "Adresse IP",
+    "MAC": "Adresse MAC",
+    "FQDN": "Nom de domaine (FQDN)",
     "NOM": "Terme personnalisé",
 }
+
+# Types détectés automatiquement (les termes personnalisés sont à part).
+TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN"]
+
+EXEMPLES = {
+    "EMAIL": "jean.dupont@exemple.fr",
+    "TEL": "06 12 34 56 78, +33 1 23 45 67 89",
+    "IBAN": "FR76 3000 6000 0112 3456 7890 189",
+    "CARTE": "4111 1111 1111 1111",
+    "SECU": "1 85 05 78 006 084 36",
+    "IP": "192.168.1.10",
+    "MAC": "00:1A:2B:3C:4D:5E",
+    "FQDN": "srv-paie01.acme.local, intranet.acme.fr",
+}
+
+# Un « domaine » qui se termine par une extension de fichier est un nom de fichier (rapport.pdf).
+EXTENSIONS_FICHIERS = set(
+    "pdf doc docx docm xls xlsx xlsm csv ppt pptx odt ods odp rtf txt md log ini cfg conf json xml yml "
+    "yaml toml html htm css js ts jsx tsx py java cs cpp go rs rb php sql sh bat cmd ps1 vbs exe dll msi "
+    "jar apk zip rar 7z gz tar iso png jpg jpeg gif bmp svg webp ico mp3 mp4 wav mov avi mkv eml msg "
+    "tmp bak old dat db sqlite lnk".split())
 
 # Ordre important : les motifs les plus spécifiques passent en premier.
 MOTIFS = [
@@ -29,7 +52,17 @@ MOTIFS = [
         r"|(?<![\w+])\+\d{1,3}[\s.-]?\d{1,4}(?:[\s.-]?\d{2,4}){2,4}(?!\w)"           # international
     )),
     ("IP", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
+    ("MAC", re.compile(r"(?<![\w:-])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![\w:-])")),
+    ("FQDN", re.compile(
+        r"(?<![\w@.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63})(?![\w-]|\.\w)",
+        re.IGNORECASE)),
 ]
+
+
+def _accepte(type_, m):
+    if type_ == "FQDN":
+        return m.group(1).lower() not in EXTENSIONS_FICHIERS
+    return True
 
 # Tolère les variantes qu'une IA peut produire : [nom_1], [ NOM_1 ], [NOM 1], \[NOM\_1\] (Markdown)…
 JETON_RE = re.compile(
@@ -91,7 +124,8 @@ class Anonymiseur:
         self.exclus.discard(jeton)
 
     # --- traitements ------------------------------------------------------
-    def anonymiser(self, texte, termes=()):
+    def anonymiser(self, texte, termes=(), types=None):
+        """types : ensemble des types détectés automatiquement (None = tous)."""
         # Les jetons d'un aperçu non copié sont recalculés à chaque fois : taper
         # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
         self._apercu, self._apercu_index = {}, {}
@@ -102,8 +136,10 @@ class Anonymiseur:
             return all(f <= a or d >= b for a, b in occupe)
 
         for type_, motif in MOTIFS:
+            if types is not None and type_ not in types:
+                continue
             for m in motif.finditer(texte):
-                if libre(*m.span()):
+                if libre(*m.span()) and _accepte(type_, m):
                     trouves.append((m.start(), m.end(), type_, m.group(0)))
                     occupe.append(m.span())
 
