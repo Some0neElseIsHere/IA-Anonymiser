@@ -3,6 +3,7 @@
 À gauche : les conversations. Onglet 1 : texte original / version anonymisée.
 Onglet 2 : réponse de l'IA / vraies valeurs. En bas : éléments masqués et termes de la conversation.
 """
+import bisect
 import json
 import os
 import platform
@@ -163,17 +164,41 @@ class Zone(ttk.Frame):
         self.texte.delete("1.0", "end")
         self.texte.insert("1.0", contenu)
         if tag:
-            self.surligner(spans, tag)
+            self.surligner(spans, tag, contenu)
         self.texte.yview_moveto(position)
         if self.lecture_seule:
             self.texte.configure(state="disabled")
         else:
             self.texte.edit_reset()
 
-    def surligner(self, spans, tag):
+    def surligner(self, spans, tag, contenu=None):
+        """Colore des plages (début, fin) exprimées en caractères depuis le début du texte.
+
+        Les positions sont converties en « ligne.colonne » : avec « 1.0+Nc », Tk recompte le texte
+        depuis le début à chaque plage, ce qui fige l'application sur un gros fichier de logs.
+        """
         self.texte.tag_remove(tag, "1.0", "end")
+        if not spans:
+            return
+        contenu = self.lire() if contenu is None else contenu
+        lignes = [0]
+        position = contenu.find("\n")
+        while position != -1:
+            lignes.append(position + 1)
+            position = contenu.find("\n", position + 1)
+
+        def index(n):
+            ligne = bisect.bisect_right(lignes, n) - 1
+            return f"{ligne + 1}.{n - lignes[ligne]}"
+
+        plages = []
         for debut, fin, _ in spans:
-            self.texte.tag_add(tag, f"1.0+{debut}c", f"1.0+{fin}c")
+            plages += (index(debut), index(fin))
+            if len(plages) >= 1000:
+                self.texte.tag_add(tag, *plages)
+                plages = []
+        if plages:
+            self.texte.tag_add(tag, *plages)
 
 
 class ListeTermes(ttk.Frame):
@@ -416,18 +441,28 @@ class Application:
         self.source.texte.bind("<Button-3>", self.menu_contextuel)
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
         self.maj_resume_options()
-        self.root.after_idle(self.positionner_separateurs)
+        self.proportion(self.lateral, lambda l, h: min(int(250 * self.echelle), l // 3))
+        self.proportion(self.principal, lambda l, h: int(h * 0.6))
+        self.proportion(self.p1, lambda l, h: l // 2)
+        self.proportion(self.p2, lambda l, h: l // 2)
 
-    def positionner_separateurs(self):
-        """Proportions fixes : sinon, une interface reconstruite peut écraser les zones de texte."""
-        self.root.update_idletasks()
-        try:
-            self.lateral.sashpos(0, int(250 * self.echelle))
-            self.principal.sashpos(0, int(self.principal.winfo_height() * 0.6))
-            for pan in (self.p1, self.p2):
-                pan.sashpos(0, pan.winfo_width() // 2)
-        except tk.TclError:
-            pass
+    def proportion(self, pan, position):
+        """Place le séparateur d'un panneau dès qu'il a sa vraie taille, une seule fois.
+
+        Placé plus tôt, quand la fenêtre n'est pas encore affichée (taille de 1 pixel), le
+        séparateur se retrouve à 0 et écrase une colonne. Le second onglet n'a sa taille
+        qu'au moment où il est affiché pour la première fois.
+        """
+        def au_redimensionnement(evenement):
+            if getattr(pan, "_place", False) or evenement.width < 100 or evenement.height < 100:
+                return
+            pan._place = True
+            try:
+                pan.sashpos(0, position(evenement.width, evenement.height))
+            except tk.TclError:
+                pass
+
+        pan.bind("<Configure>", au_redimensionnement, add="+")
 
     def construire_conversations(self, parent):
         t = self.t
@@ -529,7 +564,8 @@ class Application:
         widget.edit_modified(False)
         if action in self.attentes:
             self.root.after_cancel(self.attentes[action])
-        self.attentes[action] = self.root.after(DELAI_MS, action)
+        delai = DELAI_MS if int(widget.index("end-1c").split(".")[0]) < 2000 else 4 * DELAI_MS
+        self.attentes[action] = self.root.after(delai, action)
 
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
@@ -591,7 +627,9 @@ class Application:
         spans = [s for s in (self.resultat.spans_source if self.resultat else []) if s[2] == jeton]
         self.source.surligner(spans, "actif")
         if spans:
-            self.source.texte.see(f"1.0+{spans[0][0]}c")
+            premier = self.source.texte.tag_nextrange("actif", "1.0")
+            if premier:
+                self.source.texte.see(premier[0])
 
     def maj_termes(self):
         self.termes.remplir(self.conv.termes)
@@ -1163,7 +1201,21 @@ def capture(app, chemin):
         app.ouvrir_options()
         app.onglets_options.select(onglet)
 
+    def gros_log():
+        lignes = [f"2026-11-10 12:{i % 60:02d}:01 srv{i % 40}.acme.local [10.0.{i % 250}.{i % 200}] GET "
+                  f"/api/v1/items?id={i} 200 user{i % 50}@acme.fr" for i in range(3000)]
+        import time
+        debut = time.perf_counter()
+        app.source.ecrire("\n".join(lignes))
+        app.actualiser()
+        app.root.update()
+        with open(os.path.join(chemin, "duree-gros-log.txt"), "w", encoding="utf-8") as f:
+            f.write(f"{len(lignes)} lignes : {time.perf_counter() - debut:.2f} s\n")
+
     etapes = [
+        lambda: photo(app.root, "demarrage.png"),
+        lambda: (app.onglets.select(1), app.root.update()), lambda: photo(app.root, "demarrage-onglet2.png"),
+        lambda: (app.onglets.select(0), gros_log()), lambda: photo(app.root, "gros-log.png"),
         lambda: theme("clair"), lambda: langue("fr"),
         lambda: photo(app.root, "clair-anonymiser.png"),
         lambda: conversation(0, 1), lambda: photo(app.root, "clair-restaurer.png"),

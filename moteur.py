@@ -2,6 +2,7 @@
 
 Les correspondances jeton -> valeur restent en mémoire uniquement.
 """
+import bisect
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -94,6 +95,7 @@ class Anonymiseur:
         self.exclus = set()   # jetons que l'utilisateur ne veut plus masquer
         self._apercu = {}     # jetons du texte en cours, pas encore copiés
         self._apercu_index = {}
+        self._compteurs = Counter()  # type -> nombre de jetons déjà créés (validés + aperçu)
 
     # --- jetons -----------------------------------------------------------
     def _jeton(self, type_, valeur):
@@ -101,7 +103,8 @@ class Anonymiseur:
         jeton = self.index.get(cle) or self._apercu_index.get(cle)
         if jeton:
             return jeton
-        n = 1 + sum(1 for t, _ in (*self.valide.values(), *self._apercu.values()) if t == type_)
+        self._compteurs[type_] += 1
+        n = self._compteurs[type_]
         jeton = f"[{PREFIXES.get(self.langue, PREFIXES['fr'])[type_]}_{n}]"
         self._apercu[jeton] = (type_, valeur)
         self._apercu_index[cle] = jeton
@@ -123,12 +126,14 @@ class Anonymiseur:
             self.valide[jeton] = (type_, valeur)
             self.index[(type_, _cle(valeur))] = jeton
         self.exclus = set(etat.get("exclus", [])) & set(self.valide)
+        self._compteurs = Counter(t for t, _ in self.valide.values())
 
     def valider(self):
         """Fige les jetons du texte en cours (à appeler quand il est copié pour l'IA)."""
         self.valide.update(self._apercu)
         self.index.update(self._apercu_index)
         self._apercu, self._apercu_index = {}, {}
+        self._compteurs = Counter(t for t, _ in self.valide.values())
 
     def reinclure(self, type_, valeur):
         cle = (type_, _cle(valeur))
@@ -141,28 +146,35 @@ class Anonymiseur:
         # Les jetons d'un aperçu non copié sont recalculés à chaque fois : taper
         # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
         self._apercu, self._apercu_index = {}, {}
+        self._compteurs = Counter(t for t, _ in self.valide.values())
 
-        trouves, occupe = [], []
+        trouves = []
+        debuts, fins = [], []  # intervalles déjà pris, triés et sans chevauchement
 
-        def libre(d, f):
-            return all(f <= a or d >= b for a, b in occupe)
+        def prendre(d, f):
+            i = bisect.bisect_right(debuts, d)
+            if i and fins[i - 1] > d:          # chevauche l'intervalle précédent
+                return False
+            if i < len(debuts) and debuts[i] < f:  # chevauche le suivant
+                return False
+            debuts.insert(i, d)
+            fins.insert(i, f)
+            return True
 
         for type_, motif in MOTIFS:
             if types is not None and type_ not in types:
                 continue
             for m in motif.finditer(texte):
-                if libre(*m.span()) and _accepte(type_, m):
+                if _accepte(type_, m) and prendre(*m.span()):
                     trouves.append((m.start(), m.end(), type_, m.group(0)))
-                    occupe.append(m.span())
 
         propres = {" ".join(t.split()) for t in termes}
         for terme in sorted((t for t in propres if len(t) >= 2), key=len, reverse=True):
             motif = re.compile(
                 r"(?<!\w)" + r"\s+".join(map(re.escape, terme.split())) + r"(?!\w)", re.IGNORECASE)
             for m in motif.finditer(texte):
-                if libre(*m.span()):
+                if prendre(*m.span()):
                     trouves.append((m.start(), m.end(), "NOM", terme))
-                    occupe.append(m.span())
 
         trouves.sort()
         res = Resultat(texte="")
