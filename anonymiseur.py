@@ -20,8 +20,8 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import rapport
 import stockage
-from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif
-from textes import CONSIGNES, Traducteur, libelle_jour
+from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, expressions
+from textes import CONSIGNES, TEXTES, Traducteur, libelle_jour
 
 try:
     import sv_ttk  # thème Sun Valley (style Windows 11), clair et sombre
@@ -96,6 +96,9 @@ def version_tuple(v):
         return tuple(int(x) for x in v.lstrip("vV").split("."))
     except ValueError:
         return None
+
+
+TEXTES_CLES = set(TEXTES["fr"])
 
 
 class Conversation:
@@ -348,6 +351,7 @@ class Application:
         style.configure("Aide.TLabel", foreground=p["aide"])
         style.configure("Statut.TLabel", foreground=p["aide"])
         style.configure("Lien.TLabel", foreground=p["lien"], font=(f, 10, "underline"))
+        style.configure("LienDiscret.TLabel", foreground=p["lien"], font=(f, 9))
         style.configure("TNotebook.Tab", padding=(16, 6))
         hauteur = self.police.metrics("linespace") + int(12 * self.echelle)
         style.configure("Treeview", rowheight=hauteur, font=self.police)
@@ -1104,8 +1108,12 @@ class Application:
             case = ttk.Frame(grille, padding=(0, 4, 24, 4))
             case.grid(row=i // 2, column=i % 2, sticky="w")
             ttk.Checkbutton(case, text=t(f"type_{type_}"), variable=cases[type_]).pack(anchor="w")
-            ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
-                anchor="w", padx=(int(28 * e), 0))
+            ligne = ttk.Frame(case)
+            ligne.pack(anchor="w", padx=(int(28 * e), 0))
+            ttk.Label(ligne, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(side="left")
+            lien = ttk.Label(ligne, text=t("voir_expression"), style="LienDiscret.TLabel", cursor="hand2")
+            lien.pack(side="left", padx=(10, 0))
+            lien.bind("<Button-1>", lambda _, ty=type_: self.voir_expression(ty, fen))
 
         # Termes permanents
         o = ttk.Frame(onglets, padding=18)
@@ -1293,11 +1301,64 @@ class Application:
                 self.actualiser()
             self.message(self.t("msg_options_ok"))
 
+        # Ordre affiché : Général, Détection, Motifs personnalisés, Termes permanents, Consigne pour l'IA
+        detection, termes_perm, motifs_onglet, consigne_onglet, general = onglets.tabs()
+        for position, onglet in enumerate((general, detection, motifs_onglet, termes_perm, consigne_onglet)):
+            onglets.insert(position, onglet)
+        onglets.select(0)
+
         boutons = ttk.Frame(cadre)
         boutons.pack(fill="x", pady=(16, 0))
         ttk.Button(boutons, text=t("enregistrer"), command=enregistrer, style="Accent.TButton").pack(side="right")
         ttk.Button(boutons, text=t("annuler"), command=fen.destroy).pack(side="right", padx=(0, 8))
         self.afficher(fen)
+
+    def voir_expression(self, type_, parent):
+        """Fenêtre qui montre les expressions régulières appliquées pour un type de données."""
+        t = self.t
+        fen = tk.Toplevel(parent)
+        fen.title(t("expr_titre", t=t(f"type_{type_}")))
+        fen.transient(parent)
+        fen.withdraw()
+        self.fenetre_expression = fen
+        cadre = ttk.Frame(fen, padding=18)
+        cadre.pack(fill="both", expand=True)
+        ttk.Label(cadre, text=t(f"type_{type_}"), style="Section.TLabel").pack(anchor="w", pady=(0, 8))
+        lignes, groupe = [], False
+        for motif, insensible in expressions(type_):
+            lignes.append(f"# {t('expr_casse') if insensible else t('expr_sensible')}\n{motif}")
+            groupe = groupe or "(?P<v>" in motif
+        zone = tk.Text(cadre, wrap="char", font=("Consolas", 10), height=min(14, 3 + 3 * len(lignes)), width=90,
+                       relief="flat", padx=10, pady=8, highlightthickness=1)
+        zone.insert("1.0", "\n\n".join(lignes))
+        p = self.palette
+        zone.configure(state="disabled", background=p["fond_lecture"], foreground=p["texte"],
+                       highlightbackground=p["bordure"], selectbackground=p["selection"])
+        zone.pack(fill="both", expand=True)
+        notes = [t(f"expr_note_{type_}")] if f"expr_note_{type_}" in TEXTES_CLES else []
+        if groupe:
+            notes.append(t("expr_groupe"))
+        notes.append(t("expr_commun"))
+        for note in notes:
+            ttk.Label(cadre, text="• " + note, style="Aide.TLabel", wraplength=int(620 * self.echelle),
+                      justify="left").pack(anchor="w", pady=(8, 0))
+        bas = ttk.Frame(cadre)
+        bas.pack(fill="x", pady=(14, 0))
+        bouton_copier = ttk.Button(bas, text=t("copier"))
+        bouton_copier.configure(command=lambda: (self.ecrire_presse_papiers(zone.get("1.0", "end-1c")),
+                                                 self.confirmer(bouton_copier, "copier")))
+        bouton_copier.pack(side="left")
+        ttk.Button(bas, text=t("fermer"), command=fen.destroy, style="Accent.TButton").pack(side="right")
+        fen.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width() - fen.winfo_reqwidth()) // 2
+        y = parent.winfo_rooty() + 40
+        fen.geometry(f"+{max(0, x)}+{max(0, y)}")
+        fen.deiconify()
+        barre_de_titre(fen, self.theme_applique == "sombre")
+        fen.bind("<Escape>", lambda _: fen.destroy())
+        # À la fermeture, la fenêtre Options redevient modale
+        fen.bind("<Destroy>", lambda ev: ev.widget is fen and parent.winfo_exists() and parent.grab_set())
+        fen.grab_set()
 
     def lien(self, parent, texte, url):
         etiquette = ttk.Label(parent, text=texte, style="Lien.TLabel", cursor="hand2")
@@ -1512,11 +1573,15 @@ def capture(app, chemin):
         lambda: conversation(1, 1), lambda: photo(app.root, "clair-restaurer.png"),
         lambda: conversation(1, 0), lambda: photo(app.root, "clair-relance.png"),
         lambda: conversation(1, 2), lambda: photo(app.root, "clair-elements.png"),
-        lambda: options(0), lambda: mesurer("ouverture"), lambda: photo(app.fenetre_options, "options-detection.png"),
+        lambda: options(1), lambda: mesurer("ouverture"), lambda: photo(app.fenetre_options, "options-detection.png"),
+        lambda: app.voir_expression("SECRET", app.fenetre_options),
+        lambda: photo(app.fenetre_expression, "expression-secret.png"), lambda: app.fenetre_expression.destroy(),
+        lambda: app.voir_expression("FQDN", app.fenetre_options),
+        lambda: photo(app.fenetre_expression, "expression-fqdn.png"), lambda: app.fenetre_expression.destroy(),
         lambda: app.onglets_options.select(2), lambda: mesurer("onglet Motifs"),
         lambda: photo(app.fenetre_options, "options-motifs.png"), lambda: mesurer("onglet Motifs, 1 s après"),
-        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-consigne.png"),
-        lambda: app.onglets_options.select(4), lambda: photo(app.fenetre_options, "options-general.png"),
+        lambda: app.onglets_options.select(4), lambda: photo(app.fenetre_options, "options-consigne.png"),
+        lambda: app.onglets_options.select(0), lambda: photo(app.fenetre_options, "options-general.png"),
         lambda: app.fenetre_options.destroy(),
         app.ouvrir_a_propos, lambda: photo(app.fenetre_a_propos, "a-propos.png"),
         lambda: app.fenetre_a_propos.destroy(),

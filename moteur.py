@@ -183,6 +183,11 @@ def _plage(m):
     return debut, fin
 
 
+def expressions(type_):
+    """Expressions appliquées pour un type : [(motif, insensible_a_la_casse)], pour les afficher."""
+    return [(m.pattern, bool(m.flags & re.IGNORECASE)) for t, m in MOTIFS if t == type_]
+
+
 def compiler_motif(motif):
     """Motif personnalisé (expression régulière), insensible à la casse. Lève re.error s'il est invalide.
 
