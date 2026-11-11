@@ -1107,13 +1107,14 @@ class Application:
             cases[type_] = tk.BooleanVar(value=type_ in self.options.types)
             case = ttk.Frame(grille, padding=(0, 4, 24, 4))
             case.grid(row=i // 2, column=i % 2, sticky="w")
-            ttk.Checkbutton(case, text=t(f"type_{type_}"), variable=cases[type_]).pack(anchor="w")
             ligne = ttk.Frame(case)
-            ligne.pack(anchor="w", padx=(int(28 * e), 0))
-            ttk.Label(ligne, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(side="left")
+            ligne.pack(anchor="w")
+            ttk.Checkbutton(ligne, text=t(f"type_{type_}"), variable=cases[type_]).pack(side="left")
             lien = ttk.Label(ligne, text=t("voir_expression"), style="LienDiscret.TLabel", cursor="hand2")
             lien.pack(side="left", padx=(10, 0))
             lien.bind("<Button-1>", lambda _, ty=type_: self.voir_expression(ty, fen))
+            ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
+                anchor="w", padx=(int(28 * e), 0))
 
         # Termes permanents
         o = ttk.Frame(onglets, padding=18)
