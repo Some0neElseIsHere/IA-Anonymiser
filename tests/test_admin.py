@@ -55,7 +55,7 @@ class Secrets(unittest.TestCase):
     def test_bearer_et_url(self):
         self.assertEqual(anon("Authorization: Bearer abc.DEF-123_456xyz"), "Authorization: Bearer [SECRET_1]")
         self.assertEqual(anon("git clone https://deploy:Tok3nValue@git.acme.local/app.git"),
-                         "git clone https://deploy:[SECRET_1]@[FQDN_1]/app.git")
+                         "git clone https://[COMPTE_1]:[SECRET_1]@[FQDN_1]/app.git")
         self.assertEqual(anon("<password>Secr3t</password>"), "<password>[SECRET_1]</password>")
 
     def test_cle_privee(self):
@@ -115,8 +115,26 @@ class Comptes(unittest.TestCase):
 
     def test_dn(self):
         self.assertEqual(anon("Objet CN=Marc Lefevre,OU=Compta,DC=acme,DC=local (verrouillé)"),
-                         "Objet [DN_1] (verrouillé)")
-        self.assertEqual(anon("ldap: cn=svc-backup, ou=Services, dc=acme, dc=fr"), "ldap: [DN_1]")
+                         "Objet CN=[COMPTE_1],OU=Compta,[DN_1] (verrouillé)")
+        self.assertEqual(anon("ldap: cn=svc-backup, ou=Services, dc=acme, dc=fr"),
+                         "ldap: cn=[COMPTE_1], ou=Services, [DN_1]")
+        self.assertEqual(anon("O=Acme SAS, C=FR"), "O=[DN_1], C=FR")
+
+    def test_dn_relie_au_terme(self):
+        """Le CN reprend le jeton du terme : l'IA sait que c'est la même personne."""
+        texte = "CN=Sophie Bernard,OU=Compta,DC=acme,DC=local ajoutée. Sophie Bernard demande pourquoi."
+        self.assertEqual(anon(texte, ["Sophie Bernard"]),
+                         "CN=[NOM_1],OU=Compta,[DN_1] ajoutée. [NOM_1] demande pourquoi.")
+        # Sans terme : le nom du CN est masqué comme compte, puis reconnu ailleurs dans le texte
+        self.assertEqual(anon(texte), "CN=[COMPTE_1],OU=Compta,[DN_1] ajoutée. [COMPTE_1] demande pourquoi.")
+
+    def test_meme_domaine_meme_jeton(self):
+        self.assertEqual(anon("CN=a1,DC=acme,DC=local et CN=b2,OU=X,DC=acme,DC=local"),
+                         "CN=[COMPTE_1],[DN_1] et CN=[COMPTE_2],OU=X,[DN_1]")
+
+    def test_compte_dans_une_url(self):
+        self.assertEqual(anon("https://deploy:Pw1x@repo.acme.local/x et ftp://backup@nas.acme.local"),
+                         "https://[COMPTE_1]:[SECRET_1]@[FQDN_1]/x et ftp://[COMPTE_2]@[FQDN_2]")
 
     def test_pieges_dn(self):
         for texte in ["CN=", "x=1, y=2", "OU=Compta"]:

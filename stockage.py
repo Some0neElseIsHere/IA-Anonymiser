@@ -100,16 +100,26 @@ def trier(termes):
 
 
 def motifs_valides(motifs):
-    sortie = []
+    """Liste de {"titre", "motif"} valides et sans doublon. Accepte aussi l'ancien format (chaînes)."""
+    sortie, vus = [], set()
     for m in motifs:
-        m = str(m).strip()
-        if m and m not in sortie:
-            try:
-                compiler_motif(m)
-            except Exception:
-                continue
-            sortie.append(m)
+        if isinstance(m, dict):
+            titre, motif = str(m.get("titre", "")).strip(), str(m.get("motif", "")).strip()
+        else:
+            titre, motif = "", str(m).strip()
+        if not motif or motif in vus:
+            continue
+        try:
+            compiler_motif(motif)
+        except Exception:
+            continue
+        vus.add(motif)
+        sortie.append({"titre": titre, "motif": motif})
     return sortie
+
+
+def expressions(motifs):
+    return [m["motif"] for m in motifs]
 
 
 class Options:
@@ -118,7 +128,7 @@ class Options:
         self.chemin = os.path.join(self.dossier, "options.json")
         self.types = set(TYPES_AUTO)
         self.permanents = []
-        self.motifs = []             # expressions régulières personnalisées
+        self.motifs = []             # [{"titre", "motif"}] : expressions régulières personnalisées
         self.consigne = True
         self.consigne_texte = None   # None : texte par défaut, dans la langue de l'interface
         self.langue = "auto"         # auto, fr, en

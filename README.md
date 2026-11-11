@@ -34,7 +34,9 @@ Les conversations sont conservées d'un lancement à l'autre : vous pouvez resta
   - données personnelles : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale ;
   - réseau : adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`) ;
   - **secrets** : `password=…`, `pwd:`, `token=`, `api_key=`, chaînes de connexion, `Authorization: Bearer …`, identifiants dans une URL (`https://user:motdepasse@…`), clés AWS, GitHub, GitLab, Slack, OpenAI, Anthropic et Google, jetons JWT, clés privées. Seule la valeur est masquée (`password=[SECRET_1]`), pour que l'IA comprenne encore de quoi il s'agit ;
-  - **comptes et annuaire** : `ACME\mlefevre`, le nom d'utilisateur dans `C:\Users\…` et `/home/…`, les DN Active Directory (`CN=…,OU=…,DC=…`), les SID Windows.
+  - **comptes et annuaire** : `ACME\mlefevre`, `User Id=…`, `login=…`, le compte dans une URL (`https://deploy:…@`), le nom d'utilisateur dans `C:\Users\…` et `/home/…`, les SID Windows ;
+  - **DN Active Directory**, masqués partie par partie : `CN=Sophie Bernard,OU=Compta,DC=acme,DC=local` devient `CN=[NOM_3],OU=Compta,[DN_1]`. Le nom garde le même jeton qu'ailleurs dans la conversation, donc l'IA sait de qui il s'agit ; l'OU reste lisible.
+- **Une valeur déjà masquée l'est partout** : si `slefevre` a été masqué dans un chemin, il l'est aussi dans « user slefevre », et un mot de passe recopié plus tard dans une phrase est masqué lui aussi.
 - **Motifs personnalisés** : vos conventions de nommage, sous forme d'expressions régulières, dans **Options → Motifs personnalisés**. Par exemple `PC-\d{4}` pour les postes, `INC-\d{4}-\d+` pour les tickets, `SRV-[A-Z]+\d*` pour les serveurs.
 - **Termes permanents** : le nom de votre entreprise, de vos clients, de vos collègues… Ils se règlent dans **Options**, sont enregistrés et s'appliquent à toutes les conversations.
 - **Termes de la conversation** : un nom qui ne concerne que cette discussion. Ajoutez-le dans l'onglet **3. Éléments masqués**, ou sélectionnez-le dans le texte puis clic droit → **Masquer** (ou **Ctrl+M**). Le bouton **Toujours masquer** en fait un terme permanent.
@@ -52,7 +54,8 @@ Pour garder une trace de ce qui a été envoyé à l'IA, cliquez sur **Exporter 
 - la date de l'export, le compte Windows qui l'a généré (`DOMAINE\utilisateur`) et la version de l'application ;
 - la conversation et les réglages actifs (types détectés, nombre de termes et de motifs) ;
 - chaque élément masqué : jeton, **valeur d'origine**, type, et s'il a été masqué ou laissé en clair volontairement ;
-- le texte exact de chaque envoi à l'IA, tel qu'il est parti (anonymisé), avec sa date et son empreinte SHA-256.
+- le texte exact de chaque envoi à l'IA, tel qu'il est parti (anonymisé), avec sa date et son empreinte SHA-256 ;
+- **les valeurs parties en clair par erreur** : chaque envoi est vérifié, et une valeur retrouvée en clair est signalée en rouge, avec le numéro de l'envoi (par exemple un terme ajouté après coup, ou un envoi fait avec une ancienne version).
 
 **C'est un document confidentiel** : il réunit les valeurs d'origine de la conversation (noms, adresses, secrets…). Conservez-le dans un emplacement sécurisé. Les envois sont enregistrés à chaque « Copier pour l'IA » (ou copie depuis le texte à envoyer), à partir de la version 1.6.
 
@@ -62,7 +65,9 @@ Pour garder une trace de ce qui a été envoyé à l'IA, cliquez sur **Exporter 
 
 - **Détection** : cochez les types de données à masquer automatiquement.
 - **Termes permanents** : la liste des termes toujours masqués.
-- **Motifs personnalisés** : vos expressions régulières. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours. Pour en créer un facilement, utilisez [regex101.com](https://regex101.com/?flavor=python) en choisissant « Python » : collez un extrait de log, écrivez le motif, et le site surligne ce qu'il trouve.
+- **Motifs personnalisés** : vos expressions régulières, chacune avec un titre (« Postes de travail », « Tickets »…). Ce titre apparaît comme type dans la liste des éléments masqués et dans le rapport. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours. Cliquez sur un motif pour le modifier.
+
+  Les motifs utilisent le moteur d'expressions régulières de **Python** (module `re`), très proche de PCRE, de JavaScript et de .NET. Un motif testé dans PowerShell avec `'PC-0815' -match 'PC-\d{4}'` fonctionne donc ici, y compris la syntaxe .NET `(?<v>…)` pour ne masquer qu'une partie. La casse est ignorée.
 - **Consigne pour l'IA** : un texte ajouté au début de ce que vous copiez, qui demande à l'IA de garder les jetons tels quels. Vous pouvez le modifier, le désactiver ou rétablir le texte par défaut.
 - **Général** :
   - la langue (automatique, français ou anglais) ;

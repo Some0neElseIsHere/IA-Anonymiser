@@ -9,7 +9,7 @@ import hashlib
 import html
 import os
 
-from moteur import TYPES_AUTO
+from moteur import TYPES_AUTO, Anonymiseur
 
 STYLE = """
 body { font-family: "Segoe UI", system-ui, sans-serif; color: #1b1b1b; max-width: 960px; margin: 32px auto;
@@ -22,6 +22,9 @@ table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
 th { background: #f5f5f7; }
 .clair { color: #8a8a8a; }
+.fuite td { background: #fdecea; }
+.fuite .statut { color: #b71c1c; font-weight: 600; }
+.alerte { color: #b71c1c; font-weight: 600; }
 code, pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; }
 td code { word-break: break-all; }
 pre { background: #f7f7f8; border: 1px solid #e5e5e5; padding: 12px; white-space: pre-wrap;
@@ -49,6 +52,12 @@ def empreinte(texte):
     return hashlib.sha256(texte.encode("utf-8")).hexdigest()
 
 
+def envois_en_clair(valeur, type_, envois):
+    """Numéros des envois où la valeur d'origine apparaît en clair (même règles que la détection)."""
+    return [i for i, envoi in enumerate(envois, 1)
+            if Anonymiseur._occurrences_connues(envoi["texte"], [(valeur, type_)], None)]
+
+
 def generer(conversation, options, t, version, libelle_type, maintenant=None, utilisateur=None):
     """conversation : objet Conversation ; options : Options ; t : Traducteur ; libelle_type(type, valeur)."""
     e = html.escape
@@ -57,6 +66,8 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     moteur = conversation.moteur
     jetons = list(moteur.valide)  # seuls les jetons réellement envoyés (validés) sont rapportés
     titre = e(t("rp_titre", c=conversation.nom))
+    en_clair = {j: envois_en_clair(moteur.valide[j][1], moteur.valide[j][0], conversation.envois) for j in jetons}
+    fuites = [j for j in jetons if en_clair[j] and j not in moteur.exclus]
 
     lignes = [
         "<!DOCTYPE html>",
@@ -72,6 +83,7 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
         f"{e(_date(conversation.cree) if conversation.cree else t('rp_inconnue'))}</td></tr>",
         f"<tr><th>{e(t('rp_activite'))}</th><td>{e(_date(conversation.activite))}</td></tr>",
         f"<tr><th>{e(t('rp_nb_envois'))}</th><td>{len(conversation.envois)}</td></tr>",
+        f"<tr><th>{e(t('rp_nb_fuites'))}</th><td" + (' class="alerte"' if fuites else "") + f">{len(fuites)}</td></tr>",
         "</table>",
 
         f"<h2>{e(t('rp_reglages'))}</h2><table>",
@@ -89,11 +101,17 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     ]
     for j in jetons:
         type_, valeur = moteur.valide[j]
-        clair = j in moteur.exclus
-        statut = t("rp_statut_clair") if clair else t("rp_statut_masque")
-        classe = ' class="clair"' if clair else ""
+        numeros = ", ".join(str(n) for n in en_clair[j])
+        if j in moteur.exclus:
+            statut, classe = t("rp_statut_clair"), ' class="clair"'
+            if numeros:
+                statut += " " + t("rp_envois_numeros", n=numeros)
+        elif numeros:
+            statut, classe = t("rp_statut_fuite", n=numeros), ' class="fuite"'
+        else:
+            statut, classe = t("rp_statut_masque"), ""
         lignes.append(f"<tr{classe}><td><code>{e(j)}</code></td><td><code>{e(valeur)}</code></td>"
-                      f"<td>{e(libelle_type(type_, valeur))}</td><td>{e(statut)}</td></tr>")
+                      f"<td>{e(libelle_type(type_, valeur))}</td><td class=\"statut\">{e(statut)}</td></tr>")
     if not jetons:
         lignes.append(f"<tr><td colspan=\"4\">{e(t('rp_aucun_element'))}</td></tr>")
     lignes.append("</table>")

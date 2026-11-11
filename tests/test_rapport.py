@@ -62,6 +62,20 @@ class Rapport(unittest.TestCase):
         self.assertIn("Document confidentiel", page)
         self.assertNotIn("Résumé", page)
 
+    def test_envoi_en_clair_signale(self):
+        """Une valeur partie en clair dans un envoi (ancienne version, terme ajouté trop tard) est signalée."""
+        conv, envoi = conversation()
+        conv.envois.insert(0, {"date": time.time() - 60, "texte": "Login for 'jdupont' from 10.20.30.41"})
+        page = html.unescape(generer(conv))
+        self.assertIn("envoyé en clair (envoi 1)", page)
+        self.assertIn("<tr><th>Éléments envoyés en clair par erreur</th><td class=\"alerte\">1</td></tr>", page)
+
+    def test_aucune_fuite(self):
+        conv, _ = conversation()
+        page = html.unescape(generer(conv))
+        self.assertNotIn("envoyé en clair (", page)
+        self.assertIn("<tr><th>Éléments envoyés en clair par erreur</th><td>0</td></tr>", page)
+
     def test_valeur_echappee(self):
         conv, _ = conversation()
         conv.moteur.valide["[NOM_9]"] = ("NOM", "<script>alert(1)</script>")

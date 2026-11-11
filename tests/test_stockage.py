@@ -45,12 +45,12 @@ class Stockage(unittest.TestCase):
             for nouveau in ("SECRET", "COMPTE", "DN", "SID"):
                 self.assertIn(nouveau, o.types)        # nouveaux types activés
             o.types.discard("SID")
-            o.motifs = ["PC-\\d{4}", "PC-(", ""]
-            o.motifs = stockage.motifs_valides(o.motifs)
+            o.motifs = stockage.motifs_valides(["PC-\\d{4}", "PC-(", "", {"titre": "Tickets", "motif": "INC-\\d+"}])
             o.sauver()
             o2 = stockage.Options(d)
             self.assertNotIn("SID", o2.types)         # désactivé après coup : reste désactivé
-            self.assertEqual(o2.motifs, ["PC-\\d{4}"])
+            self.assertEqual(o2.motifs, [{"titre": "", "motif": "PC-\\d{4}"},
+                                         {"titre": "Tickets", "motif": "INC-\\d+"}])
 
 
 if __name__ == "__main__":

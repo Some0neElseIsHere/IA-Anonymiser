@@ -64,6 +64,9 @@ _CLES_SECRETES = (
 )
 _VALEUR = r"""(?P<q>["'])?(?P<v>(?(q)[^"'\n]+|[^\s;,"'<>&]+))(?(q)(?P=q))"""
 
+# Une partie de DN : DC=… et C=… ne contiennent jamais d'espace (sinon DC=local avalerait la suite de la phrase)
+_RDN = r"(?:(?:CN|OU|O|L|ST|UID)=[^,=\n+\"<>;()]+|(?:DC|C)=[\w-]+)"
+
 # Ordre important : les motifs les plus spécifiques passent en premier.
 MOTIFS = [
     ("SECRET", re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----[\s\S]+?-----END (?:[A-Z0-9]+ )*PRIVATE KEY-----")),
@@ -83,8 +86,11 @@ MOTIFS = [
         r"|AIza[0-9A-Za-z_-]{35}"                         # Google
         r"|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"  # JWT
         r")(?![\w-])")),
+    # Compte dans une URL : https://deploy:motdepasse@serveur (le mot de passe est pris juste au-dessus)
+    ("COMPTE", re.compile(r"\b[a-z][a-z0-9+.-]*://(?P<v>[^\s:/@]+)(?::[^\s@/]*)?@", re.IGNORECASE)),
+    # DN : masqué partie par partie (voir _decomposer_dn), pour que l'IA reconnaisse la personne
     ("DN", re.compile(
-        r"(?<![\w=])(?:CN|OU|DC|O|L|ST|C|UID)=[^,=\n+\"<>;()]+(?:\s*,\s*(?:CN|OU|DC|O|L|ST|C|UID)=[^,=\n+\"<>;()]+)+",
+        r"(?<![\w=])" + _RDN + r"(?:\s*,\s*" + _RDN + r")+",
         re.IGNORECASE)),
     ("SID", re.compile(r"\bS-1-5-21-\d+-\d+-\d+(?:-\d+)?\b")),
     ("EMAIL", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
@@ -130,6 +136,44 @@ def _accepte(type_, m, valeur):
     return True
 
 
+_COMPOSANT_DN = re.compile(r"(?P<cle>CN|OU|O|L|ST|UID)=(?P<val>[^,=\n+\"<>;()]+)|(?P<cle2>DC|C)=(?P<val2>[\w-]+)",
+                           re.IGNORECASE)
+
+
+def _decomposer_dn(m, termes):
+    """Parties à masquer d'un DN : (début, fin, type, valeur).
+
+    CN=Sophie Bernard,OU=Comptabilite,DC=acme,DC=local devient CN=[NOM_3],OU=Comptabilite,[DN_1] :
+    le nom (CN, UID) reprend le jeton du terme ou du compte s'il est connu, la suite DC=… (le domaine)
+    et O=… sont masquées, l'OU et la localisation restent lisibles.
+    """
+    texte, base = m.string, m.start()
+    sortie, domaine = [], None
+
+    def fermer():
+        if domaine:
+            sortie.append((domaine[0], domaine[1], "DN", texte[domaine[0]:domaine[1]]))
+
+    for c in _COMPOSANT_DN.finditer(m.group(0)):
+        groupe = "val" if c.group("cle") else "val2"
+        cle = (c.group("cle") or c.group("cle2")).upper()
+        d, f = base + c.start(groupe), base + c.end(groupe)
+        while f > d and texte[f - 1].isspace():
+            f -= 1
+        if cle == "DC":
+            domaine = [domaine[0], f] if domaine else [base + c.start(), f]
+            continue
+        fermer()
+        domaine = None
+        valeur = texte[d:f]
+        if cle in ("CN", "UID"):
+            sortie.append((d, f, "NOM" if " ".join(valeur.split()).casefold() in termes else "COMPTE", valeur))
+        elif cle == "O":
+            sortie.append((d, f, "DN", valeur))
+    fermer()
+    return sortie
+
+
 def _plage(m):
     """Partie à masquer : le groupe « v » s'il existe, sinon tout ; sans espaces en bout."""
     debut, fin = m.span("v") if "v" in m.re.groupindex and m.group("v") else m.span()
@@ -140,7 +184,11 @@ def _plage(m):
 
 
 def compiler_motif(motif):
-    """Motif personnalisé (expression régulière), insensible à la casse. Lève re.error s'il est invalide."""
+    """Motif personnalisé (expression régulière), insensible à la casse. Lève re.error s'il est invalide.
+
+    La syntaxe .NET / PowerShell des groupes nommés, (?<v>…), est acceptée comme (?P<v>…).
+    """
+    motif = re.sub(r"\(\?<(?![=!])", "(?P<", motif)
     rx = re.compile(motif, re.IGNORECASE)
     if rx.match(""):
         raise re.error("le motif ne doit pas accepter un texte vide")
@@ -251,6 +299,7 @@ class Anonymiseur:
         self._compteurs = Counter(t for t, _ in self.valide.values())
 
         trouves = []
+        termes_cf = {" ".join(t.split()).casefold() for t in termes}
         debuts, fins = [], []  # intervalles déjà pris, triés et sans chevauchement
 
         def prendre(d, f):
@@ -267,6 +316,11 @@ class Anonymiseur:
             if types is not None and type_ not in types:
                 continue
             for m in motif.finditer(texte):
+                if type_ == "DN":
+                    for d, f, sous_type, valeur in _decomposer_dn(m, termes_cf):
+                        if f > d and prendre(d, f):
+                            trouves.append((d, f, sous_type, valeur))
+                    continue
                 d, f = _plage(m)
                 if f > d and _accepte(type_, m, texte[d:f]) and prendre(d, f):
                     trouves.append((d, f, type_, texte[d:f]))

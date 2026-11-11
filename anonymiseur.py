@@ -599,7 +599,7 @@ class Application:
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
         res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types,
-                                     self.options.motifs)
+                                     stockage.expressions(self.options.motifs))
         self.resultat = res
         self.source.surligner(res.spans_source, "masque")
         self.sortie.ecrire(res.texte, res.spans_sortie, "jeton")
@@ -623,6 +623,13 @@ class Application:
     def libelle(self, type_, valeur):
         if type_ == "NOM" and valeur.casefold() in {p.casefold() for p in self.options.permanents}:
             return self.t("type_permanent")
+        if type_ == "PERSO":  # titre du motif qui a trouvé cette valeur
+            for m in self.options.motifs:
+                try:
+                    if m["titre"] and compiler_motif(m["motif"]).search(valeur):
+                        return self.t("type_PERSO_titre", t=m["titre"])
+                except Exception:
+                    continue
         return self.t(f"type_{type_}")
 
     def remplir_elements(self, res):
@@ -1124,12 +1131,56 @@ class Application:
         onglets.add(o, text=t("opt_motifs"))
         ttk.Label(o, text=t("opt_motifs_titre"), style="Section.TLabel").pack(anchor="w")
         ttk.Label(o, text=t("opt_motifs_aide"), style="Aide.TLabel", wraplength=largeur_texte,
-                  justify="left").pack(anchor="w", pady=(2, 10))
-        motifs = list(self.options.motifs)
+                  justify="left").pack(anchor="w", pady=(2, 4))
+        ttk.Label(o, text=t("opt_motifs_memo"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", pady=(0, 10))
+        motifs = [dict(m) for m in self.options.motifs]
+
+        saisie = ttk.Frame(o)
+        saisie.pack(fill="x", pady=(0, 8))
+        ttk.Label(saisie, text=t("opt_motif_titre")).grid(row=0, column=0, sticky="w")
+        ttk.Label(saisie, text=t("opt_motif_expression")).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        champ_titre = ttk.Entry(saisie, font=self.police, width=18)
+        champ_titre.grid(row=1, column=0, sticky="ew")
+        champ_motif = ttk.Entry(saisie, font=("Consolas", 11), width=30)
+        champ_motif.grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        bouton_motif = ttk.Button(saisie, text=t("ajouter"))
+        bouton_motif.grid(row=1, column=2, padx=(8, 0))
+        saisie.columnconfigure(1, weight=1)
+
+        zone = ttk.Frame(o)
+        zone.pack(fill="both", expand=True)
+        arbre_motifs = ttk.Treeview(zone, columns=("titre", "motif"), show="headings", selectmode="extended",
+                                    height=6)
+        arbre_motifs.heading("titre", text=t("opt_motif_titre"), anchor="w")
+        arbre_motifs.heading("motif", text=t("opt_motif_expression"), anchor="w")
+        arbre_motifs.column("titre", width=int(170 * e), stretch=False)
+        arbre_motifs.column("motif", width=int(300 * e), stretch=True)
+        barre = ttk.Scrollbar(zone, command=arbre_motifs.yview)
+        arbre_motifs.configure(yscrollcommand=barre.set)
+        barre.pack(side="right", fill="y", padx=(4, 0))
+        arbre_motifs.pack(side="left", fill="both", expand=True)
         retour_motif = ttk.Label(o, style="Aide.TLabel", wraplength=largeur_texte, justify="left")
 
-        def ajouter_motif():
-            motif = liste_motifs.champ.get().strip()
+        def remplir_motifs():
+            arbre_motifs.delete(*arbre_motifs.get_children())
+            for i, m in enumerate(motifs):
+                arbre_motifs.insert("", "end", iid=str(i), values=(m["titre"] or "—", m["motif"]))
+
+        def choisir_motif(_=None):
+            selection = arbre_motifs.selection()
+            if len(selection) != 1:
+                bouton_motif.configure(text=t("ajouter"))
+                return
+            m = motifs[int(selection[0])]
+            champ_titre.delete(0, "end")
+            champ_titre.insert(0, m["titre"])
+            champ_motif.delete(0, "end")
+            champ_motif.insert(0, m["motif"])
+            bouton_motif.configure(text=t("opt_motif_maj"))
+
+        def ajouter_motif(_=None):
+            titre, motif = champ_titre.get().strip(), champ_motif.get().strip()
             if not motif:
                 return
             try:
@@ -1137,23 +1188,33 @@ class Application:
             except Exception as exc:
                 retour_motif.configure(text=t("opt_motif_invalide", e=exc))
                 return
-            liste_motifs.champ.delete(0, "end")
-            if motif not in motifs:
-                motifs.append(motif)
-            liste_motifs.remplir(motifs)
+            selection = arbre_motifs.selection()
+            if len(selection) == 1:  # mise à jour du motif sélectionné
+                motifs[int(selection[0])] = {"titre": titre, "motif": motif}
+            elif all(m["motif"] != motif for m in motifs):
+                motifs.append({"titre": titre, "motif": motif})
+            else:
+                next(m for m in motifs if m["motif"] == motif)["titre"] = titre
+            champ_titre.delete(0, "end")
+            champ_motif.delete(0, "end")
+            remplir_motifs()
+            bouton_motif.configure(text=t("ajouter"))
             n = sum(1 for _ in rx.finditer(self.source.lire()))
-            retour_motif.configure(text=t("opt_motif_trouve", m=motif, n=n))
+            retour_motif.configure(text=t("opt_motif_trouve", m=titre or motif, n=n))
 
-        def supprimer_motifs():
-            retires = set(liste_motifs.selection())
-            motifs[:] = [x for x in motifs if x not in retires]
-            liste_motifs.remplir(motifs)
+        def supprimer_motifs(_=None):
+            retires = {int(i) for i in arbre_motifs.selection()}
+            motifs[:] = [m for i, m in enumerate(motifs) if i not in retires]
+            remplir_motifs()
+            bouton_motif.configure(text=t("ajouter"))
 
-        liste_motifs = ListeTermes(self, o, ajouter_motif, supprimer_motifs, hauteur=7)
-        liste_motifs.pack(fill="both", expand=True)
-        liste_motifs.remplir(motifs)
+        bouton_motif.configure(command=ajouter_motif)
+        champ_motif.bind("<Return>", ajouter_motif)
+        champ_titre.bind("<Return>", lambda _: champ_motif.focus_set())
+        arbre_motifs.bind("<<TreeviewSelect>>", choisir_motif)
+        arbre_motifs.bind("<Delete>", supprimer_motifs)
+        remplir_motifs()
         retour_motif.pack(anchor="w", pady=(8, 0))
-        self.lien(o, t("opt_motifs_site"), "https://regex101.com/?flavor=python")
         ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer_motifs).pack(anchor="e", pady=(8, 0))
 
         # Consigne pour l'IA
@@ -1370,7 +1431,8 @@ def capture(app, chemin):
         texte, reponse, nom1, nom2, serveurs = DEMO[app.t.langue]
         nom3, nom4 = ("Modèles de mails", "Audit AD") if app.t.langue == "fr" else ("Email templates", "AD audit")
         app.options.permanents = ["Acme SAS", "Acme Ltd", "Claire Martin"]
-        app.options.motifs = [r"PC-\d{4}", r"INC-\d{4}-\d+"]
+        app.options.motifs = [{"titre": "Postes de travail", "motif": r"PC-\d{4}"},
+                              {"titre": "Tickets d'incident", "motif": r"INC-\d{4}-\d+"}]
         app.conversations, app.numero = [], 0
         app.nouvelle_conversation()
         app.conv.nom = nom1
