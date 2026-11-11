@@ -24,7 +24,7 @@ class Secrets(unittest.TestCase):
             "MYSQL_ROOT_PASSWORD: 'p@ss w0rd'": "MYSQL_ROOT_PASSWORD: '[SECRET_1]'",
             '"password": "Azerty123"': '"password": "[SECRET_1]"',
             "spring.datasource.password=Xy9#k": "spring.datasource.password=[SECRET_1]",
-            "Server=sql01;User Id=sa;Password=Mdp2026!;": "Server=sql01;User Id=sa;Password=[SECRET_1];",
+            "Server=sql01;User Id=sa;Password=Mdp2026!;": "Server=sql01;User Id=[COMPTE_1];Password=[SECRET_1];",
             "pwd: Lili2024": "pwd: [SECRET_1]",
             "mot de passe : Printemps2026": "mot de passe : [SECRET_1]",
             "api_key=ABCD1234efgh": "api_key=[SECRET_1]",
@@ -144,6 +144,33 @@ class MotifsPersonnalises(unittest.TestCase):
         a = Anonymiseur("en")
         r = a.anonymiser(r"ACME\jsmith PC-0815", [], None, [r"PC-\d{4}"])
         self.assertEqual(r.texte, "[ACCOUNT_1] [REF_1]")
+
+
+class ValeursConnues(unittest.TestCase):
+    def test_valeur_reprise_sans_contexte(self):
+        self.assertEqual(anon(r"C:\Users\slefevre\Temp puis user slefevre a copié"),
+                         r"C:\Users\[COMPTE_1]\Temp puis user [COMPTE_1] a copié")
+
+    def test_secret_recopie_dans_une_phrase(self):
+        a = Anonymiseur()
+        a.anonymiser("password=Paie#2026!", [])
+        a.valider()
+        r = a.anonymiser("le mot de passe c'est Paie#2026! je crois, pas paie#2026!", [])
+        self.assertEqual(r.texte, "le mot de passe c'est [SECRET_1] je crois, pas paie#2026!")
+
+    def test_compte_sql(self):
+        self.assertEqual(anon("User Id=paie_app;Password=X1y2z3; Login succeeded for 'paie_app'"),
+                         "User Id=[COMPTE_1];Password=[SECRET_1]; Login succeeded for '[COMPTE_1]'")
+
+    def test_valeurs_courtes_ignorees(self):
+        # « sa » (2 lettres) ne doit pas être masqué partout dans le texte
+        self.assertEqual(anon("uid=sa; la salle sa"), "uid=[COMPTE_1]; la salle sa")
+
+    def test_type_desactive_non_propage(self):
+        a = Anonymiseur()
+        a.anonymiser("10.0.0.1", [])
+        a.valider()
+        self.assertEqual(a.anonymiser("10.0.0.1", [], types={"EMAIL"}).texte, "10.0.0.1")
 
 
 class PiegesDeLogs(unittest.TestCase):

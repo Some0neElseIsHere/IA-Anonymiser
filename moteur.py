@@ -103,6 +103,9 @@ MOTIFS = [
         r"\b[a-z]:\\(?:users|documents and settings)\\(?P<v>[^\\/\n:*?\"<>|]+(?=\\)|[^\\/\s:*?\"<>|]+)",
         re.IGNORECASE)),
     ("COMPTE", re.compile(r"(?<![\w./-])/(?:home|Users)/(?P<v>[A-Za-z0-9._-]+)")),
+    ("COMPTE", re.compile(
+        r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|account(?:[_-]?name)?|samaccountname)"
+        r"[\"']?\s*[:=]\s*" + _VALEUR, re.IGNORECASE)),
     ("IP", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
     ("MAC", re.compile(r"(?<![\w:-])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![\w:-])")),
     ("FQDN", re.compile(
@@ -278,6 +281,13 @@ class Anonymiseur:
                 if f > d and prendre(d, f):
                     trouves.append((d, f, "PERSO", texte[d:f]))
 
+        # Une valeur déjà masquée dans la conversation est masquée partout où elle réapparaît,
+        # même sans le contexte qui l'a fait détecter (« user slefevre » après « C:\\Users\\slefevre »).
+        connues = [(v, t) for t, v in self.valide.values()] + [(v, t) for _, _, t, v in trouves]
+        for d, f, type_, valeur in self._occurrences_connues(texte, connues, types):
+            if prendre(d, f):
+                trouves.append((d, f, type_, valeur))
+
         propres = {" ".join(t.split()) for t in termes}
         for terme in sorted((t for t in propres if len(t) >= 2), key=len, reverse=True):
             motif = re.compile(
@@ -308,6 +318,29 @@ class Anonymiseur:
         morceaux.append(texte[pos:])
         res.texte = "".join(morceaux)
         return res
+
+    @staticmethod
+    def _occurrences_connues(texte, connues, types):
+        """Occurrences littérales de valeurs déjà connues : (début, fin, type, texte trouvé)."""
+        par_valeur = {}
+        for valeur, type_ in connues:
+            if len(valeur) >= 3 and "\n" not in valeur and (types is None or type_ in types or
+                                                            type_ in ("NOM", "PERSO")):
+                par_valeur.setdefault(valeur, type_)
+        sortie = []
+        for exact in (True, False):  # les secrets à l'identique, le reste sans tenir compte de la casse
+            valeurs = sorted((v for v, t in par_valeur.items() if (t == "SECRET") == exact), key=len, reverse=True)
+            if not valeurs:
+                continue
+            morceaux = [("(?<!\\w)" if v[0].isalnum() else "") + re.escape(v) + ("(?!\\w)" if v[-1].isalnum() else "")
+                        for v in valeurs]
+            motif = re.compile("|".join(morceaux), 0 if exact else re.IGNORECASE)
+            index = {v if exact else v.casefold(): par_valeur[v] for v in valeurs}
+            for m in motif.finditer(texte):
+                cle = m.group(0) if exact else m.group(0).casefold()
+                if cle in index:
+                    sortie.append((m.start(), m.end(), index[cle], m.group(0)))
+        return sortie
 
     def restaurer(self, texte):
         res = Resultat(texte="")
