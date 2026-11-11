@@ -22,11 +22,11 @@ Chaque [release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases) co
 
 ### Une conversation par discussion avec l'IA
 
-La colonne de gauche liste vos conversations, la plus récente en haut. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. L'onglet **3. Éléments masqués** liste tous les éléments déjà masqués dans la conversation, y compris ceux des messages précédents.
+La colonne de gauche liste vos conversations, classées comme dans Claude : d'abord les **épinglées**, puis **Aujourd'hui**, **Hier**, et une rubrique par date (« 9 nov. »), selon votre dernière activité dans chacune. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. L'onglet **3. Éléments masqués** liste tous les éléments déjà masqués dans la conversation, y compris ceux des messages précédents.
 
 **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Un jeton inconnu de cette conversation apparaît en rouge.
 
-Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour la renommer ou la fermer.
+Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour l'épingler, la renommer ou la fermer.
 
 ### Ce qui est masqué
 
