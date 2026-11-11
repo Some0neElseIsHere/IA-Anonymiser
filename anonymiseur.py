@@ -555,8 +555,13 @@ class Application:
         return cadre
 
     def aide_adaptee(self, parent, texte):
-        """Texte d'aide qui passe à la ligne selon la largeur disponible, au lieu d'être coupé."""
-        etiquette = ttk.Label(parent, text=texte, style="Aide.TLabel", justify="left")
+        """Texte d'aide qui passe à la ligne selon la largeur disponible, au lieu d'être coupé.
+
+        À réserver à la fenêtre principale, dont la taille ne dépend pas de son contenu. La largeur
+        de départ est petite pour que le texte ne demande jamais à élargir son conteneur.
+        """
+        etiquette = ttk.Label(parent, text=texte, style="Aide.TLabel", justify="left",
+                              wraplength=int(200 * self.echelle))
         etiquette.bind("<Configure>", lambda e: etiquette.configure(wraplength=max(e.width - 4, 100)))
         return etiquette
 
@@ -1083,7 +1088,7 @@ class Application:
         onglets = ttk.Notebook(cadre)
         onglets.pack(fill="both", expand=True)
         self.onglets_options = onglets
-        largeur_texte = int(520 * e)
+        largeur_texte = int(640 * e)
 
         # Détection
         o = ttk.Frame(onglets, padding=18)
@@ -1130,8 +1135,11 @@ class Application:
         o = ttk.Frame(onglets, padding=18)
         onglets.add(o, text=t("opt_motifs"))
         ttk.Label(o, text=t("opt_motifs_titre"), style="Section.TLabel").pack(anchor="w")
-        self.aide_adaptee(o, t("opt_motifs_aide")).pack(fill="x", pady=(2, 4))
-        self.aide_adaptee(o, t("opt_motifs_memo")).pack(fill="x", pady=(0, 10))
+        # Largeur fixe : dans une fenêtre qui prend la taille de son contenu, un texte qui se recoupe
+        # selon la largeur disponible ferait rétrécir la fenêtre par à-coups.
+        for cle, marge in (("opt_motifs_aide", (2, 4)), ("opt_motifs_memo", (0, 10))):
+            ttk.Label(o, text=t(cle), style="Aide.TLabel", wraplength=largeur_texte,
+                      justify="left").pack(anchor="w", pady=marge)
         motifs = [dict(m) for m in self.options.motifs]
 
         saisie = ttk.Frame(o)
@@ -1479,6 +1487,11 @@ def capture(app, chemin):
         app.ouvrir_options()
         app.onglets_options.select(onglet)
 
+    def mesurer(etiquette):
+        app.root.update()
+        with open(os.path.join(chemin, "tailles-options.txt"), "a", encoding="utf-8") as f:
+            f.write(f"{etiquette} : {app.fenetre_options.winfo_width()} x {app.fenetre_options.winfo_height()}\n")
+
     def gros_log():
         lignes = [f"2026-11-10 12:{i % 60:02d}:01 srv{i % 40}.acme.local [10.0.{i % 250}.{i % 200}] GET "
                   f"/api/v1/items?id={i} 200 user{i % 50}@acme.fr" for i in range(3000)]
@@ -1499,8 +1512,9 @@ def capture(app, chemin):
         lambda: conversation(1, 1), lambda: photo(app.root, "clair-restaurer.png"),
         lambda: conversation(1, 0), lambda: photo(app.root, "clair-relance.png"),
         lambda: conversation(1, 2), lambda: photo(app.root, "clair-elements.png"),
-        lambda: options(0), lambda: photo(app.fenetre_options, "options-detection.png"),
-        lambda: app.onglets_options.select(2), lambda: photo(app.fenetre_options, "options-motifs.png"),
+        lambda: options(0), lambda: mesurer("ouverture"), lambda: photo(app.fenetre_options, "options-detection.png"),
+        lambda: app.onglets_options.select(2), lambda: mesurer("onglet Motifs"),
+        lambda: photo(app.fenetre_options, "options-motifs.png"), lambda: mesurer("onglet Motifs, 1 s après"),
         lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-consigne.png"),
         lambda: app.onglets_options.select(4), lambda: photo(app.fenetre_options, "options-general.png"),
         lambda: app.fenetre_options.destroy(),
