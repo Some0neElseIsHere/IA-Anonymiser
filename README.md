@@ -49,11 +49,12 @@ Pour laisser un élément en clair, faites un clic droit dessus → **Ne pas mas
 
 Pour garder une trace de ce qui a été envoyé à l'IA, cliquez sur **Exporter le rapport…** dans l'onglet **3. Éléments masqués**, ou faites un clic droit sur la conversation. Le rapport est une page HTML, lisible dans un navigateur et imprimable en PDF. Il contient :
 
-- la conversation, la date de l'export et les réglages actifs (types détectés, nombre de termes et de motifs) ;
-- la liste des éléments envoyés : jeton, type, et s'il a été masqué ou laissé en clair volontairement ;
-- le texte exact de chaque envoi à l'IA, avec sa date et son empreinte SHA-256.
+- la date de l'export, le compte Windows qui l'a généré (`DOMAINE\utilisateur`) et la version de l'application ;
+- la conversation et les réglages actifs (types détectés, nombre de termes et de motifs) ;
+- chaque élément masqué : jeton, **valeur d'origine**, type, et s'il a été masqué ou laissé en clair volontairement ;
+- le texte exact de chaque envoi à l'IA, tel qu'il est parti (anonymisé), avec sa date et son empreinte SHA-256.
 
-**Il ne contient aucune valeur d'origine** : ni nom, ni adresse, ni secret. Il peut donc être transmis à un RSSI ou à un DPO. Les envois sont enregistrés à chaque « Copier pour l'IA » (ou copie depuis le texte à envoyer), à partir de la version 1.6.
+**C'est un document confidentiel** : il réunit les valeurs d'origine de la conversation (noms, adresses, secrets…). Conservez-le dans un emplacement sécurisé. Les envois sont enregistrés à chaque « Copier pour l'IA » (ou copie depuis le texte à envoyer), à partir de la version 1.6.
 
 ## Options
 

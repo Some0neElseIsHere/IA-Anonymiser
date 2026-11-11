@@ -37,13 +37,35 @@ def generer(conv, langue="fr"):
 
 
 class Rapport(unittest.TestCase):
-    def test_aucune_valeur_d_origine(self):
+    def test_valeurs_d_origine_presentes(self):
         for langue in ("fr", "en"):
             conv, _ = conversation()
-            page = generer(conv, langue)
+            page = html.unescape(generer(conv, langue))
             for valeur in VRAIES_VALEURS:
                 with self.subTest(langue=langue, valeur=valeur):
-                    self.assertNotIn(valeur, page)
+                    self.assertIn(valeur, page)
+
+    def test_textes_envoyes_restent_anonymises(self):
+        conv, envoi = conversation()
+        page = html.unescape(generer(conv))
+        bloc = page[page.index(envoi[:20]):]
+        for valeur in ("Paie2026!", "jean.dupont@acme.fr", "10.20.30.41"):
+            self.assertNotIn(valeur, bloc[:len(envoi)])
+
+    def test_utilisateur_et_avertissement(self):
+        conv, _ = conversation()
+        t = Traducteur("fr")
+        options = SimpleNamespace(types=set(TYPES_AUTO), permanents=[], motifs=[], consigne=True)
+        page = html.unescape(rapport.generer(conv, options, t, "v1.6.1", lambda a, b: a,
+                                             utilisateur="ACME\\mlefevre"))
+        self.assertIn("par ACME\\mlefevre, avec IA-Anonymiser v1.6.1", page)
+        self.assertIn("Document confidentiel", page)
+        self.assertNotIn("Résumé", page)
+
+    def test_valeur_echappee(self):
+        conv, _ = conversation()
+        conv.moteur.valide["[NOM_9]"] = ("NOM", "<script>alert(1)</script>")
+        self.assertNotIn("<script>", generer(conv))
 
     def test_contenu(self):
         conv, envoi = conversation()
