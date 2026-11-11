@@ -154,7 +154,27 @@ class Zone(ttk.Frame):
         self.lecture_seule = lecture_seule
         if lecture_seule:
             self.texte.configure(state="disabled")
+        self.indication = None
         app.textes_tk.append(self)
+
+    def indiquer(self, texte, police):
+        """Consignes affichées en gris tant que la zone est vide ; elles disparaissent dès qu'on colle."""
+        self.indication = tk.Label(self.texte, text=texte, font=police, justify="left", anchor="nw",
+                                   borderwidth=0, cursor="xterm")
+        self.indication.bind("<Button-1>", lambda _: self.texte.focus_set())
+        self.texte.bind("<Configure>", lambda e: self.indication.configure(wraplength=max(e.width - 44, 150)),
+                        add="+")
+        for evenement in ("<KeyRelease>", "<<Paste>>", "<<Cut>>", "<<Undo>>", "<<Redo>>"):
+            self.texte.bind(evenement, lambda _: self.after_idle(self.maj_indication), add="+")
+        self.maj_indication()
+
+    def maj_indication(self):
+        if not self.indication:
+            return
+        if self.texte.compare("end-1c", "==", "1.0"):
+            self.indication.place(x=16, y=12)
+        else:
+            self.indication.place_forget()
 
     def bouton(self, texte, commande, accent=False):
         """Ajoute un bouton à droite du titre (le premier ajouté est le plus à droite)."""
@@ -173,6 +193,8 @@ class Zone(ttk.Frame):
             self.texte.tag_configure(nom, background=fond, foreground=texte)
         self.texte.tag_raise("actif")
         self.texte.tag_raise("sel")
+        if self.indication:
+            self.indication.configure(background=p["fond"], foreground=p["aide"])
 
     def lire(self):
         return self.texte.get("1.0", "end-1c")
@@ -189,6 +211,7 @@ class Zone(ttk.Frame):
             self.texte.configure(state="disabled")
         else:
             self.texte.edit_reset()
+        self.maj_indication()
 
     def surligner(self, spans, tag, contenu=None):
         """Colore des plages (début, fin) exprimées en caractères depuis le début du texte.
@@ -286,6 +309,8 @@ class Application:
         root.protocol("WM_DELETE_WINDOW", self.quitter)
         root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
         root.after(THEME_MS, self.suivre_theme_windows)
+        if self.options.premier_lancement:
+            root.after(400, self.accueil)
 
     @property
     def conv(self):
@@ -347,6 +372,7 @@ class Application:
             tkfont.nametofont(nom).configure(family=f, size=10)
         style.configure("Titre.TLabel", font=(f, 11, "bold"))
         style.configure("Entete.TLabel", font=(f, 17, "bold"))
+        style.configure("Numero.TLabel", font=(f, 16, "bold"), foreground=p["lien"])
         style.configure("Marque.TLabel", font=(f, 14, "bold"))
         style.configure("Section.TLabel", font=(f, 12, "bold"))
         style.configure("Aide.TLabel", foreground=p["aide"])
@@ -416,6 +442,7 @@ class Application:
         self.p1 = p1 = ttk.Panedwindow(o1, orient="horizontal")
         p1.pack(fill="both", expand=True)
         self.source = Zone(self, p1, t("texte_original"), marge=(0, 0, 10, 0))
+        self.source.indiquer(t("ind_source"), self.police)
         self.source.bouton(t("effacer"), lambda: self.vider(self.source))
         self.source.bouton(t("coller"), lambda: self.coller(self.source))
         self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(10, 0, 0, 0))
@@ -428,6 +455,7 @@ class Application:
         self.p2 = p2 = ttk.Panedwindow(o2, orient="horizontal")
         p2.pack(fill="both", expand=True)
         self.reponse = Zone(self, p2, t("reponse_ia"), marge=(0, 0, 10, 0))
+        self.reponse.indiquer(t("ind_reponse"), self.police)
         self.reponse.bouton(t("effacer"), lambda: self.vider(self.reponse))
         self.reponse.bouton(t("coller"), lambda: self.coller(self.reponse))
         self.restauree = Zone(self, p2, t("reponse_restauree"), lecture_seule=True, marge=(10, 0, 0, 0))
@@ -1402,6 +1430,61 @@ class Application:
         fen.bind("<Destroy>", lambda ev: ev.widget is fen and parent.winfo_exists() and parent.grab_set())
         fen.grab_set()
 
+    def accueil(self):
+        """Écran d'accueil, affiché une seule fois : à la première installation."""
+        t, e = self.t, self.echelle
+        fen = self.fenetre(t("acc_titre"))
+        self.fenetre_accueil = fen
+        cadre = ttk.Frame(fen, padding=26)
+        cadre.pack(fill="both", expand=True)
+        largeur = int(520 * e)
+
+        haut = ttk.Frame(cadre)
+        haut.pack(fill="x")
+        if self.icone_entete:
+            ttk.Label(haut, image=self.icone_entete).pack(side="left", padx=(0, 14))
+        titres = ttk.Frame(haut)
+        titres.pack(side="left", fill="x")
+        ttk.Label(titres, text=t("acc_titre"), style="Entete.TLabel").pack(anchor="w")
+        ttk.Label(titres, text=t("acc_intro"), style="Aide.TLabel", wraplength=int(420 * e),
+                  justify="left").pack(anchor="w")
+
+        etapes = ttk.Frame(cadre)
+        etapes.pack(fill="x", pady=(20, 0))
+        for n in (1, 2, 3):
+            ligne = ttk.Frame(etapes)
+            ligne.pack(fill="x", pady=(0, 12))
+            ttk.Label(ligne, text=str(n), style="Numero.TLabel", width=2, anchor="center").pack(
+                side="left", anchor="n", padx=(0, 12))
+            texte = ttk.Frame(ligne)
+            texte.pack(side="left", fill="x")
+            ttk.Label(texte, text=t(f"acc_etape{n}"), style="Titre.TLabel").pack(anchor="w")
+            ttk.Label(texte, text=t(f"acc_etape{n}_texte"), wraplength=largeur - int(60 * e),
+                      justify="left").pack(anchor="w")
+
+        ttk.Separator(cadre).pack(fill="x", pady=(6, 16))
+        ttk.Label(cadre, text=t("acc_termes"), style="Section.TLabel").pack(anchor="w")
+        ttk.Label(cadre, text=t("acc_termes_aide"), wraplength=largeur, justify="left").pack(anchor="w", pady=(2, 8))
+        zone = tk.Text(cadre, height=4, width=50, font=self.police, relief="flat", padx=10, pady=6,
+                       highlightthickness=1, wrap="word")
+        p = self.palette
+        zone.configure(background=p["fond"], foreground=p["texte"], insertbackground=p["texte"],
+                       highlightbackground=p["bordure"], highlightcolor=p["focus"], selectbackground=p["selection"])
+        zone.pack(fill="x")
+        ttk.Label(cadre, text=t("acc_termes_note"), style="Aide.TLabel").pack(anchor="w", pady=(6, 0))
+
+        def commencer():
+            termes = [l for l in zone.get("1.0", "end").splitlines() if l.strip()]
+            self.options.permanents = stockage.trier(self.options.permanents + termes)
+            self.sauver_options()  # crée options.json : l'écran ne s'affichera plus
+            fen.destroy()
+            self.actualiser()
+
+        ttk.Button(cadre, text=t("acc_commencer"), command=commencer, style="Accent.TButton").pack(
+            anchor="e", pady=(18, 0))
+        fen.protocol("WM_DELETE_WINDOW", commencer)
+        self.afficher(fen, focus=zone)
+
     def lien(self, parent, texte, url):
         etiquette = ttk.Label(parent, text=texte, style="Lien.TLabel", cursor="hand2")
         etiquette.bind("<Button-1>", lambda e: webbrowser.open(url))
@@ -1607,6 +1690,7 @@ def capture(app, chemin):
             f.write(f"{len(lignes)} lignes : {time.perf_counter() - debut:.2f} s\n")
 
     etapes = [
+        lambda: photo(app.fenetre_accueil, "accueil.png"), lambda: app.fenetre_accueil.destroy(),
         lambda: photo(app.root, "demarrage.png"),
         lambda: (app.onglets.select(1), app.root.update()), lambda: photo(app.root, "demarrage-onglet2.png"),
         lambda: (app.onglets.select(0), gros_log()), lambda: photo(app.root, "gros-log.png"),

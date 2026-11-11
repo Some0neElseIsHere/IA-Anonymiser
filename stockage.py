@@ -134,6 +134,8 @@ class Options:
         self.langue = "auto"         # auto, fr, en
         self.theme = "auto"          # auto, clair, sombre
         self.conserver = True        # conversations gardées entre deux lancements
+        # Première installation : aucun réglage enregistré (sert à afficher l'écran d'accueil une seule fois)
+        self.premier_lancement = not os.path.exists(self.chemin)
         self.charger()
 
     def langue_effective(self):

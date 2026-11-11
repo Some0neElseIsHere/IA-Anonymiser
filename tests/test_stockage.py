@@ -19,6 +19,13 @@ class Stockage(unittest.TestCase):
                 self.assertNotIn(b"Dupont", brut)  # chiffré par DPAPI
             self.assertEqual(stockage.charger_conversations(d), donnees)
 
+    def test_premier_lancement(self):
+        with tempfile.TemporaryDirectory() as d:
+            o = stockage.Options(d)
+            self.assertTrue(o.premier_lancement)   # écran d'accueil affiché
+            o.sauver()
+            self.assertFalse(stockage.Options(d).premier_lancement)  # plus jamais ensuite
+
     def test_pas_de_fichier(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(stockage.charger_conversations(d))
