@@ -128,6 +128,7 @@ class Options:
         self.chemin = os.path.join(self.dossier, "options.json")
         self.types = set(TYPES_AUTO)
         self.permanents = []
+        self.etiquettes = {}         # terme permanent -> jeton personnalisé (ENTREPRISE…), facultatif
         self.motifs = []             # [{"titre", "motif"}] : expressions régulières personnalisées
         self.consigne = True
         self.consigne_texte = None   # None : texte par défaut, dans la langue de l'interface
@@ -161,6 +162,9 @@ class Options:
         self.types = {t for t in d.get("types", TYPES_AUTO) if t in TYPES_AUTO} | (set(TYPES_AUTO) - connus)
         self.motifs = motifs_valides(d.get("motifs", []))
         self.permanents = trier(d.get("permanents", []))
+        noms = {p.casefold(): p for p in self.permanents}
+        self.etiquettes = {noms[k.casefold()]: str(v) for k, v in d.get("etiquettes", {}).items()
+                           if k.casefold() in noms and str(v).strip()}
         self.consigne = bool(d.get("consigne", True))
         texte = d.get("consigne_texte")
         self.consigne_texte = texte if isinstance(texte, str) and texte.strip() else None
@@ -171,6 +175,7 @@ class Options:
     def sauver(self):
         with open(self.chemin, "w", encoding="utf-8") as f:
             json.dump({"types": sorted(self.types), "types_connus": TYPES_AUTO, "permanents": self.permanents,
+                       "etiquettes": self.etiquettes,
                        "motifs": self.motifs,
                        "consigne": self.consigne, "consigne_texte": self.consigne_texte,
                        "langue": self.langue, "theme": self.theme, "conserver": self.conserver},

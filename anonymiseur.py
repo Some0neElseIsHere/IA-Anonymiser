@@ -20,7 +20,8 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import rapport
 import stockage
-from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, expressions
+from moteur import (EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, etiquette_reservee, expressions,
+                    normaliser_etiquette)
 from textes import CONSIGNES, TEXTES, Traducteur, libelle_jour
 
 try:
@@ -638,6 +639,7 @@ class Application:
 
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
+        self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in self.options.etiquettes.items() if j}
         res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types,
                                      stockage.expressions(self.options.motifs))
         self.resultat = res
@@ -1074,10 +1076,15 @@ class Application:
         if not texte.strip():
             self.message(self.t("msg_rien_copier"))
             return
+        # Jeton d'un terme renommé alors que l'IA connaît l'ancien : on la prévient
+        renommages = self.moteur.renommages()
+        if renommages:
+            texte = "\n".join(self.t("annonce_renommage", a=a, n=n) for a, n in renommages.items()) + "\n\n" + texte
         if self.options.consigne and self.resultat and self.resultat.compte:
             texte = self.consigne() + texte
         self.enregistrer_envoi(texte)
         self.valider()
+        self.moteur.renommages_annonces()
         self.ecrire_presse_papiers(texte)
         self.confirmer(self.bouton_copier_ia, "copier_ia")
 
@@ -1152,28 +1159,101 @@ class Application:
             ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
                 anchor="w", padx=(int(28 * e), 0))
 
-        # Termes permanents
+        # Termes permanents, avec un jeton personnalisé facultatif
         o = ttk.Frame(onglets, padding=18)
         onglets.add(o, text=t("opt_termes"))
         ttk.Label(o, text=t("opt_termes_titre"), style="Section.TLabel").pack(anchor="w")
         ttk.Label(o, text=t("opt_termes_aide"), style="Aide.TLabel", wraplength=largeur_texte,
-                  justify="left").pack(anchor="w", pady=(2, 10))
-        permanents = list(self.options.permanents)
+                  justify="left").pack(anchor="w", pady=(2, 4))
+        ttk.Label(o, text=t("opt_jeton_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", pady=(0, 10))
+        permanents = [{"terme": p, "jeton": self.options.etiquettes.get(p, "")} for p in self.options.permanents]
 
-        def ajouter():
-            terme = liste.saisie()
-            if len(terme) >= 2:
-                permanents[:] = stockage.trier(permanents + [terme])
-                liste.remplir(permanents)
+        saisie_t = ttk.Frame(o)
+        saisie_t.pack(fill="x", pady=(0, 8))
+        ttk.Label(saisie_t, text=t("opt_terme")).grid(row=0, column=0, sticky="w")
+        ttk.Label(saisie_t, text=t("opt_jeton")).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        champ_terme = ttk.Entry(saisie_t, font=self.police, width=28)
+        champ_terme.grid(row=1, column=0, sticky="ew")
+        champ_jeton = ttk.Entry(saisie_t, font=("Consolas", 11), width=22)
+        champ_jeton.grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        bouton_terme = ttk.Button(saisie_t, text=t("ajouter"))
+        bouton_terme.grid(row=1, column=2, padx=(8, 0))
+        saisie_t.columnconfigure(0, weight=1)
 
-        def supprimer():
-            retires = set(liste.selection())
-            permanents[:] = [x for x in permanents if x not in retires]
-            liste.remplir(permanents)
+        zone_t = ttk.Frame(o)
+        zone_t.pack(fill="both", expand=True)
+        arbre_termes = ttk.Treeview(zone_t, columns=("terme", "jeton"), show="headings", selectmode="extended",
+                                    height=6)
+        arbre_termes.heading("terme", text=t("opt_terme"), anchor="w")
+        arbre_termes.heading("jeton", text=t("opt_jeton"), anchor="w")
+        arbre_termes.column("terme", width=int(300 * e), stretch=True)
+        arbre_termes.column("jeton", width=int(200 * e), stretch=False)
+        barre_t = ttk.Scrollbar(zone_t, command=arbre_termes.yview)
+        arbre_termes.configure(yscrollcommand=barre_t.set)
+        barre_t.pack(side="right", fill="y", padx=(4, 0))
+        arbre_termes.pack(side="left", fill="both", expand=True)
+        retour_terme = ttk.Label(o, style="Aide.TLabel", wraplength=largeur_texte, justify="left")
 
-        liste = ListeTermes(self, o, ajouter, supprimer, hauteur=8)
-        liste.pack(fill="both", expand=True)
-        liste.remplir(permanents)
+        def remplir_termes():
+            permanents.sort(key=lambda x: x["terme"].casefold())
+            arbre_termes.delete(*arbre_termes.get_children())
+            for i, x in enumerate(permanents):
+                arbre_termes.insert("", "end", iid=str(i),
+                                    values=(x["terme"], f"[{x['jeton']}]" if x["jeton"] else t("opt_jeton_auto")))
+
+        def choisir_terme(_=None):
+            selection = arbre_termes.selection()
+            if len(selection) != 1:
+                bouton_terme.configure(text=t("ajouter"))
+                return
+            x = permanents[int(selection[0])]
+            champ_terme.delete(0, "end")
+            champ_terme.insert(0, x["terme"])
+            champ_jeton.delete(0, "end")
+            champ_jeton.insert(0, x["jeton"])
+            bouton_terme.configure(text=t("opt_motif_maj"))
+
+        def ajouter(_=None):
+            terme = normaliser(champ_terme.get())
+            jeton = normaliser_etiquette(champ_jeton.get())
+            if len(terme) < 2:
+                retour_terme.configure(text=t("msg_terme_court"))
+                return
+            if jeton and etiquette_reservee(jeton):
+                retour_terme.configure(text=t("opt_jeton_reserve", j=jeton))
+                return
+            selection = arbre_termes.selection()
+            courant = permanents[int(selection[0])] if len(selection) == 1 else next(
+                (x for x in permanents if x["terme"].casefold() == terme.casefold()), None)
+            autre = next((x for x in permanents if jeton and x["jeton"] == jeton and x is not courant), None)
+            if autre:
+                retour_terme.configure(text=t("opt_jeton_pris", j=jeton, t=autre["terme"]))
+                return
+            if courant:
+                courant.update(terme=terme, jeton=jeton)
+            else:
+                permanents.append({"terme": terme, "jeton": jeton})
+            champ_terme.delete(0, "end")
+            champ_jeton.delete(0, "end")
+            arbre_termes.selection_remove(*arbre_termes.selection())
+            remplir_termes()
+            bouton_terme.configure(text=t("ajouter"))
+            retour_terme.configure(text="")
+
+        def supprimer(_=None):
+            retires = {int(i) for i in arbre_termes.selection()}
+            permanents[:] = [x for i, x in enumerate(permanents) if i not in retires]
+            remplir_termes()
+            bouton_terme.configure(text=t("ajouter"))
+
+        bouton_terme.configure(command=ajouter)
+        champ_jeton.bind("<Return>", ajouter)
+        champ_terme.bind("<Return>", ajouter)
+        arbre_termes.bind("<<TreeviewSelect>>", choisir_terme)
+        arbre_termes.bind("<Delete>", supprimer)
+        remplir_termes()
+        retour_terme.pack(anchor="w", pady=(8, 0))
         ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer).pack(anchor="e", pady=(8, 0))
 
         # Motifs personnalisés
@@ -1313,7 +1393,8 @@ class Application:
         def enregistrer():
             ancienne_langue = self.t.langue
             self.options.types = {k for k, v in cases.items() if v.get()}
-            self.options.permanents = stockage.trier(permanents)
+            self.options.permanents = stockage.trier([x["terme"] for x in permanents])
+            self.options.etiquettes = {x["terme"]: x["jeton"] for x in permanents if x["jeton"]}
             self.options.motifs = stockage.motifs_valides(motifs)
             self.options.consigne = avec_consigne.get()
             texte = zone_consigne.lire().strip()
@@ -1571,7 +1652,7 @@ DEMO = {
         "F-2026-118. Ses coordonnées : jean.dupont@acme-sas.fr, 06 12 34 56 78.\n"
         "Le virement est attendu sur FR76 3000 6000 0112 3456 7890 189.\n\nMerci, Claire Martin",
         "Voici une proposition :\n\nBonjour [NOM_1],\n\nSauf erreur de notre part, la facture F-2026-118 reste "
-        "impayée. Merci d'effectuer le virement sur [IBAN_1].\n\nCordialement,\n[NOM_3]",
+        "impayée. Merci d'effectuer le virement sur [IBAN_1].\n\nCordialement,\n[NOM_2]",
         "Relance facture", "Panne serveur paie",
         "Le serveur srv-paie01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) ne répond plus depuis la mise à "
         "jour (INC-2026-4471). Compte ACME\\svc-paie, profil C:\\Users\\svc-paie\\AppData, "
@@ -1583,7 +1664,7 @@ DEMO = {
         "His details: john.smith@acme-ltd.com, +44 20 7946 0958.\n"
         "Payment is expected on GB29 NWBK 6016 1331 9268 19.\n\nThanks, Claire Martin",
         "Here is a draft:\n\nDear [NAME_1],\n\nAccording to our records, invoice F-2026-118 is still unpaid. "
-        "Please make the transfer to [IBAN_1].\n\nBest regards,\n[NAME_3]",
+        "Please make the transfer to [IBAN_1].\n\nBest regards,\n[NAME_2]",
         "Invoice reminder", "Payroll server down",
         "Server srv-pay01.acme.local (10.12.4.21, MAC 00:1A:2B:3C:4D:5E) stopped responding after the update. "
         "(INC-2026-4471). Account ACME\\svc-pay, profile C:\\Users\\svc-pay\\AppData, "
@@ -1602,6 +1683,7 @@ def capture(app, chemin):
         texte, reponse, nom1, nom2, serveurs = DEMO[app.t.langue]
         nom3, nom4 = ("Modèles de mails", "Audit AD") if app.t.langue == "fr" else ("Email templates", "AD audit")
         app.options.permanents = ["Acme SAS", "Acme Ltd", "Claire Martin"]
+        app.options.etiquettes = {"Acme SAS": "ENTREPRISE", "Acme Ltd": "COMPANY"}
         app.options.motifs = [{"titre": "Postes de travail", "motif": r"PC-\d{4}"},
                               {"titre": "Tickets d'incident", "motif": r"INC-\d{4}-\d+"}]
         app.conversations, app.numero = [], 0
@@ -1685,6 +1767,7 @@ def capture(app, chemin):
         lambda: photo(app.fenetre_expression, "expression-fqdn.png"), lambda: app.fenetre_expression.destroy(),
         lambda: app.onglets_options.select(2), lambda: mesurer("onglet Motifs"),
         lambda: photo(app.fenetre_options, "options-motifs.png"), lambda: mesurer("onglet Motifs, 1 s après"),
+        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-termes.png"),
         lambda: app.onglets_options.select(4), lambda: photo(app.fenetre_options, "options-consigne.png"),
         lambda: app.onglets_options.select(0), lambda: photo(app.fenetre_options, "options-general.png"),
         lambda: app.fenetre_options.destroy(),

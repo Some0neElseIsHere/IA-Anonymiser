@@ -188,6 +188,18 @@ def expressions(type_):
     return [(m.pattern, bool(m.flags & re.IGNORECASE)) for t, m in MOTIFS if t == type_]
 
 
+def normaliser_etiquette(texte):
+    """Jeton personnalisé saisi par l'utilisateur -> nom de jeton : « Client principal » -> CLIENT_PRINCIPAL."""
+    import unicodedata
+    texte = unicodedata.normalize("NFKD", texte.strip().strip("[]")).encode("ascii", "ignore").decode()
+    return re.sub(r"_+", "_", re.sub(r"[^A-Z0-9]", "_", texte.upper())).strip("_")[:40]
+
+
+def etiquette_reservee(nom):
+    """Un jeton personnalisé ne doit pas ressembler à un jeton automatique ([NOM_3], [IP_1]…)."""
+    return bool(re.fullmatch(r"(?:" + "|".join(TOUS_PREFIXES) + r")_\d+", nom))
+
+
 def compiler_motif(motif):
     """Motif personnalisé (expression régulière), insensible à la casse. Lève re.error s'il est invalide.
 
@@ -251,13 +263,25 @@ class Anonymiseur:
         self._apercu = {}     # jetons du texte en cours, pas encore copiés
         self._apercu_index = {}
         self._compteurs = Counter()  # type -> nombre de jetons déjà créés (validés + aperçu)
+        self.etiquettes = {}  # clé d'un terme permanent -> jeton personnalisé (sans crochets)
+        self.a_annoncer = {}  # ancien jeton déjà envoyé -> nouveau jeton, à signaler à l'IA à la copie
+        self._renommages = {}
 
     # --- jetons -----------------------------------------------------------
     def _jeton(self, type_, valeur):
         cle = (type_, _cle(valeur, type_))
-        jeton = self.index.get(cle) or self._apercu_index.get(cle)
-        if jeton:
+        existant = self.index.get(cle) or self._apercu_index.get(cle)
+        perso = self.etiquettes.get(cle[1]) if type_ == "NOM" else None
+        if perso:
+            jeton = f"[{perso}]"
+            if existant and existant != jeton and existant in self.valide:
+                self._renommages[existant] = jeton  # l'IA connaît l'ancien jeton : il faudra la prévenir
+            if jeton not in self.valide:
+                self._apercu[jeton] = (type_, valeur)
+            self._apercu_index[cle] = jeton
             return jeton
+        if existant:
+            return existant
         self._compteurs[type_] += 1
         n = self._compteurs[type_]
         jeton = f"[{PREFIXES.get(self.langue, PREFIXES['fr'])[type_]}_{n}]"
@@ -273,21 +297,35 @@ class Anonymiseur:
         return list(self.valide) + [j for j in self._apercu if j not in self.valide]
 
     def etat(self):
-        return {"valide": {j: list(v) for j, v in self.valide.items()}, "exclus": sorted(self.exclus)}
+        return {"valide": {j: list(v) for j, v in self.valide.items()}, "exclus": sorted(self.exclus),
+                "index": [[t, c, j] for (t, c), j in self.index.items()], "a_annoncer": self.a_annoncer}
 
     def charger_etat(self, etat):
         self.reinitialiser()
         for jeton, (type_, valeur) in etat.get("valide", {}).items():
             self.valide[jeton] = (type_, valeur)
             self.index[(type_, _cle(valeur, type_))] = jeton
+        # Index enregistré : après un renommage, la valeur pointe vers le nouveau jeton, pas l'ancien
+        for type_, cle, jeton in etat.get("index", []):
+            if jeton in self.valide:
+                self.index[(type_, cle)] = jeton
+        self.a_annoncer = {a: n for a, n in etat.get("a_annoncer", {}).items() if a in self.valide}
         self.exclus = set(etat.get("exclus", [])) & set(self.valide)
         self._compteurs = Counter(t for t, _ in self.valide.values())
+
+    def renommages(self):
+        """Changements de jeton à signaler à l'IA : ceux déjà validés et ceux du texte en cours."""
+        return {**self.a_annoncer, **self._renommages}
+
+    def renommages_annonces(self):
+        self.a_annoncer = {}
 
     def valider(self):
         """Fige les jetons du texte en cours (à appeler quand il est copié pour l'IA)."""
         self.valide.update(self._apercu)
         self.index.update(self._apercu_index)
-        self._apercu, self._apercu_index = {}, {}
+        self.a_annoncer.update(self._renommages)
+        self._apercu, self._apercu_index, self._renommages = {}, {}, {}
         self._compteurs = Counter(t for t, _ in self.valide.values())
 
     def reinclure(self, type_, valeur):
@@ -300,7 +338,7 @@ class Anonymiseur:
         """types : types détectés automatiquement (None = tous) ; motifs : expressions personnalisées."""
         # Les jetons d'un aperçu non copié sont recalculés à chaque fois : taper
         # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
-        self._apercu, self._apercu_index = {}, {}
+        self._apercu, self._apercu_index, self._renommages = {}, {}, {}
         self._compteurs = Counter(t for t, _ in self.valide.values())
 
         trouves = []
@@ -419,11 +457,28 @@ class Anonymiseur:
                 sortie.append((pos, pos + n, type_, texte[pos:pos + n]))
         return sortie
 
+    def _jetons_trouves(self, texte):
+        """(match, jeton canonique) pour les jetons automatiques et personnalisés, dans l'ordre du texte."""
+        trouves = [(m, f"[{m.group(1).upper()}_{int(m.group(2))}]") for m in JETON_RE.finditer(texte)]
+        perso = {j[1:-1] for j in (*self.valide, *self._apercu) if not JETON_RE.fullmatch(j)}
+        if perso:
+            noms = sorted(perso, key=len, reverse=True)
+            motif = re.compile(r"\\?\[\s*(" + "|".join(re.escape(n).replace("_", r"\\?_") for n in noms)
+                               + r")\s*\\?\]", re.IGNORECASE)
+            canonique = {n.casefold(): n for n in noms}
+            pris = [(m.start(), m.end()) for m, _ in trouves]
+            for m in motif.finditer(texte):
+                if not any(d < m.end() and m.start() < f for d, f in pris):
+                    nom = canonique.get(m.group(1).replace("\\", "").casefold())
+                    if nom:
+                        trouves.append((m, f"[{nom}]"))
+            trouves.sort(key=lambda x: x[0].start())
+        return trouves
+
     def restaurer(self, texte):
         res = Resultat(texte="")
         morceaux, pos, taille = [], 0, 0
-        for m in JETON_RE.finditer(texte):
-            jeton = f"[{m.group(1).upper()}_{int(m.group(2))}]"
+        for m, jeton in self._jetons_trouves(texte):
             info = self.info(jeton)
             if not info:
                 res.inconnus.append((m.start(), m.end(), m.group(0)))

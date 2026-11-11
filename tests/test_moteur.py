@@ -163,6 +163,60 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class JetonsPersonnalises(unittest.TestCase):
+    def test_jeton_personnalise_des_le_depart(self):
+        a = Anonymiseur()
+        a.etiquettes = {"acme industries": "ENTREPRISE"}
+        r = a.anonymiser("Acme Industries et Jean Dupont", ["Acme Industries", "Jean Dupont"])
+        self.assertEqual(r.texte, "[ENTREPRISE] et [NOM_1]")
+        self.assertEqual(a.renommages(), {})  # rien à annoncer : l'IA n'a jamais vu d'autre jeton
+
+    def test_renommage_annonce_une_fois(self):
+        a = Anonymiseur()
+        a.anonymiser("Acme Industries", ["Acme Industries"])
+        a.valider()                                    # envoyé sous [NOM_1]
+        a.etiquettes = {"acme industries": "ENTREPRISE"}
+        r = a.anonymiser("Acme Industries", ["Acme Industries"])
+        self.assertEqual(r.texte, "[ENTREPRISE]")
+        self.assertEqual(a.renommages(), {"[NOM_1]": "[ENTREPRISE]"})
+        a.valider()
+        a.renommages_annonces()                        # annoncé à la copie
+        a.anonymiser("Acme Industries", ["Acme Industries"])
+        self.assertEqual(a.renommages(), {})
+
+    def test_ancien_et_nouveau_jeton_restaures(self):
+        a = Anonymiseur()
+        a.anonymiser("Acme Industries", ["Acme Industries"])
+        a.valider()
+        a.etiquettes = {"acme industries": "CLIENT_PRINCIPAL"}
+        a.anonymiser("Acme Industries", ["Acme Industries"])
+        a.valider()
+        r = a.restaurer("[NOM_1], [CLIENT_PRINCIPAL], [client_principal], \\[CLIENT\\_PRINCIPAL\\], [CLIENT]")
+        self.assertEqual(r.texte, "Acme Industries, Acme Industries, Acme Industries, Acme Industries, [CLIENT]")
+
+    def test_renommage_conserve_au_redemarrage(self):
+        a = Anonymiseur()
+        a.anonymiser("Acme Industries", ["Acme Industries"])
+        a.valider()
+        a.etiquettes = {"acme industries": "ENTREPRISE"}
+        a.anonymiser("Acme Industries", ["Acme Industries"])
+        a.valider()                                    # copié sans annonce (copie manuelle)
+        b = Anonymiseur()
+        b.charger_etat(a.etat())
+        self.assertEqual(b.renommages(), {"[NOM_1]": "[ENTREPRISE]"})   # toujours à annoncer
+        b.etiquettes = {}                              # jeton personnalisé retiré ensuite
+        self.assertEqual(b.anonymiser("Acme Industries", ["Acme Industries"]).texte, "[ENTREPRISE]")
+
+    def test_etiquettes(self):
+        from moteur import etiquette_reservee, normaliser_etiquette
+        self.assertEqual(normaliser_etiquette(" client principal "), "CLIENT_PRINCIPAL")
+        self.assertEqual(normaliser_etiquette("[Société]"), "SOCIETE")
+        self.assertTrue(etiquette_reservee("NOM_3"))
+        self.assertTrue(etiquette_reservee("NAME_12"))
+        self.assertFalse(etiquette_reservee("ENTREPRISE"))
+        self.assertFalse(etiquette_reservee("NOM"))
+
+
 class Performance(unittest.TestCase):
     def test_gros_log(self):
         """Un log de 3 000 lignes doit rester rapide, même avec des centaines de valeurs connues."""
