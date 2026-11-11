@@ -4,20 +4,23 @@
 Onglet 2 : réponse de l'IA / vraies valeurs. En bas : éléments masqués et termes de la conversation.
 """
 import bisect
+import datetime
 import json
 import os
 import platform
 import sys
 import threading
+import time
 import tkinter as tk
 import urllib.request
+import uuid
 import webbrowser
 from tkinter import font as tkfont
 from tkinter import messagebox, simpledialog, ttk
 
 import stockage
 from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif
-from textes import CONSIGNES, Traducteur
+from textes import CONSIGNES, Traducteur, libelle_jour
 
 try:
     import sv_ttk  # thème Sun Valley (style Windows 11), clair et sombre
@@ -101,10 +104,14 @@ class Conversation:
         self.termes = []
         self.source = ""
         self.reponse = ""
+        self.id = uuid.uuid4().hex[:12]
+        self.activite = time.time()  # dernière activité : sert au classement Aujourd'hui / Hier / date
+        self.epingle = False
 
     def etat(self):
         return {"nom": self.nom, "termes": self.termes, "source": self.source, "reponse": self.reponse,
-                "moteur": self.moteur.etat()}
+                "moteur": self.moteur.etat(), "id": self.id, "activite": self.activite,
+                "epingle": self.epingle}
 
     @classmethod
     def depuis_etat(cls, d, langue):
@@ -113,6 +120,9 @@ class Conversation:
         c.source = str(d.get("source", ""))
         c.reponse = str(d.get("reponse", ""))
         c.moteur.charger_etat(d.get("moteur", {}))
+        c.id = str(d.get("id") or c.id)
+        c.activite = float(d.get("activite", c.activite))
+        c.epingle = bool(d.get("epingle", False))
         return c
 
 
@@ -368,6 +378,8 @@ class Application:
                                activeforeground=p["texte"], relief="flat", borderwidth=1)
         for fenetre in [self.root] + [w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel)]:
             barre_de_titre(fenetre, sombre)
+        if self.conversations and hasattr(self, "arbre_conv"):
+            self.maj_conversations()  # couleur des rubriques
 
     def suivre_theme_windows(self):
         if self.options.theme == "auto":
@@ -423,6 +435,9 @@ class Application:
         self.reponse.texte.bind("<<Modified>>",
                                 lambda e: self.modifie(self.reponse.texte, self.actualiser_reponse))
         self.sortie.texte.bind("<<Copy>>", lambda e: self.valider(), add="+")
+        for zone in (self.source, self.reponse):
+            for evenement in ("<Key>", "<<Paste>>", "<<Cut>>"):
+                zone.texte.bind(evenement, self.activite, add="+")
         self.menu = tk.Menu(root, tearoff=0)
         self.menu_conv = tk.Menu(root, tearoff=0)
         for zone, spans in ((self.source, lambda: self.resultat and self.resultat.spans_source),
@@ -639,13 +654,46 @@ class Application:
         self.termes.remplir(self.conv.termes)
         self.titre_termes.configure(text=self.t("termes_conv", n=len(self.conv.termes)))
 
+    def ordre_conversations(self):
+        """(rubrique, conversation) : épinglées en haut, puis par jour de dernière activité, récentes d'abord."""
+        aujourdhui = datetime.date.today()
+        for c in sorted(self.conversations, key=lambda c: (not c.epingle, -c.activite)):
+            if c.epingle:
+                yield self.t("epinglees"), c
+            else:
+                yield libelle_jour(datetime.date.fromtimestamp(c.activite), aujourdhui, self.t.langue), c
+
     def maj_conversations(self):
         self.arbre_conv.delete(*self.arbre_conv.get_children())
-        for i, c in enumerate(self.conversations):
+        self.jour_affiche = datetime.date.today()
+        self.ordre_affiche = []
+        rubrique = None
+        for libelle, c in self.ordre_conversations():
+            if libelle != rubrique:
+                rubrique = libelle
+                self.arbre_conv.insert("", "end", iid=f"rubrique-{len(self.ordre_affiche)}", text=libelle,
+                                       tags=("rubrique",))
             n = len(c.moteur.valide)
-            self.arbre_conv.insert("", "end", iid=str(i), text=c.nom, values=(n or "",))
-        self.arbre_conv.selection_set(str(self.courante))
-        self.arbre_conv.see(str(self.courante))
+            self.arbre_conv.insert("", "end", iid=c.id, text=c.nom, values=(n or "",))
+            self.ordre_affiche.append((libelle, c.id))
+        self.arbre_conv.tag_configure("rubrique", foreground=self.palette["aide"],
+                                      font=(self.famille, 9, "bold"))
+        self.arbre_conv.selection_set(self.conv.id)
+        self.arbre_conv.see(self.conv.id)
+
+    def activite(self, evenement=None):
+        """L'utilisateur agit sur la conversation : elle remonte en tête de sa rubrique."""
+        if evenement is not None and getattr(evenement, "keysym", "") and not (
+                evenement.char or evenement.keysym in ("BackSpace", "Delete", "Return")):
+            return  # touches de déplacement, Ctrl seul… : pas une modification
+        self.conv.activite = time.time()
+        if [(l, c.id) for l, c in self.ordre_conversations()] != self.ordre_affiche:
+            self.maj_conversations()
+
+    def basculer_epingle(self):
+        self.conv.epingle = not self.conv.epingle
+        self.maj_conversations()
+        self.sauvegarder()
 
     # --- conversations ----------------------------------------------------
     def sauver_zones(self):
@@ -678,21 +726,31 @@ class Application:
 
     def changer_conversation(self):
         selection = self.arbre_conv.selection()
-        if not selection or int(selection[0]) == self.courante:
+        if not selection or selection[0] == self.conv.id:
+            return
+        if selection[0].startswith("rubrique-"):
+            self.arbre_conv.selection_set(self.conv.id)  # une rubrique ne se sélectionne pas
+            return
+        index = next((i for i, c in enumerate(self.conversations) if c.id == selection[0]), None)
+        if index is None:
             return
         self.sauver_zones()
-        self.courante = int(selection[0])
+        self.courante = index
         self.charger_zones()
         self.message(self.t("msg_conversation_choisie", c=self.conv.nom))
 
     def menu_conversation(self, evenement):
         ligne = self.arbre_conv.identify_row(evenement.y)
+        if ligne.startswith("rubrique-"):
+            ligne = ""
         if ligne:
             self.arbre_conv.selection_set(ligne)
             self.changer_conversation()
         t, menu = self.t, self.menu_conv
         menu.delete(0, "end")
         if ligne:
+            menu.add_command(label=t("desepingler" if self.conv.epingle else "epingler"),
+                             command=self.basculer_epingle)
             menu.add_command(label=t("renommer"), command=self.renommer_conversation)
             menu.add_command(label=t("fermer"), command=self.fermer_conversation)
             menu.add_separator()
@@ -723,6 +781,7 @@ class Application:
 
     def valider(self):
         self.moteur.valider()
+        self.conv.activite = time.time()
         self.maj_conversations()
         if self.resultat:
             self.remplir_elements(self.resultat)
@@ -762,6 +821,8 @@ class Application:
             self.erreur(self.t("msg_erreur_sauvegarde", e=e))
 
     def sauvegarde_periodique(self):
+        if getattr(self, "jour_affiche", None) != datetime.date.today():
+            self.maj_conversations()  # passage à minuit : « Aujourd'hui » devient « Hier »
         self.sauvegarder()
         self.root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
 
@@ -908,6 +969,7 @@ class Application:
             return
         zone.ecrire(texte)
         zone.texte.edit_modified(True)
+        self.activite()
 
     def ecrire_presse_papiers(self, texte):
         self.root.clipboard_clear()
@@ -1259,6 +1321,7 @@ def capture(app, chemin):
 
     def remplir():
         texte, reponse, nom1, nom2, serveurs = DEMO[app.t.langue]
+        nom3, nom4 = ("Modèles de mails", "Audit AD") if app.t.langue == "fr" else ("Email templates", "AD audit")
         app.options.permanents = ["Acme SAS", "Acme Ltd", "Claire Martin"]
         app.options.motifs = [r"PC-\d{4}", r"INC-\d{4}-\d+"]
         app.conversations, app.numero = [], 0
@@ -1275,6 +1338,13 @@ def capture(app, chemin):
         app.conv.nom = nom2
         app.source.ecrire(serveurs)
         app.actualiser()
+        # Rubriques : une épinglée, une d'hier, une plus ancienne
+        maintenant = time.time()
+        app.conversations[1].activite = maintenant - 86400
+        for nom, jours, epingle in ((nom3, 6, True), (nom4, 3, False)):
+            c = Conversation(nom, app.t.langue)
+            c.activite, c.epingle = maintenant - jours * 86400, epingle
+            app.conversations.append(c)
         app.maj_conversations()
 
     def photo(fenetre, nom):
@@ -1285,7 +1355,7 @@ def capture(app, chemin):
         ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(os.path.join(chemin, nom))
 
     def conversation(i, onglet):
-        app.arbre_conv.selection_set(str(i))
+        app.arbre_conv.selection_set(app.conversations[i].id)
         app.changer_conversation()
         app.onglets.select(onglet)
 

@@ -7,6 +7,11 @@ TEXTES = {
         "conversations": "Conversations",
         "nouvelle_conversation": "+ Nouvelle conversation",
         "renommer": "Renommer",
+        "epingler": "Épingler",
+        "desepingler": "Désépingler",
+        "epinglees": "Épinglées",
+        "aujourdhui": "Aujourd'hui",
+        "hier": "Hier",
         "fermer": "Fermer",
         "aide_conversations": "Une conversation par discussion avec l'IA : les mêmes éléments y gardent toujours les mêmes jetons. Clic droit pour renommer ou fermer.",
         "nom_conversation": "Conversation {n}",
@@ -151,6 +156,11 @@ TEXTES = {
         "conversations": "Conversations",
         "nouvelle_conversation": "+ New conversation",
         "renommer": "Rename",
+        "epingler": "Pin",
+        "desepingler": "Unpin",
+        "epinglees": "Pinned",
+        "aujourdhui": "Today",
+        "hier": "Yesterday",
         "fermer": "Close",
         "aide_conversations": "One conversation per chat with the AI: the same items always keep the same tokens. Right-click to rename or close.",
         "nom_conversation": "Conversation {n}",
@@ -298,6 +308,28 @@ CONSIGNES = {
         "Keep the tokens exactly as they are in your answer, without changing, translating or completing them."
     ),
 }
+
+
+MOIS = {
+    "fr": ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
+    "en": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+}
+
+
+def libelle_jour(jour, aujourdhui, langue):
+    """Rubrique d'une conversation selon le jour de sa dernière activité : Aujourd'hui, Hier, 9 nov."""
+    langue = langue if langue in MOIS else "en"
+    ecart = (aujourdhui - jour).days
+    if ecart <= 0:
+        return TEXTES[langue]["aujourdhui"]
+    if ecart == 1:
+        return TEXTES[langue]["hier"]
+    mois = MOIS[langue][jour.month - 1]
+    if langue == "fr":
+        texte = f"{jour.day} {mois}"
+        return texte if jour.year == aujourdhui.year else f"{texte} {jour.year}"
+    texte = f"{mois} {jour.day}"
+    return texte if jour.year == aujourdhui.year else f"{texte}, {jour.year}"
 
 
 class Traducteur:
