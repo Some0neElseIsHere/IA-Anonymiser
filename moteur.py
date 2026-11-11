@@ -321,25 +321,43 @@ class Anonymiseur:
 
     @staticmethod
     def _occurrences_connues(texte, connues, types):
-        """Occurrences littérales de valeurs déjà connues : (début, fin, type, texte trouvé)."""
+        """Occurrences littérales de valeurs déjà connues : (début, fin, type, texte trouvé).
+
+        Recherche directe (str.find) valeur par valeur : une seule expression régulière avec des
+        milliers d'alternatives serait trente fois plus lente sur un gros fichier de logs.
+        """
         par_valeur = {}
         for valeur, type_ in connues:
             if len(valeur) >= 3 and "\n" not in valeur and (types is None or type_ in types or
                                                             type_ in ("NOM", "PERSO")):
-                par_valeur.setdefault(valeur, type_)
+                par_valeur.setdefault(valeur if type_ == "SECRET" else valeur.lower(), (type_, valeur))
+        minuscules = texte.lower()
+        if len(minuscules) != len(texte):  # caractère dont la minuscule change la longueur : cas rare
+            minuscules = None
+
+        def mot(c):
+            return c.isalnum() or c == "_"
+
         sortie = []
-        for exact in (True, False):  # les secrets à l'identique, le reste sans tenir compte de la casse
-            valeurs = sorted((v for v, t in par_valeur.items() if (t == "SECRET") == exact), key=len, reverse=True)
-            if not valeurs:
-                continue
-            morceaux = [("(?<!\\w)" if v[0].isalnum() else "") + re.escape(v) + ("(?!\\w)" if v[-1].isalnum() else "")
-                        for v in valeurs]
-            motif = re.compile("|".join(morceaux), 0 if exact else re.IGNORECASE)
-            index = {v if exact else v.casefold(): par_valeur[v] for v in valeurs}
-            for m in motif.finditer(texte):
-                cle = m.group(0) if exact else m.group(0).casefold()
-                if cle in index:
-                    sortie.append((m.start(), m.end(), index[cle], m.group(0)))
+        for cle in sorted(par_valeur, key=len, reverse=True):  # les plus longues d'abord
+            type_, valeur = par_valeur[cle]
+            exact = type_ == "SECRET"
+            if exact or minuscules is not None:
+                cible = texte if exact else minuscules
+                positions = []
+                pos = cible.find(cle)
+                while pos != -1:
+                    positions.append(pos)
+                    pos = cible.find(cle, pos + 1)
+            else:
+                positions = [m.start() for m in re.finditer(re.escape(valeur), texte, re.IGNORECASE)]
+            n = len(valeur)
+            for pos in positions:
+                if mot(valeur[0]) and pos > 0 and mot(texte[pos - 1]):
+                    continue
+                if mot(valeur[-1]) and pos + n < len(texte) and mot(texte[pos + n]):
+                    continue
+                sortie.append((pos, pos + n, type_, texte[pos:pos + n]))
         return sortie
 
     def restaurer(self, texte):

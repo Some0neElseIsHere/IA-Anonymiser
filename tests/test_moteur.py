@@ -161,3 +161,19 @@ class Etat(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Performance(unittest.TestCase):
+    def test_gros_log(self):
+        """Un log de 3 000 lignes doit rester rapide, même avec des centaines de valeurs connues."""
+        import time
+        lignes = [f"2026-11-10 12:{i % 60:02d}:01 srv{i % 40}.acme.local [10.0.{i % 250}.{i % 200}] GET "
+                  f"/api/v1/items?id={i} 200 user{i % 50}@acme.fr user=jdoe{i % 30}" for i in range(3000)]
+        log = "\n".join(lignes)
+        a = Anonymiseur()
+        a.anonymiser(log, ["Acme SAS"])
+        a.valider()
+        debut = time.perf_counter()
+        r = a.anonymiser(log, ["Acme SAS"])
+        self.assertLess(time.perf_counter() - debut, 2.0)  # environ 0,4 s ; 3,4 s avant la correction
+        self.assertEqual(a.restaurer(r.texte).texte, log)
