@@ -45,6 +45,16 @@ Ce qui reste volontairement en clair : les noms de fichiers (`rapport.pdf`, `bac
 
 Pour laisser un élément en clair, faites un clic droit dessus → **Ne pas masquer**. Ça marche dans les trois onglets : sur la valeur surlignée dans votre texte, sur un jeton, ou sur une ligne du tableau des éléments masqués. Le même clic droit permet de le masquer à nouveau.
 
+### Rapport de preuve
+
+Pour garder une trace de ce qui a été envoyé à l'IA, cliquez sur **Exporter le rapport…** dans l'onglet **3. Éléments masqués**, ou faites un clic droit sur la conversation. Le rapport est une page HTML, lisible dans un navigateur et imprimable en PDF. Il contient :
+
+- la conversation, la date de l'export et les réglages actifs (types détectés, nombre de termes et de motifs) ;
+- la liste des éléments envoyés : jeton, type, et s'il a été masqué ou laissé en clair volontairement ;
+- le texte exact de chaque envoi à l'IA, avec sa date et son empreinte SHA-256.
+
+**Il ne contient aucune valeur d'origine** : ni nom, ni adresse, ni secret. Il peut donc être transmis à un RSSI ou à un DPO. Les envois sont enregistrés à chaque « Copier pour l'IA » (ou copie depuis le texte à envoyer), à partir de la version 1.6.
+
 ## Options
 
 ![Options](docs/options-detection.png)

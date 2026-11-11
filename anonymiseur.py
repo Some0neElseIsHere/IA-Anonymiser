@@ -16,8 +16,9 @@ import urllib.request
 import uuid
 import webbrowser
 from tkinter import font as tkfont
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
+import rapport
 import stockage
 from moteur import EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif
 from textes import CONSIGNES, Traducteur, libelle_jour
@@ -106,12 +107,14 @@ class Conversation:
         self.reponse = ""
         self.id = uuid.uuid4().hex[:12]
         self.activite = time.time()  # dernière activité : sert au classement Aujourd'hui / Hier / date
+        self.cree = time.time()
         self.epingle = False
+        self.envois = []  # textes exacts copiés pour l'IA (déjà anonymisés), pour le rapport de preuve
 
     def etat(self):
         return {"nom": self.nom, "termes": self.termes, "source": self.source, "reponse": self.reponse,
                 "moteur": self.moteur.etat(), "id": self.id, "activite": self.activite,
-                "epingle": self.epingle}
+                "epingle": self.epingle, "cree": self.cree, "envois": self.envois}
 
     @classmethod
     def depuis_etat(cls, d, langue):
@@ -123,6 +126,9 @@ class Conversation:
         c.id = str(d.get("id") or c.id)
         c.activite = float(d.get("activite", c.activite))
         c.epingle = bool(d.get("epingle", False))
+        c.cree = float(d["cree"]) if d.get("cree") else None  # inconnue avant la version 1.6
+        c.envois = [{"date": float(x["date"]), "texte": str(x["texte"])}
+                    for x in d.get("envois", []) if isinstance(x, dict) and "texte" in x]
         return c
 
 
@@ -434,7 +440,7 @@ class Application:
         self.source.texte.bind("<<Modified>>", lambda e: self.modifie(self.source.texte, self.actualiser))
         self.reponse.texte.bind("<<Modified>>",
                                 lambda e: self.modifie(self.reponse.texte, self.actualiser_reponse))
-        self.sortie.texte.bind("<<Copy>>", lambda e: self.valider(), add="+")
+        self.sortie.texte.bind("<<Copy>>", lambda e: self.copie_manuelle(), add="+")
         for zone in (self.source, self.reponse):
             for evenement in ("<Key>", "<<Paste>>", "<<Cut>>"):
                 zone.texte.bind(evenement, self.activite, add="+")
@@ -508,6 +514,7 @@ class Application:
         self.bouton_basculer = ttk.Button(entete, text=t("ne_plus_masquer"), command=self.basculer_element,
                                           state="disabled")
         self.bouton_basculer.pack(side="right")
+        ttk.Button(entete, text=t("rp_exporter"), command=self.exporter_rapport).pack(side="right", padx=(0, 8))
         zone = ttk.Frame(cadre)
         zone.pack(fill="both", expand=True)
         self.arbre = ttk.Treeview(zone, columns=("jeton", "type", "valeur", "nb"), show="headings",
@@ -752,6 +759,7 @@ class Application:
             menu.add_command(label=t("desepingler" if self.conv.epingle else "epingler"),
                              command=self.basculer_epingle)
             menu.add_command(label=t("renommer"), command=self.renommer_conversation)
+            menu.add_command(label=t("rp_exporter"), command=self.exporter_rapport)
             menu.add_command(label=t("fermer"), command=self.fermer_conversation)
             menu.add_separator()
         menu.add_command(label=t("nouvelle_conversation").lstrip("+ "), command=self.nouvelle_conversation)
@@ -778,6 +786,38 @@ class Application:
         self.courante = min(self.courante, len(self.conversations) - 1)
         self.charger_zones()
         self.sauvegarder()
+
+    def enregistrer_envoi(self, texte):
+        """Garde le texte exact copié pour l'IA (sans valeur d'origine), pour le rapport de preuve."""
+        if texte.strip() and (not self.conv.envois or self.conv.envois[-1]["texte"] != texte):
+            self.conv.envois.append({"date": time.time(), "texte": texte})
+
+    def copie_manuelle(self):
+        try:
+            self.enregistrer_envoi(self.sortie.texte.get("sel.first", "sel.last"))
+        except tk.TclError:
+            pass
+        self.valider()
+
+    def exporter_rapport(self):
+        t = self.t
+        jour = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+        nom = "".join(c if c.isalnum() or c in "-_" else "-" for c in self.conv.nom).strip("-") or "conversation"
+        chemin = filedialog.asksaveasfilename(
+            parent=self.root, title=t("rp_exporter").rstrip("…"), defaultextension=".html",
+            initialfile=f"rapport-{nom}-{jour}.html", filetypes=[("HTML", "*.html")])
+        if not chemin:
+            return
+        self.sauver_zones()
+        try:
+            contenu = rapport.generer(self.conv, self.options, t, VERSION, self.libelle)
+            with open(chemin, "w", encoding="utf-8") as f:
+                f.write(contenu)
+        except OSError as e:
+            messagebox.showerror("IA-Anonymiser", t("rp_erreur", e=e), parent=self.root)
+            return
+        if messagebox.askyesno("IA-Anonymiser", t("rp_enregistre", f=chemin), parent=self.root):
+            webbrowser.open("file:///" + os.path.abspath(chemin).replace("\\", "/"))
 
     def valider(self):
         self.moteur.valider()
@@ -981,9 +1021,10 @@ class Application:
         if not texte.strip():
             self.message(self.t("msg_rien_copier"))
             return
-        self.valider()
         if self.options.consigne and self.resultat and self.resultat.compte:
             texte = self.consigne() + texte
+        self.enregistrer_envoi(texte)
+        self.valider()
         self.ecrire_presse_papiers(texte)
         self.confirmer(self.bouton_copier_ia, "copier_ia")
 
