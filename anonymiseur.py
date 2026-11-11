@@ -1439,8 +1439,6 @@ class Application:
         self.fenetre_accueil = fen
         cadre = ttk.Frame(fen, padding=26)
         cadre.pack(fill="both", expand=True)
-        largeur = int(520 * e)
-
         haut = ttk.Frame(cadre)
         haut.pack(fill="x")
         if self.icone_entete:
@@ -1452,40 +1450,19 @@ class Application:
                   justify="left").pack(anchor="w")
 
         etapes = ttk.Frame(cadre)
-        etapes.pack(fill="x", pady=(20, 0))
+        etapes.pack(anchor="w", pady=(22, 0))
         for n in (1, 2, 3):
-            ligne = ttk.Frame(etapes)
-            ligne.pack(fill="x", pady=(0, 12))
-            ttk.Label(ligne, text=str(n), style="Numero.TLabel", width=2, anchor="center").pack(
-                side="left", anchor="n", padx=(0, 12))
-            texte = ttk.Frame(ligne)
-            texte.pack(side="left", fill="x")
-            ttk.Label(texte, text=t(f"acc_etape{n}"), style="Titre.TLabel").pack(anchor="w")
-            ttk.Label(texte, text=t(f"acc_etape{n}_texte"), wraplength=largeur - int(60 * e),
-                      justify="left").pack(anchor="w")
-
-        ttk.Separator(cadre).pack(fill="x", pady=(6, 16))
-        ttk.Label(cadre, text=t("acc_termes"), style="Section.TLabel").pack(anchor="w")
-        ttk.Label(cadre, text=t("acc_termes_aide"), wraplength=largeur, justify="left").pack(anchor="w", pady=(2, 8))
-        zone = tk.Text(cadre, height=4, width=50, font=self.police, relief="flat", padx=10, pady=6,
-                       highlightthickness=1, wrap="word")
-        p = self.palette
-        zone.configure(background=p["fond"], foreground=p["texte"], insertbackground=p["texte"],
-                       highlightbackground=p["bordure"], highlightcolor=p["focus"], selectbackground=p["selection"])
-        zone.pack(fill="x")
-        ttk.Label(cadre, text=t("acc_termes_note"), style="Aide.TLabel").pack(anchor="w", pady=(6, 0))
+            ttk.Label(etapes, text=str(n), style="Numero.TLabel").pack(side="left", padx=(0, 8))
+            ttk.Label(etapes, text=t(f"acc_etape{n}"), style="Section.TLabel").pack(side="left", padx=(0, 28))
 
         def commencer():
-            termes = [l for l in zone.get("1.0", "end").splitlines() if l.strip()]
-            self.options.permanents = stockage.trier(self.options.permanents + termes)
             self.sauver_options()  # crée options.json : l'écran ne s'affichera plus
             fen.destroy()
-            self.actualiser()
 
         ttk.Button(cadre, text=t("acc_commencer"), command=commencer, style="Accent.TButton").pack(
-            anchor="e", pady=(18, 0))
+            anchor="e", pady=(22, 0))
         fen.protocol("WM_DELETE_WINDOW", commencer)
-        self.afficher(fen, focus=zone)
+        self.afficher(fen)
 
     def lien(self, parent, texte, url):
         etiquette = ttk.Label(parent, text=texte, style="Lien.TLabel", cursor="hand2")
