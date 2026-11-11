@@ -1130,10 +1130,8 @@ class Application:
         o = ttk.Frame(onglets, padding=18)
         onglets.add(o, text=t("opt_motifs"))
         ttk.Label(o, text=t("opt_motifs_titre"), style="Section.TLabel").pack(anchor="w")
-        ttk.Label(o, text=t("opt_motifs_aide"), style="Aide.TLabel", wraplength=largeur_texte,
-                  justify="left").pack(anchor="w", pady=(2, 4))
-        ttk.Label(o, text=t("opt_motifs_memo"), style="Aide.TLabel", wraplength=largeur_texte,
-                  justify="left").pack(anchor="w", pady=(0, 10))
+        self.aide_adaptee(o, t("opt_motifs_aide")).pack(fill="x", pady=(2, 4))
+        self.aide_adaptee(o, t("opt_motifs_memo")).pack(fill="x", pady=(0, 10))
         motifs = [dict(m) for m in self.options.motifs]
 
         saisie = ttk.Frame(o)
@@ -1151,7 +1149,7 @@ class Application:
         zone = ttk.Frame(o)
         zone.pack(fill="both", expand=True)
         arbre_motifs = ttk.Treeview(zone, columns=("titre", "motif"), show="headings", selectmode="extended",
-                                    height=6)
+                                    height=4)
         arbre_motifs.heading("titre", text=t("opt_motif_titre"), anchor="w")
         arbre_motifs.heading("motif", text=t("opt_motif_expression"), anchor="w")
         arbre_motifs.column("titre", width=int(170 * e), stretch=False)
