@@ -507,14 +507,14 @@ class Application:
     def construire_elements(self, parent):
         t = self.t
         cadre = ttk.Frame(parent, padding=(0, 0, 10, 0))
-        entete = ttk.Frame(cadre)
-        entete.pack(fill="x", pady=(0, 8))
-        self.titre_elements = ttk.Label(entete, style="Titre.TLabel")
-        self.titre_elements.pack(side="left")
-        self.bouton_basculer = ttk.Button(entete, text=t("ne_plus_masquer"), command=self.basculer_element,
+        self.titre_elements = ttk.Label(cadre, style="Titre.TLabel")
+        self.titre_elements.pack(anchor="w", pady=(0, 8))
+        actions = ttk.Frame(cadre)
+        actions.pack(fill="x", pady=(0, 8))
+        ttk.Button(actions, text=t("rp_exporter"), command=self.exporter_rapport).pack(side="left")
+        self.bouton_basculer = ttk.Button(actions, text=t("ne_plus_masquer"), command=self.basculer_element,
                                           state="disabled")
-        self.bouton_basculer.pack(side="right")
-        ttk.Button(entete, text=t("rp_exporter"), command=self.exporter_rapport).pack(side="right", padx=(0, 8))
+        self.bouton_basculer.pack(side="left", padx=(8, 0))
         zone = ttk.Frame(cadre)
         zone.pack(fill="both", expand=True)
         self.arbre = ttk.Treeview(zone, columns=("jeton", "type", "valeur", "nb"), show="headings",
@@ -535,7 +535,7 @@ class Application:
         self.arbre.bind("<<TreeviewSelect>>", lambda e: self.selection_element())
         self.arbre.bind("<Double-1>", lambda e: self.basculer_element())
         self.arbre.bind("<Button-3>", self.menu_element)
-        ttk.Label(cadre, style="Aide.TLabel", text=t("aide_elements")).pack(anchor="w", pady=(6, 0))
+        self.aide_adaptee(cadre, t("aide_elements")).pack(fill="x", pady=(6, 0))
         self.arbre_elements_couleurs()
         return cadre
 
@@ -549,10 +549,16 @@ class Application:
         self.termes.pack(fill="both", expand=True)
         pied = ttk.Frame(cadre)
         pied.pack(fill="x", pady=(8, 0))
-        ttk.Button(pied, text=t("supprimer"), command=self.supprimer_termes).pack(side="right")
-        ttk.Button(pied, text=t("toujours_masquer"), command=self.rendre_permanents).pack(side="right", padx=(0, 8))
-        ttk.Label(pied, style="Aide.TLabel", text=t("aide_clic_droit")).pack(side="left")
+        ttk.Button(pied, text=t("toujours_masquer"), command=self.rendre_permanents).pack(side="left")
+        ttk.Button(pied, text=t("supprimer"), command=self.supprimer_termes).pack(side="left", padx=(8, 0))
+        self.aide_adaptee(cadre, t("aide_clic_droit")).pack(fill="x", pady=(6, 0))
         return cadre
+
+    def aide_adaptee(self, parent, texte):
+        """Texte d'aide qui passe à la ligne selon la largeur disponible, au lieu d'être coupé."""
+        etiquette = ttk.Label(parent, text=texte, style="Aide.TLabel", justify="left")
+        etiquette.bind("<Configure>", lambda e: etiquette.configure(wraplength=max(e.width - 4, 100)))
+        return etiquette
 
     def reconstruire(self):
         """Reconstruit l'interface (changement de langue), sans toucher aux conversations."""
