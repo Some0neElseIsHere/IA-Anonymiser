@@ -8,6 +8,8 @@ Masquez vos données personnelles avant de les envoyer à une IA (Claude, ChatGP
 
 Téléchargez **[IA-Anonymiser.exe](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases/latest/download/IA-Anonymiser.exe)**, la dernière version. Aucune installation n'est nécessaire : lancez simplement le fichier.
 
+Les nouveautés de chaque version sont détaillées dans les [notes de version](docs/release-notes.md).
+
 Chaque [release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases) contient deux fois le même programme : `IA-Anonymiser.exe`, dont le lien ci-dessus mène toujours à la dernière version, et `IA-Anonymiser-vX.Y.Z.exe`, qui porte son numéro de version.
 
 > Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur », car l'exe n'est pas signé. Cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
@@ -107,7 +109,7 @@ L'empreinte affichée doit correspondre à celle indiquée dans le fichier, qui 
 
 ## Publier une nouvelle version
 
-Dans l'onglet **Actions**, ouvrez **Construction et release**, cliquez sur **Run workflow** et saisissez le numéro de version (par exemple `v1.4.0`). Les tests sont lancés, puis l'exe est compilé et publié dans une release.
+Ajoutez d'abord les nouveautés en tête de [docs/release-notes.md](docs/release-notes.md) (une entrée `- **vX.Y.Z** : …`) : sans elle, la publication est refusée. Ensuite, dans l'onglet **Actions**, ouvrez **Construction et release**, cliquez sur **Run workflow** et saisissez le numéro de version (par exemple `v1.4.0`). Les tests sont lancés, puis l'exe est compilé et publié dans une release.
 
 ## Licence
 

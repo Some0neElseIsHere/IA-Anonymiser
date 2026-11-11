@@ -56,11 +56,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          # Description : nouveautés de cette version, tirées de docs/release-notes.md
+          python tools/release-body.py docs/release-notes.md "$VERSION" "$GITHUB_REPOSITORY" corps.md --exiger
           fichiers=(dist/IA-Anonymiser.exe "dist/IA-Anonymiser-$VERSION.exe" dist/SHA256SUMS.txt)
           if gh release view "$VERSION" > /dev/null 2>&1; then
-            # Release déjà publiée : ses fichiers sont remplacés
+            # Release déjà publiée : ses fichiers et sa description sont remplacés
             gh release upload "$VERSION" "${fichiers[@]}" --clobber
+            gh release edit "$VERSION" --notes-file corps.md
           else
             gh release create "$VERSION" "${fichiers[@]}" \
-              --target "$GITHUB_SHA" --title "IA-Anonymiser $VERSION" --generate-notes
+              --target "$GITHUB_SHA" --title "IA-Anonymiser $VERSION" --notes-file corps.md
           fi

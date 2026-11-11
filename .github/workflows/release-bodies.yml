@@ -1,0 +1,26 @@
+# Réécrit la description de toutes les versions publiées à partir de docs/release-notes.md
+# (liens de téléchargement en tête, nouveautés de la version seulement).
+# À lancer à la main, par exemple après une modification des notes de version.
+
+name: Descriptions des releases
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  descriptions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Réécrire les descriptions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft | not) | .tag_name' | grep '^v' | while read -r tag; do
+            fichiers=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '[.assets[].name] | join(",")')
+            python3 tools/release-body.py docs/release-notes.md "$tag" "$GITHUB_REPOSITORY" corps.md "$fichiers"
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file corps.md > /dev/null && echo "::notice::$tag mise à jour"
+          done
