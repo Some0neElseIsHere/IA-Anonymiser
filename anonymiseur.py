@@ -172,6 +172,8 @@ class Zone(ttk.Frame):
         if not self.indication:
             return
         if self.texte.compare("end-1c", "==", "1.0"):
+            # même fond que la zone, quel que soit le thème : pas de rectangle visible
+            self.indication.configure(background=self.texte.cget("background"))
             self.indication.place(x=16, y=12)
         else:
             self.indication.place_forget()
@@ -194,7 +196,7 @@ class Zone(ttk.Frame):
         self.texte.tag_raise("actif")
         self.texte.tag_raise("sel")
         if self.indication:
-            self.indication.configure(background=p["fond"], foreground=p["aide"])
+            self.indication.configure(background=self.texte.cget("background"), foreground=p["aide"])
 
     def lire(self):
         return self.texte.get("1.0", "end-1c")
