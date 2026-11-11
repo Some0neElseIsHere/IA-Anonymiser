@@ -14,6 +14,8 @@ Chaque [release](https://github.com/Some0neElseIsHere/IA-Anonymiser/releases) co
 
 ## Utilisation
 
+Au premier lancement, un écran d'accueil présente le principe et vous propose d'indiquer les noms à toujours masquer : votre entreprise, vos clients, vos collègues. Ensuite, tant qu'une zone de texte est vide, elle affiche les étapes à suivre.
+
 1. **Onglet « Anonymiser mon texte »** : collez votre texte à gauche. La version anonymisée apparaît aussitôt à droite. Les éléments masqués sont surlignés en jaune.
 2. Cliquez sur **Copier pour l'IA** et collez le texte dans votre conversation.
 3. **Onglet « Restaurer la réponse de l'IA »** : collez la réponse de l'IA à gauche. À droite, les jetons comme `[NOM_1]` sont remplacés par les vraies valeurs. Cliquez sur **Copier**.
