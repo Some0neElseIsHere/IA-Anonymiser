@@ -62,3 +62,19 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def icone_info(couleur, texte, chemin):
+    """Petite icône « i » ronde (32 px, réduite à 16 px à 100 % d'affichage)."""
+    t = 256
+    img = Image.new("RGBA", (t, t), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse([8, 8, t - 8, t - 8], fill=couleur)
+    d.ellipse([112, 52, 144, 84], fill=texte)            # point du i
+    d.rounded_rectangle([114, 106, 142, 204], radius=12, fill=texte)  # barre du i
+    img.resize((32, 32), Image.LANCZOS).save(chemin)
+
+
+if __name__ == "__main__":
+    icone_info((0, 95, 184, 255), (255, 255, 255, 255), os.path.join(RACINE, "info-clair.png"))
+    icone_info((87, 200, 255, 255), (28, 28, 28, 255), os.path.join(RACINE, "info-sombre.png"))

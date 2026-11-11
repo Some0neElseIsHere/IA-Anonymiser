@@ -269,6 +269,7 @@ class Application:
         self.attentes = {}
         self.theme_applique = None
         self.erreurs_vues = set()
+        self.icones_info = {}
         self.resultat_reponse = None
         self.textes_tk = []
 
@@ -1110,9 +1111,14 @@ class Application:
             ligne = ttk.Frame(case)
             ligne.pack(anchor="w")
             ttk.Checkbutton(ligne, text=t(f"type_{type_}"), variable=cases[type_]).pack(side="left")
-            lien = ttk.Label(ligne, text=t("voir_expression"), style="LienDiscret.TLabel", cursor="hand2")
-            lien.pack(side="left", padx=(10, 0))
+            icone = self.icone_info()
+            if icone:
+                lien = ttk.Label(ligne, image=icone, cursor="hand2")
+            else:
+                lien = ttk.Label(ligne, text="ⓘ", style="LienDiscret.TLabel", cursor="hand2")
+            lien.pack(side="left", padx=(8, 0))
             lien.bind("<Button-1>", lambda _, ty=type_: self.voir_expression(ty, fen))
+            self.info_bulle(lien, t("voir_expression"))
             ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
                 anchor="w", padx=(int(28 * e), 0))
 
@@ -1313,6 +1319,41 @@ class Application:
         ttk.Button(boutons, text=t("enregistrer"), command=enregistrer, style="Accent.TButton").pack(side="right")
         ttk.Button(boutons, text=t("annuler"), command=fen.destroy).pack(side="right", padx=(0, 8))
         self.afficher(fen)
+
+    def icone_info(self):
+        """Petite icône « i » assortie au thème (16 px à 100 %, 32 px à partir de 150 %)."""
+        nom = "info-sombre.png" if self.theme_applique == "sombre" else "info-clair.png"
+        if nom not in self.icones_info:
+            try:
+                image = tk.PhotoImage(file=ressource(nom))
+                self.icones_info[nom] = image if self.echelle >= 1.5 else image.subsample(2, 2)
+            except (tk.TclError, OSError):
+                self.icones_info[nom] = None
+        return self.icones_info[nom]
+
+    def info_bulle(self, widget, texte):
+        """Info-bulle affichée au survol."""
+        bulle = {}
+
+        def montrer(_):
+            if bulle.get("fen"):
+                return
+            fen = tk.Toplevel(widget)
+            fen.wm_overrideredirect(True)
+            fen.wm_attributes("-topmost", True)
+            p = self.palette
+            tk.Label(fen, text=texte, background=p["fond"], foreground=p["texte"], relief="solid", borderwidth=1,
+                     padx=6, pady=2, font=(self.famille, 9)).pack()
+            fen.geometry(f"+{widget.winfo_rootx() + widget.winfo_width() + 4}+{widget.winfo_rooty() - 2}")
+            bulle["fen"] = fen
+
+        def cacher(_):
+            if bulle.get("fen"):
+                bulle.pop("fen").destroy()
+
+        widget.bind("<Enter>", montrer, add="+")
+        widget.bind("<Leave>", cacher, add="+")
+        widget.bind("<Button-1>", cacher, add="+")
 
     def voir_expression(self, type_, parent):
         """Fenêtre qui montre les expressions régulières appliquées pour un type de données."""
