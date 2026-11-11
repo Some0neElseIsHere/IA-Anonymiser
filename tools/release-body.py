@@ -32,7 +32,7 @@ def entree(nouveautes, version):
     texte = re.sub(r"\A([^\n-][^\n]*)\n- ", r"\1\n\n- ", texte)  # ligne vide entre la phrase et la liste
     # majuscule en tête du texte et de chaque puce
     texte = re.sub(r"^(- (?:\*\*)?)(\w)", lambda m: m.group(1) + m.group(2).upper(), texte, flags=re.M)
-    return texte[:1].upper() + texte[1:]
+    return re.sub(r"\A((?:\*\*)?)(\w)", lambda m: m.group(1) + m.group(2).upper(), texte)
 
 
 def liens(base, version, fichiers):
