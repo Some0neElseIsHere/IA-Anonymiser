@@ -94,14 +94,14 @@ MOTIFS = [
         re.IGNORECASE)),
     ("SID", re.compile(r"\bS-1-5-21-\d+-\d+-\d+(?:-\d+)?\b")),
     ("EMAIL", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
-    ("IBAN", re.compile(r"\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}(?:\s?[A-Z0-9]{1,3})?\b")),
+    ("IBAN", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b")),
     ("SECU", re.compile(
-        r"(?<![\d\w])[12][\s.]?\d{2}[\s.]?(?:0[1-9]|1[0-2]|[2-9]\d)[\s.]?(?:\d{2}|2[AB])"
-        r"[\s.]?\d{3}[\s.]?\d{3}(?:[\s.]?\d{2})?(?![\d\w])")),
+        r"(?<![\d\w.])[12] ?\d{2} ?(?:0[1-9]|1[0-2]|[2-9]\d) ?(?:\d{2}|2[AB])"
+        r" ?\d{3} ?\d{3}(?: ?\d{2})?(?![\d\w.])")),
     ("CARTE", re.compile(r"(?<!\d)(?:\d{4}[ -]?){3}\d{4}(?!\d)")),
     ("TEL", re.compile(
-        r"(?<![\w+])(?:(?:\+|00)33\s?(?:\(0\)\s?)?|0)[1-9](?:[\s.-]?\d{2}){4}(?!\w)"  # France
-        r"|(?<![\w+])\+\d{1,3}[\s.-]?\d{1,4}(?:[\s.-]?\d{2,4}){2,4}(?!\w)"           # international
+        r"(?<![\w+])(?:(?:\+|00)33 ?(?:\(0\) ?)?|0)[1-9](?:[ .-]?\d{2}){4}(?!\w)"  # France
+        r"|(?<![\w+])\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?!\w)"           # international
     )),
     # Comptes : DOMAINE\utilisateur (domaine NetBIOS en majuscules), et l'utilisateur dans un chemin de profil
     ("COMPTE", re.compile(r"(?<![\w\\/.-])(?P<d>[A-Z][A-Z0-9-]{1,14})\\[A-Za-z0-9][\w.$-]{1,63}(?![\w\\])")),
@@ -125,6 +125,8 @@ PROFILS_GENERIQUES = {"public", "default", "default user", "all users", "shared"
 
 
 def _accepte(type_, m, valeur):
+    if type_ == "SECRET" and re.match(r"(?:[/~]|[A-Za-z]:\\)", valeur):
+        return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
     if type_ == "FQDN":
         tld = m.group("tld").lower()
         return tld not in EXTENSIONS_FICHIERS and (len(tld) == 2 or tld in EXTENSIONS_DOMAINE)
@@ -219,6 +221,23 @@ JETON_RE = re.compile(
 )
 
 
+_VARIANTES = {"a": "aàâäáãå", "e": "eéèêë", "i": "iîïíì", "o": "oôöóòõ", "u": "uùûüú", "c": "cç", "y": "yÿý", "n": "nñ"}
+
+
+def _sans_accents(texte):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFKD", texte) if not unicodedata.combining(c))
+
+
+def _motif_mot(mot):
+    """Mot d'un terme, insensible aux accents : « Lefèvre » trouve aussi « Lefevre » et « LEFEVRE »."""
+    morceaux = []
+    for c in mot:
+        base = _sans_accents(c).lower()
+        morceaux.append(f"[{_VARIANTES[base]}]" if base in _VARIANTES else re.escape(c))
+    return "".join(morceaux)
+
+
 def _cle(valeur, type_=None):
     """Clé de comparaison : les différentes écritures d'une même donnée donnent le même jeton."""
     if type_ == "TEL":
@@ -237,6 +256,8 @@ def _cle(valeur, type_=None):
         return re.sub(r"[\s.-]", "", valeur).upper()
     if type_ == "MAC":
         return re.sub(r"[:-]", "", valeur).upper()
+    if type_ == "NOM":
+        return _sans_accents(" ".join(valeur.split())).casefold()
     return " ".join(valeur.split()).casefold()
 
 
@@ -271,7 +292,9 @@ class Anonymiseur:
     def _jeton(self, type_, valeur):
         cle = (type_, _cle(valeur, type_))
         existant = self.index.get(cle) or self._apercu_index.get(cle)
-        perso = self.etiquettes.get(cle[1]) if type_ == "NOM" else None
+        perso = None
+        if type_ == "NOM":  # clés des jetons personnalisés comparées sans accents, comme les termes
+            perso = next((j for t, j in self.etiquettes.items() if _cle(t, "NOM") == cle[1] and j), None)
         if perso:
             jeton = f"[{perso}]"
             if existant and existant != jeton and existant in self.valide:
@@ -282,9 +305,12 @@ class Anonymiseur:
             return jeton
         if existant:
             return existant
-        self._compteurs[type_] += 1
-        n = self._compteurs[type_]
-        jeton = f"[{PREFIXES.get(self.langue, PREFIXES['fr'])[type_]}_{n}]"
+        prefixe = PREFIXES.get(self.langue, PREFIXES["fr"])[type_]
+        while True:  # un numéro déjà écrit tel quel dans le texte (« [IP_1] » d'un modèle) est sauté
+            self._compteurs[type_] += 1
+            jeton = f"[{prefixe}_{self._compteurs[type_]}]"
+            if jeton not in self._reserves:
+                break
         self._apercu[jeton] = (type_, valeur)
         self._apercu_index[cle] = jeton
         return jeton
@@ -308,7 +334,8 @@ class Anonymiseur:
         # Index enregistré : après un renommage, la valeur pointe vers le nouveau jeton, pas l'ancien
         for type_, cle, jeton in etat.get("index", []):
             if jeton in self.valide:
-                self.index[(type_, cle)] = jeton
+                # clé recalculée : celles des termes sont sans accents depuis la v1.10.2
+                self.index[(type_, _cle(cle, type_) if type_ == "NOM" else cle)] = jeton
         self.a_annoncer = {a: n for a, n in etat.get("a_annoncer", {}).items() if a in self.valide}
         self.exclus = set(etat.get("exclus", [])) & set(self.valide)
         self._compteurs = Counter(t for t, _ in self.valide.values())
@@ -340,6 +367,8 @@ class Anonymiseur:
         # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
         self._apercu, self._apercu_index, self._renommages = {}, {}, {}
         self._compteurs = Counter(t for t, _ in self.valide.values())
+        # Jetons écrits tels quels dans le texte d'origine et inconnus de la conversation : réservés
+        self._reserves = {f"[{m.group(1).upper()}_{int(m.group(2))}]" for m in JETON_RE.finditer(texte)} - set(self.valide)
 
         trouves = []
         termes_cf = {" ".join(t.split()).casefold() for t in termes}
@@ -388,7 +417,7 @@ class Anonymiseur:
         propres = {" ".join(t.split()) for t in termes}
         for terme in sorted((t for t in propres if len(t) >= 2), key=len, reverse=True):
             motif = re.compile(
-                r"(?<!\w)" + r"\s+".join(map(re.escape, terme.split())) + r"(?!\w)", re.IGNORECASE)
+                r"(?<!\w)" + r"\s+".join(map(_motif_mot, terme.split())) + r"(?!\w)", re.IGNORECASE)
             for m in motif.finditer(texte):
                 if prendre(*m.span()):
                     trouves.append((m.start(), m.end(), "NOM", terme))

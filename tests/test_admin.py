@@ -191,6 +191,56 @@ class ValeursConnues(unittest.TestCase):
         self.assertEqual(a.anonymiser("10.0.0.1", [], types={"EMAIL"}).texte, "10.0.0.1")
 
 
+class DefautsTrouvesParLesTestsDeMasse(unittest.TestCase):
+    def test_pwd_de_sudo_n_est_pas_un_mot_de_passe(self):
+        self.assertEqual(anon("sudo: jmoreau : TTY=pts/0 ; PWD=/home/jmoreau ; COMMAND=/bin/ls"),
+                         "sudo: [COMPTE_1] : TTY=pts/0 ; PWD=/home/[COMPTE_1] ; COMMAND=/bin/ls")
+
+    def test_pas_de_numero_a_cheval_sur_deux_lignes(self):
+        self.assertEqual(anon("/api/users/123\n10.69.114.122 GET"), "/api/users/123\n[IP_1] GET")
+        self.assertEqual(anon("tel 06 12 34\n56 78 90"), "tel 06 12 34\n56 78 90")
+
+
+class CasLimites(unittest.TestCase):
+    def test_termes_insensibles_aux_accents(self):
+        a = Anonymiseur()
+        r = a.anonymiser("Marc Lefèvre, MARC LEFEVRE, marc lefevre, Marc Lefévre", ["Marc Lefèvre"])
+        self.assertEqual(r.texte, "[NOM_1], [NOM_1], [NOM_1], [NOM_1]")
+        self.assertEqual(a.restaurer("[NOM_1]").texte, "Marc Lefèvre")
+
+    def test_jeton_personnalise_terme_accentue(self):
+        a = Anonymiseur()
+        a.etiquettes = {"société générale": "CLIENT"}
+        self.assertEqual(a.anonymiser("Société Générale et SOCIETE GENERALE", ["Société Générale"]).texte,
+                         "[CLIENT] et [CLIENT]")
+
+    def test_conversation_enregistree_avant_les_accents(self):
+        """Un état enregistré par une version précédente (clé avec accents) garde ses jetons."""
+        ancien = {"valide": {"[NOM_1]": ["NOM", "Marc Lefèvre"]}, "exclus": [],
+                  "index": [["NOM", "marc lefèvre", "[NOM_1]"]], "a_annoncer": {}}
+        a = Anonymiseur()
+        a.charger_etat(ancien)
+        self.assertEqual(a.anonymiser("Marc Lefèvre puis Marc Lefevre", ["Marc Lefèvre"]).texte,
+                         "[NOM_1] puis [NOM_1]")
+
+    def test_jeton_deja_ecrit_dans_le_texte(self):
+        a = Anonymiseur()
+        texte = "Modèle : remplacer [IP_1] par l'adresse. Vraie adresse : 10.0.0.9"
+        r = a.anonymiser(texte, [])
+        self.assertEqual(r.texte, "Modèle : remplacer [IP_1] par l'adresse. Vraie adresse : [IP_2]")
+        a.valider()
+        self.assertEqual(a.restaurer(r.texte).texte, texte)
+
+    def test_emoji_crlf_tabulations(self):
+        for texte in ("🔥 jean.dupont@acme.fr 😀 10.0.0.1", "a 10.0.0.1\r\nb jean@acme.fr\r\n",
+                      "user\tACME\\jdoe\tfrom\t10.0.0.2"):
+            a = Anonymiseur()
+            r = a.anonymiser(texte, [])
+            a.valider()
+            self.assertEqual(a.restaurer(r.texte).texte, texte)
+            self.assertNotIn("10.0.0", r.texte)
+
+
 class PiegesDeLogs(unittest.TestCase):
     def test_textes_techniques_laisses_en_clair(self):
         for texte in [
