@@ -165,7 +165,7 @@ def lancer():
         return next(j for j in app.moteur.jetons() if app.moteur.info(j)[1] == valeur)
 
     def reponse_ia():
-        compte, ip, ticket = jeton_de("svc-backup"), jeton_de("10.20.40.17"), jeton_de("INC-2026-5120")
+        compte, ip, ticket = jeton_de("ACME\\svc-backup"), jeton_de("10.20.40.17"), jeton_de("INC-2026-5120")
         for j in (compte, ip, ticket, jeton_de("slefevre")):
             verifier(j in contexte["envoi1"], f"{j} absent de l'envoi")
         # Réponse d'IA réaliste : jetons repris, dont certains déformés (minuscules, Markdown échappé)
@@ -178,7 +178,7 @@ def lancer():
 
     def verifier_restauration():
         restauree = app.restauree.lire()
-        verifier("Le compte svc-backup a été utilisé depuis 10.20.40.17." in restauree, f"restauration : {restauree!r}")
+        verifier("Le compte ACME\\svc-backup a été utilisé depuis 10.20.40.17." in restauree, f"restauration : {restauree!r}")
         verifier("[IP_99]" in restauree, "le jeton inconnu devrait rester tel quel")
         verifier("C:\\Users\\slefevre\\AppData" in restauree, f"chemin mal restauré : {restauree!r}")
         verifier("INC-2026-5120" in restauree, "jeton échappé en Markdown non restauré")
