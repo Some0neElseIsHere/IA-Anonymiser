@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.2** : détection plus fiable, corrigée grâce à une campagne de tests massifs (10 000 documents générés : logs Windows, Linux, pare-feu, AD, SQL, tickets, mails, en français et en anglais) :
+  - **noms avec ou sans accents** : un terme saisi « Marc Lefèvre » masque aussi « Marc Lefevre » et « MARC LEFEVRE », sous le même jeton ;
+  - **numéros sur plusieurs lignes** : un numéro de sécurité sociale, de téléphone ou un IBAN ne peut plus « déborder » sur la ligne suivante et avaler un morceau de texte ;
+  - **chemins pris pour des mots de passe** : `PWD=/home/app` ou `PATH=C:\Windows` ne sont plus masqués comme des secrets ;
+  - **jeton déjà présent dans le texte** : si le texte collé contient lui-même un `[IP_1]` (par exemple une ancienne réponse de l'IA), la numérotation l'évite pour ne pas créer de confusion.
+  - **scénario de bout en bout** : à chaque modification, la vraie application est désormais pilotée automatiquement sous Windows comme par un utilisateur (accueil, collage, copie pour l'IA, restauration, jeton personnalisé, rapport, épinglage, langue, thème, log de 3 000 lignes), puis relancée pour vérifier que tout est conservé et chiffré.
+
 - **v1.10.1** : les raccourcis clavier globaux de la v1.10.0 sont retirés : copier, appuyer sur le raccourci puis coller restait trop de manipulations. Le fonctionnement redevient celui de la v1.9.0.
 
 - **v1.10.0** : **raccourcis clavier globaux**, actifs dans toutes les applications, même quand IA-Anonymiser est en arrière-plan :
