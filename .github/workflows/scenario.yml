@@ -1,0 +1,56 @@
+# Scénario de bout en bout : pilote la vraie application sous Windows comme un utilisateur,
+# puis la relance pour vérifier que tout a été conservé. Résultats et captures sur la branche « tests-e2e ».
+
+name: Scénario de bout en bout
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scenario:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Préparer
+        shell: bash
+        run: pip install pillow sv-ttk
+
+      - name: Phase 1 (premier lancement, utilisation complète)
+        id: phase1
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:APPDATA = "$env:RUNNER_TEMP\appdata-scenario"
+          New-Item -ItemType Directory -Force $env:APPDATA | Out-Null
+          python tests/scenario_gui.py 1 resultats-e2e
+
+      - name: Phase 2 (relance, conservation)
+        id: phase2
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:APPDATA = "$env:RUNNER_TEMP\appdata-scenario"
+          python tests/scenario_gui.py 2 resultats-e2e
+
+      - name: Déposer les résultats sur la branche tests-e2e
+        if: always()
+        shell: bash
+        run: |
+          cd resultats-e2e
+          git init -q -b tests-e2e
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -q -m "Scénario ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" tests-e2e
+
+      - name: Échec si une étape a échoué
+        if: steps.phase1.outcome != 'success' || steps.phase2.outcome != 'success'
+        shell: bash
+        run: exit 1
