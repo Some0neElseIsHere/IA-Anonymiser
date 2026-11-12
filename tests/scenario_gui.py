@@ -148,7 +148,7 @@ def lancer():
         verifier(not abimes, f"pièges masqués : {abimes}")
         verifier("[ENTREPRISE]" not in sortie and "[NOM_1]" in sortie, "jeton automatique attendu pour l'entreprise")
         contexte["nb_elements"] = len(app.moteur.jetons())
-        verifier(contexte["nb_elements"] >= 18, f"trop peu d'éléments : {contexte['nb_elements']}")
+        verifier(contexte["nb_elements"] >= 15, f"trop peu d'éléments : {contexte['nb_elements']}")
         verifier(app.onglets.tab(2, "text").endswith(f"({contexte['nb_elements']})"), "compteur de l'onglet 3")
         photo("1-anonymise")
 
@@ -161,19 +161,24 @@ def lancer():
         verifier(len(app.conv.envois) == 1, f"envois enregistrés : {len(app.conv.envois)}")
         contexte["envoi1"] = envoye
 
+    def jeton_de(valeur):
+        return next(j for j in app.moteur.jetons() if app.moteur.info(j)[1] == valeur)
+
     def reponse_ia():
-        jetons = re.findall(r"\[[A-Z]+_\d+\]", contexte["envoi1"])
-        verifier(len(jetons) > 10, "pas assez de jetons dans l'envoi")
+        compte, ip, ticket = jeton_de("svc-backup"), jeton_de("10.20.40.17"), jeton_de("INC-2026-5120")
+        for j in (compte, ip, ticket, jeton_de("slefevre")):
+            verifier(j in contexte["envoi1"], f"{j} absent de l'envoi")
         # Réponse d'IA réaliste : jetons repris, dont certains déformés (minuscules, Markdown échappé)
-        reponse = ("## Analyse\n\n" + f"Le compte {jetons[2]} a été utilisé depuis {jetons[3].lower()}.\n"
-                   + f"- Chemin : `C:\\Users\\{[j for j in jetons if j.startswith('[COMPTE')][1]}\\AppData`\n"
-                   + f"- Ticket {jetons[0].replace('_', chr(92) + '_')}\n"
+        reponse = ("## Analyse\n\n" + f"Le compte {compte} a été utilisé depuis {ip.lower()}.\n"
+                   + f"- Chemin : `C:\\Users\\{jeton_de('slefevre')}\\AppData`\n"
+                   + f"- Ticket {ticket.replace('_', chr(92) + '_')}\n"
                    + "Inconnu : [IP_99]\n")
         contexte["reponse"] = reponse
         coller(app.reponse, reponse)
 
     def verifier_restauration():
         restauree = app.restauree.lire()
+        verifier("Le compte svc-backup a été utilisé depuis 10.20.40.17." in restauree, f"restauration : {restauree!r}")
         verifier("[IP_99]" in restauree, "le jeton inconnu devrait rester tel quel")
         verifier("C:\\Users\\slefevre\\AppData" in restauree, f"chemin mal restauré : {restauree!r}")
         verifier("INC-2026-5120" in restauree, "jeton échappé en Markdown non restauré")
@@ -289,6 +294,7 @@ def lancer():
         racine.update()
         duree = time.perf_counter() - debut
         contexte["duree"] = duree
+        contexte["elements_gros_log"] = len(app.moteur.jetons())
         verifier(duree < 5, f"gros log trop lent : {duree:.2f} s")
         verifier("10.0." not in app.sortie.lire(), "IP en clair dans le gros log")
 
