@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.0** : **raccourcis clavier globaux**, actifs dans toutes les applications, même quand IA-Anonymiser est en arrière-plan :
+  - **Ctrl+Alt+A** : le texte copié est anonymisé directement dans le presse-papiers, prêt à coller dans l'IA (consigne et annonces de changement de jeton comprises) ;
+  - **Ctrl+Alt+R** : la réponse de l'IA copiée est restaurée dans le presse-papiers, avec les vraies valeurs ;
+  - une petite notification en bas à droite de l'écran indique le nombre d'éléments masqués ou restaurés, et signale les jetons inconnus ;
+  - la conversation sélectionnée est utilisée, l'envoi est enregistré pour le rapport ;
+  - Options → Général : autre jeu de raccourcis (Ctrl+Maj+F9 / F10) ou désactivation. Un raccourci déjà pris par une autre application est signalé.
+
 - **v1.9.0** : **jeton personnalisé pour les termes permanents**. Dans Options → Termes permanents, chaque terme peut recevoir un jeton parlant : « Acme Industries » devient `[ENTREPRISE]` au lieu de `[NOM_1]`, pour que l'IA comprenne de quoi il s'agit.
   - **changement annoncé à l'IA** : si le terme a déjà été envoyé sous un autre jeton dans une conversation, le « Copier pour l'IA » suivant ajoute en tête : « Changement de jeton : [NOM_1] s'appelle désormais [ENTREPRISE]. C'est le même élément. » L'annonce n'est faite qu'une fois, et l'ancien jeton reste restauré dans les anciennes réponses ;
   - **saisie mise en forme** : « Client principal » devient `CLIENT_PRINCIPAL`. Un jeton déjà pris par un autre terme, ou qui ressemble à un jeton automatique (`NOM_3`), est refusé avec un message ;

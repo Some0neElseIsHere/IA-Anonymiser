@@ -24,6 +24,15 @@ Au premier lancement, un écran d'accueil présente le principe. Ensuite, tant q
 
 ![Onglet Restaurer](docs/clair-restaurer.png)
 
+### Raccourcis clavier, sans changer de fenêtre
+
+Les raccourcis fonctionnent dans toutes les applications, même quand IA-Anonymiser est en arrière-plan :
+
+- copiez votre texte n'importe où, appuyez sur **Ctrl+Alt+A**, puis collez dans l'IA : c'est la version anonymisée ;
+- copiez la réponse de l'IA, appuyez sur **Ctrl+Alt+R**, puis collez : ce sont les vraies valeurs.
+
+Une notification en bas à droite de l'écran confirme chaque opération. La conversation sélectionnée dans IA-Anonymiser est utilisée. Les raccourcis se changent ou se désactivent dans **Options → Général**.
+
 ### Une conversation par discussion avec l'IA
 
 La colonne de gauche liste vos conversations, classées comme dans Claude : d'abord les **épinglées**, puis **Aujourd'hui**, **Hier**, et une rubrique par date (« 9 nov. »), selon votre dernière activité dans chacune. Créez-en une par discussion avec l'IA. Dans une conversation, un même élément garde toujours le même jeton, d'un message à l'autre : si Jean Dupont est `[NOM_1]` dans votre premier message, il le reste dans les suivants, et l'IA s'y retrouve. L'onglet **3. Éléments masqués** liste tous les éléments déjà masqués dans la conversation, y compris ceux des messages précédents.
