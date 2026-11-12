@@ -19,7 +19,6 @@ from tkinter import font as tkfont
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import rapport
-import raccourcis
 import stockage
 from moteur import (EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, etiquette_reservee, expressions,
                     normaliser_etiquette)
@@ -315,9 +314,6 @@ class Application:
         root.after(THEME_MS, self.suivre_theme_windows)
         if self.options.premier_lancement:
             root.after(400, self.accueil)
-        self.raccourcis = raccourcis.Raccourcis()
-        root.after(600, self.activer_raccourcis)
-        root.after(100, self.ecouter_raccourcis)
 
     @property
     def conv(self):
@@ -926,7 +922,6 @@ class Application:
         self.root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
 
     def quitter(self):
-        self.raccourcis.arreter()
         if self.options.conserver:
             self.sauvegarder()
         else:
@@ -1099,88 +1094,6 @@ class Application:
             return
         self.ecrire_presse_papiers(texte)
         self.confirmer(self.bouton_copier_ia, "copier_ia")
-
-    # --- raccourcis clavier globaux ----------------------------------------
-    def activer_raccourcis(self):
-        etat = self.raccourcis.demarrer(self.options.raccourcis)
-        self.etat_raccourcis = etat
-        libelle = raccourcis.JEUX[self.options.raccourcis][0].split(" / ")
-        pris = [libelle[i] for i, action in enumerate((raccourcis.ANONYMISER, raccourcis.RESTAURER))
-                if action in etat and not etat[action]]
-        if pris:
-            self.notifier(self.t("raccourci_pris", r=", ".join(pris)), erreur=True)
-
-    def ecouter_raccourcis(self):
-        for action in self.raccourcis.lire():
-            if action == raccourcis.ANONYMISER:
-                self.raccourci_anonymiser()
-            elif action == raccourcis.RESTAURER:
-                self.raccourci_restaurer()
-        self.root.after(100, self.ecouter_raccourcis)
-
-    def lire_presse_papiers(self):
-        try:
-            texte = self.root.clipboard_get()
-        except tk.TclError:
-            return None
-        return texte if texte.strip() else None
-
-    def raccourci_anonymiser(self):
-        """Presse-papiers -> texte original de la conversation -> version pour l'IA dans le presse-papiers."""
-        texte = self.lire_presse_papiers()
-        if texte is None:
-            self.notifier(self.t("toast_vide"), erreur=True)
-            return
-        self.source.ecrire(texte)
-        self.actualiser()
-        self.activite()
-        self.onglets.select(0)
-        envoi = self.texte_pour_ia()
-        self.ecrire_presse_papiers(envoi)
-        self.notifier(self.t("toast_anonymise", n=sum(self.resultat.compte.values())), titre=self.conv.nom)
-
-    def raccourci_restaurer(self):
-        """Presse-papiers (réponse de l'IA) -> réponse avec les vraies valeurs dans le presse-papiers."""
-        texte = self.lire_presse_papiers()
-        if texte is None:
-            self.notifier(self.t("toast_vide"), erreur=True)
-            return
-        self.reponse.ecrire(texte)
-        self.actualiser_reponse()
-        res = self.resultat_reponse
-        if not res.compte and not res.inconnus:
-            self.notifier(self.t("toast_rien"), erreur=True)
-            return
-        self.activite()
-        self.onglets.select(1)
-        self.ecrire_presse_papiers(res.texte)
-        message = self.t("toast_restaure", n=sum(res.compte.values()))
-        if res.inconnus:
-            message += " " + self.t("toast_inconnus", n=len(res.inconnus))
-        self.notifier(message, titre=self.conv.nom, erreur=bool(res.inconnus))
-
-    def notifier(self, texte, titre="IA-Anonymiser", erreur=False):
-        """Petite notification en bas à droite de l'écran, visible même si la fenêtre est en arrière-plan."""
-        if getattr(self, "toast", None) and self.toast.winfo_exists():
-            self.toast.destroy()
-        p, e = self.palette, self.echelle
-        fen = tk.Toplevel(self.root)
-        fen.wm_overrideredirect(True)
-        fen.wm_attributes("-topmost", True)
-        self.toast = fen
-        cadre = tk.Frame(fen, background=p["fond"], highlightthickness=1,
-                         highlightbackground="#c62828" if erreur else p["focus"], padx=int(14 * e), pady=int(10 * e))
-        cadre.pack()
-        tk.Label(cadre, text=titre, font=(self.famille, 10, "bold"), background=p["fond"], foreground=p["texte"],
-                 anchor="w").pack(anchor="w")
-        tk.Label(cadre, text=texte, font=(self.famille, 10), background=p["fond"], foreground=p["texte"],
-                 justify="left", wraplength=int(320 * e)).pack(anchor="w")
-        fen.update_idletasks()
-        x = fen.winfo_screenwidth() - fen.winfo_reqwidth() - int(20 * e)
-        y = fen.winfo_screenheight() - fen.winfo_reqheight() - int(60 * e)
-        fen.geometry(f"+{x}+{y}")
-        fen.bind("<Button-1>", lambda _: fen.destroy())
-        fen.after(4000, lambda: fen.winfo_exists() and fen.destroy())
 
     def copier_restauree(self):
         texte = self.restauree.lire()
@@ -1472,16 +1385,6 @@ class Application:
         ligne.pack(anchor="w", pady=(6, 16))
         for valeur, cle in (("auto", "opt_theme_auto"), ("clair", "opt_theme_clair"), ("sombre", "opt_theme_sombre")):
             ttk.Radiobutton(ligne, text=t(cle), value=valeur, variable=theme).pack(side="left", padx=(0, 18))
-        if self.raccourcis.disponible():
-            ttk.Label(o, text=t("opt_raccourcis"), style="Section.TLabel").pack(anchor="w")
-            jeux = [(cle, libelle or t("opt_raccourcis_aucun")) for cle, (libelle, _) in raccourcis.JEUX.items()]
-            choix_raccourcis = ttk.Combobox(o, state="readonly", values=[n for _, n in jeux], width=34)
-            choix_raccourcis.current([c for c, _ in jeux].index(self.options.raccourcis))
-            choix_raccourcis.pack(anchor="w", pady=(6, 2))
-            ttk.Label(o, text=t("opt_raccourcis_aide"), style="Aide.TLabel", wraplength=largeur_texte,
-                      justify="left").pack(anchor="w", pady=(0, 16))
-        else:
-            jeux, choix_raccourcis = None, None
         conserver = tk.BooleanVar(value=self.options.conserver)
         ttk.Checkbutton(o, text=t("opt_conserver"), variable=conserver).pack(anchor="w")
         ttk.Label(o, text=t("opt_conserver_aide"), style="Aide.TLabel", wraplength=largeur_texte,
@@ -1506,13 +1409,8 @@ class Application:
             self.options.langue = langues[choix_langue.current()][0]
             self.options.theme = theme.get()
             self.options.conserver = conserver.get()
-            ancien_jeu = self.options.raccourcis
-            if choix_raccourcis is not None:
-                self.options.raccourcis = jeux[choix_raccourcis.current()][0]
             self.sauver_options()
             fen.destroy()
-            if self.options.raccourcis != ancien_jeu:
-                self.activer_raccourcis()
             if self.options.conserver:
                 self.sauvegarder()
             else:
@@ -1839,21 +1737,6 @@ def capture(app, chemin):
         app.reconstruire()
         remplir()
 
-    def raccourci_test(sens):
-        """Simule un appui sur un raccourci global, sur le presse-papiers, et note le résultat."""
-        journal = os.path.join(chemin, "raccourcis.txt")
-        if sens == "anonymiser":
-            with open(journal, "w", encoding="utf-8") as f:
-                f.write(f"enregistrement : {getattr(app, 'etat_raccourcis', {})}\n")
-            app.ecrire_presse_papiers("Ticket de Jean Dupont, jean.dupont@acme.fr, poste 10.20.30.41")
-            app.conv.termes = ["Jean Dupont"]
-            app.raccourci_anonymiser()
-        else:
-            app.ecrire_presse_papiers("Bonjour [NOM_1], votre poste [IP_1] est isolé. [EMAIL_9]")
-            app.raccourci_restaurer()
-        with open(journal, "a", encoding="utf-8") as f:
-            f.write(f"{sens} -> presse-papiers : {app.lire_presse_papiers()!r}\n")
-
     def options(onglet):
         app.ouvrir_options()
         app.onglets_options.select(onglet)
@@ -1877,8 +1760,6 @@ def capture(app, chemin):
     etapes = [
         lambda: photo(app.fenetre_accueil, "accueil.png"), lambda: app.fenetre_accueil.destroy(),
         lambda: photo(app.root, "demarrage.png"),
-        lambda: raccourci_test("anonymiser"), lambda: photo(app.toast, "toast-anonymise.png"),
-        lambda: raccourci_test("restaurer"), lambda: photo(app.toast, "toast-restaure.png"),
         lambda: (app.onglets.select(1), app.root.update()), lambda: photo(app.root, "demarrage-onglet2.png"),
         lambda: (app.onglets.select(0), gros_log()), lambda: photo(app.root, "gros-log.png"),
         lambda: theme("clair"), lambda: langue("fr"),

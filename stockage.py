@@ -135,7 +135,6 @@ class Options:
         self.langue = "auto"         # auto, fr, en
         self.theme = "auto"          # auto, clair, sombre
         self.conserver = True        # conversations gardées entre deux lancements
-        self.raccourcis = "ctrl_alt"  # jeu de raccourcis clavier globaux (voir raccourcis.JEUX)
         # Première installation : aucun réglage enregistré (sert à afficher l'écran d'accueil une seule fois)
         self.premier_lancement = not os.path.exists(self.chemin)
         self.charger()
@@ -171,8 +170,6 @@ class Options:
         self.consigne_texte = texte if isinstance(texte, str) and texte.strip() else None
         self.langue = d.get("langue") if d.get("langue") in ("auto", "fr", "en") else "auto"
         self.theme = d.get("theme") if d.get("theme") in ("auto", "clair", "sombre") else "auto"
-        self.raccourcis = d.get("raccourcis") if d.get("raccourcis") in ("ctrl_alt", "ctrl_maj_f", "aucun") \
-            else "ctrl_alt"
         self.conserver = bool(d.get("conserver", True))
 
     def sauver(self):
@@ -181,8 +178,7 @@ class Options:
                        "etiquettes": self.etiquettes,
                        "motifs": self.motifs,
                        "consigne": self.consigne, "consigne_texte": self.consigne_texte,
-                       "langue": self.langue, "theme": self.theme, "conserver": self.conserver,
-                       "raccourcis": self.raccourcis},
+                       "langue": self.langue, "theme": self.theme, "conserver": self.conserver},
                       f, ensure_ascii=False, indent=2)
 
 

@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.1** : les raccourcis clavier globaux de la v1.10.0 sont retirés : copier, appuyer sur le raccourci puis coller restait trop de manipulations. Le fonctionnement redevient celui de la v1.9.0.
+
 - **v1.10.0** : **raccourcis clavier globaux**, actifs dans toutes les applications, même quand IA-Anonymiser est en arrière-plan :
   - **Ctrl+Alt+A** : le texte copié est anonymisé directement dans le presse-papiers, prêt à coller dans l'IA (consigne et annonces de changement de jeton comprises) ;
   - **Ctrl+Alt+R** : la réponse de l'IA copiée est restaurée dans le presse-papiers, avec les vraies valeurs ;
