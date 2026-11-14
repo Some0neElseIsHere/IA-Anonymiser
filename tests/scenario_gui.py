@@ -238,7 +238,7 @@ def lancer():
         verifier("[VICTIME]" in sortie and "Sophie Bernard" not in sortie, "jeton de conversation non appliqué")
         contexte["nb_elements"] = len(app.moteur.jetons())
         verifier(contexte["nb_elements"] >= 15, f"trop peu d'éléments : {contexte['nb_elements']}")
-        verifier(app.onglets.tab(2, "text").endswith(f"({contexte['nb_elements']})"), "compteur de l'onglet 3")
+        verifier(app.onglets.tab(3, "text").endswith(f"({contexte['nb_elements']})"), "compteur de l'onglet 4")
         photo("1-anonymise")
 
     def recherche():
@@ -266,7 +266,7 @@ def lancer():
         verifier(not app.recherche_ouverte() and not app.source.texte.tag_ranges("recherche"), "Échap ne ferme pas")
 
     def tri_elements():
-        app.onglets.select(2)
+        app.onglets.select(3)
         racine.update()
         arbre = app.arbre
         valeurs = lambda col: [arbre.set(i, col) for i in arbre.get_children()]
@@ -551,6 +551,38 @@ def lancer():
         verifier("login.microsoftonline.com" in app.sortie.lire() and "intranet.acme.local" not in app.sortie.lire(),
                  f"domaines publics : {app.sortie.lire()!r}")
         contexte["conv_domaines"] = app.conv.id
+        verifier(app.var_domaines.get(), "case de l'onglet 3 non synchronisée")
+
+    def options_conversation():
+        noms = [app.onglets.tab(i, "text") for i in range(4)]
+        verifier(noms[2].startswith("3. ") and noms[3].startswith("4. "), f"ordre des onglets : {noms}")
+        app.nouvelle_conversation()
+        racine.update()
+        verifier(app.conv.types == set(app.options.types), "la nouvelle conversation ne reprend pas Options → Détection")
+        verifier(not app.var_domaines.get(), "domaines publics hérités de l'autre conversation")
+        verifier(str(app.bouton_retablir.cget("state")) == "disabled", "Rétablir actif alors que rien n'a changé")
+        app.source.ecrire("Connexion depuis 8.8.4.4 vers 10.1.2.3")
+        app.actualiser()
+        verifier("8.8.4.4" not in app.sortie.lire(), "IP publique non masquée par défaut")
+        app.onglets.select(2)
+        racine.update()
+        app.cases_conv["IPPUB"].set(False)
+        app.options_conversation_changees()
+        racine.update()
+        sortie = app.sortie.lire()
+        verifier("8.8.4.4" in sortie and "10.1.2.3" not in sortie, f"IP publique décochée : {sortie!r}")
+        verifier("IPPUB" in app.options.types, "décocher dans la conversation a changé les réglages par défaut")
+        verifier(str(app.bouton_retablir.cget("state")) != "disabled", "Rétablir inactif après un changement")
+        photo("3e-options-conversation")
+        contexte["conv_types"] = app.conv.id
+        # Rétablir puis re-décocher : la relance doit retrouver IPPUB décoché
+        app.retablir_options_conversation()
+        racine.update()
+        verifier(app.conv.types == set(app.options.types) and app.cases_conv["IPPUB"].get(), "Rétablir")
+        verifier("8.8.4.4" not in app.sortie.lire(), "IP publique en clair après Rétablir")
+        app.cases_conv["IPPUB"].set(False)
+        app.options_conversation_changees()
+        app.onglets.select(0)
 
     def colonne_reduite():
         racine.update()
@@ -582,7 +614,7 @@ def lancer():
     def quitter_phase1():
         app.arbre_conv.selection_set(contexte["premiere"].id)
         app.changer_conversation()
-        etat = {"premiere_id": contexte["premiere"].id, "conv_domaines": contexte.get("conv_domaines"), "reponse": contexte["reponse"],
+        etat = {"premiere_id": contexte["premiere"].id, "conv_domaines": contexte.get("conv_domaines"), "conv_types": contexte.get("conv_types"), "reponse": contexte["reponse"],
                 "nb_conversations": len(app.conversations), "nb_elements": len(contexte["premiere"].moteur.valide)}
         with open(os.path.join(SORTIE, "etat-phase1.json"), "w", encoding="utf-8") as f:
             json.dump(etat, f)
@@ -607,6 +639,9 @@ def lancer():
         verifier(app.options.tri_elements == ["type", False], f"tri non conservé : {app.options.tri_elements}")
         autre = next(c for c in app.conversations if c.id == etat["conv_domaines"])
         verifier(autre.domaines_publics and not app.conv.domaines_publics, "choix des domaines publics non conservé")
+        propre = next(c for c in app.conversations if c.id == etat["conv_types"])
+        verifier(propre.types is not None and "IPPUB" not in propre.types and "IP" in propre.types,
+                 f"détection de la conversation non conservée : {propre.types}")
         racine.update()
         verifier(app.options.colonne_reduite and app.colonne_mini.winfo_ismapped(), "colonne réduite non conservée")
         verifier(app.colonne.winfo_width() < 120 * app.echelle, f"colonne réduite trop large : {app.colonne.winfo_width()}")
@@ -632,7 +667,7 @@ def lancer():
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
-            gros_log, defilement_jumele, ouvrir_fichiers, colonne_reduite, quitter_phase1],
+            gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, fin],
     }[PHASE]
 

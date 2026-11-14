@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.15.0** : **nouvel onglet « 3. Options de la conversation »** :
+  - **détection propre à chaque conversation** : cochez ou décochez les types (noms, e-mails, IP publiques, IP privées…) pour la conversation en cours seulement ; le texte pour l'IA est recalculé aussitôt. Options → Détection devient le réglage par défaut des nouvelles conversations ; les conversations existantes gardent les réglages actuels ;
+  - **domaines publics lisibles** : la case est maintenant dans cet onglet, à la place du clic droit sur le nom de la conversation ;
+  - **Rétablir les réglages par défaut** remet la conversation sur Options → Détection ; une ligne indique si la conversation a des réglages propres ;
+  - le **masquage personnalisé de la conversation** (termes et jetons parlants) passe dans cet onglet ; **« 4. Éléments masqués »** occupe désormais toute la largeur ;
+  - le **rapport** indique les types détectés dans la conversation, et non plus les réglages généraux.
+
 - **v1.14.0** : **rapport amélioré** (Exporter le rapport…) :
   - **synthèse en tête** : nombre d'éléments masqués, d'envois, de valeurs parties en clair par erreur et laissées en clair volontairement (en rouge s'il y a une fuite), puis le nombre d'éléments par type ;
   - **réglages propres à la conversation** : jetons personnalisés de la conversation (« Sophie Bernard → [VICTIME] ») et domaines publics lisibles ou non ;

@@ -227,6 +227,8 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     remplaces = renommages(moteur, {j: p[0] for j, p in presences.items()})
     etiquettes_conv = getattr(conversation, "etiquettes", {}) or {}
     publics = getattr(conversation, "domaines_publics", False)
+    types_conv = getattr(conversation, "types", None)
+    types_conv = options.types if types_conv is None else types_conv
 
     # Synthèse : chiffres clés, éléments par type
     par_type = {}
@@ -271,7 +273,7 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
 
         f"<h2>{e(t('rp_reglages'))}</h2><table>",
         f"<tr><th>{e(t('rp_types'))}</th><td>"
-        + e(", ".join(t(f"type_{x}") for x in TYPES_AUTO if x in options.types) or "—") + "</td></tr>",
+        + e(", ".join(t(f"type_{x}") for x in TYPES_AUTO if x in types_conv) or "—") + "</td></tr>",
         f"<tr><th>{e(t('rp_permanents'))}</th><td>{len(options.permanents)}</td></tr>",
         f"<tr><th>{e(t('rp_motifs'))}</th><td>{len(options.motifs)}</td></tr>",
         f"<tr><th>{e(t('rp_consigne'))}</th><td>{e(t('rp_oui') if options.consigne else t('rp_non'))}</td></tr>",

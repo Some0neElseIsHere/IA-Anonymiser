@@ -132,12 +132,14 @@ class Conversation:
         self.envois = []  # textes exacts copiés pour l'IA (déjà anonymisés), pour le rapport de preuve
         self.etiquettes = {}  # jeton personnalisé des termes de la conversation : {terme: "CLIENT"}
         self.domaines_publics = False  # domaines publics connus laissés lisibles (microsoft.com…)
+        self.types = None  # types détectés dans cette conversation (None : reprendre ceux des Options)
 
     def etat(self):
         return {"nom": self.nom, "termes": self.termes, "source": self.source, "reponse": self.reponse,
                 "moteur": self.moteur.etat(), "id": self.id, "activite": self.activite,
                 "epingle": self.epingle, "cree": self.cree, "envois": self.envois, "etiquettes": self.etiquettes,
-                "domaines_publics": self.domaines_publics}
+                "domaines_publics": self.domaines_publics,
+                "types": sorted(self.types) if self.types is not None else None}
 
     @classmethod
     def depuis_etat(cls, d, langue):
@@ -156,6 +158,8 @@ class Conversation:
         c.etiquettes = {t: str(j) for t, j in etiquettes.items() if t in c.termes and str(j).strip()} \
             if isinstance(etiquettes, dict) else {}
         c.domaines_publics = bool(d.get("domaines_publics", False))
+        types = d.get("types")
+        c.types = {x for x in types if x in TYPES_AUTO} if isinstance(types, list) else None
         return c
 
 
@@ -675,11 +679,15 @@ class Application:
         self.restauree.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=True)
 
         o3 = ttk.Frame(self.onglets, padding=8)
-        self.onglets.add(o3, text=t("onglet_elements", n=0))
+        self.onglets.add(o3, text=t("onglet_conversation"))
         self.p3 = p3 = ttk.Panedwindow(o3, orient="horizontal")
         p3.pack(fill="both", expand=True)
-        p3.add(self.construire_elements(p3), weight=3)
+        p3.add(self.construire_options_conversation(p3), weight=3)
         p3.add(self.construire_termes(p3), weight=2)
+
+        o4 = ttk.Frame(self.onglets, padding=8)
+        self.onglets.add(o4, text=t("onglet_elements", n=0))
+        self.construire_elements(o4).pack(fill="both", expand=True)
 
         self.source.texte.bind("<<Modified>>", lambda e: self.modifie(self.source.texte, self.actualiser))
         self.reponse.texte.bind("<<Modified>>",
@@ -969,6 +977,67 @@ class Application:
         self.arbre_elements_couleurs()
         return cadre
 
+    def construire_options_conversation(self, parent):
+        """Onglet 3 : ce qui est détecté dans CETTE conversation, et les domaines publics."""
+        t, e = self.t, self.echelle
+        cadre = ttk.Frame(parent, padding=(0, 0, 6, 0))
+        ttk.Label(cadre, text=t("conv_detection_titre"), style="Titre.TLabel").pack(anchor="w")
+        self.etat_reglages = ttk.Label(cadre, style="Aide.TLabel")
+        self.etat_reglages.pack(anchor="w", pady=(2, 0))
+        self.aide_adaptee(cadre, t("conv_detection_aide")).pack(fill="x", pady=(4, 8))
+        grille = ttk.Frame(cadre)
+        grille.pack(fill="x")
+        self.cases_conv = {}
+        for i, type_ in enumerate(TYPES_AUTO):
+            self.cases_conv[type_] = var = tk.BooleanVar(value=True)
+            ligne = ttk.Frame(grille, padding=(0, 2, 16, 2))
+            ligne.grid(row=i // 2, column=i % 2, sticky="w")
+            case = ttk.Checkbutton(ligne, text=t(f"type_{type_}"), variable=var,
+                                   command=self.options_conversation_changees)
+            case.pack(side="left")
+            self.info_bulle(case, t("opt_exemple", e=EXEMPLES[type_]))
+        ttk.Separator(cadre).pack(fill="x", pady=(10, 8))
+        ligne = ttk.Frame(cadre)
+        ligne.pack(anchor="w")
+        self.var_domaines = tk.BooleanVar(value=False)
+        ttk.Checkbutton(ligne, text=t("conv_domaines"), variable=self.var_domaines,
+                        command=self.options_conversation_changees).pack(side="left")
+        icone = self.icone_info()
+        aide = (ttk.Label(ligne, image=icone, cursor="question_arrow") if icone
+                else ttk.Label(ligne, text="ⓘ", style="LienDiscret.TLabel"))
+        aide.pack(side="left", padx=(8, 0))
+        self.info_bulle(aide, t("opt_domaines_publics_bulle"), largeur=int(460 * e))
+        self.bouton_retablir = ttk.Button(cadre, text=t("conv_retablir"), command=self.retablir_options_conversation)
+        self.bouton_retablir.pack(anchor="w", pady=(12, 0))
+        return cadre
+
+    def maj_options_conversation(self):
+        """Les cases de l'onglet 3 reflètent la conversation affichée."""
+        if not hasattr(self, "cases_conv"):
+            return
+        types = self.conv.types if self.conv.types is not None else self.options.types
+        for type_, var in self.cases_conv.items():
+            var.set(type_ in types)
+        self.var_domaines.set(self.conv.domaines_publics)
+        defaut = set(types) == set(self.options.types) and self.conv.domaines_publics == self.options.domaines_publics
+        self.etat_reglages.configure(text=self.t("conv_identique" if defaut else "conv_different"))
+        self.bouton_retablir.configure(state="disabled" if defaut else "normal")
+
+    def options_conversation_changees(self):
+        """Une case de l'onglet 3 a changé : la conversation l'adopte, le texte à envoyer est recalculé."""
+        self.conv.types = {k for k, v in self.cases_conv.items() if v.get()}
+        self.conv.domaines_publics = self.var_domaines.get()
+        self.actualiser()
+        self.maj_options_conversation()
+        self.sauvegarder()
+
+    def retablir_options_conversation(self):
+        self.conv.types = set(self.options.types)
+        self.conv.domaines_publics = self.options.domaines_publics
+        self.actualiser()
+        self.maj_options_conversation()
+        self.sauvegarder()
+
     def construire_termes(self, parent):
         t = self.t
         cadre = ttk.Frame(parent, padding=(6, 0, 0, 0))
@@ -1035,7 +1104,9 @@ class Application:
         self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in
                                   {**self.options.etiquettes, **self.conv.etiquettes}.items() if j}
         self.moteur.domaines_publics = self.conv.domaines_publics
-        res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types,
+        if self.conv.types is None:  # conversation d'avant la v1.15 : elle reprend les réglages des Options
+            self.conv.types = set(self.options.types)
+        res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.conv.types,
                                      stockage.expressions(self.options.motifs))
         self.resultat = res
         self.source.surligner(res.spans_source, "masque")
@@ -1107,7 +1178,7 @@ class Application:
             self.arbre.selection_set(garde)
         n = len(self.moteur.jetons())
         self.titre_elements.configure(text=self.t("elements", n=n))
-        self.onglets.tab(2, text=self.t("onglet_elements", n=n))
+        self.onglets.tab(3, text=self.t("onglet_elements", n=n))
         self.selection_element()
 
     def trier_elements(self, colonne):
@@ -1219,6 +1290,7 @@ class Application:
         self.maj_termes()
         self.maj_conversations()
         self.actualiser()
+        self.maj_options_conversation()
         self.actualiser_reponse()
         self.root.title(f"IA-Anonymiser {VERSION} — {self.conv.nom}")
 
@@ -1227,7 +1299,8 @@ class Application:
         self.numero += 1
         # La plus récente en haut de la liste
         nouvelle = Conversation(self.t("nom_conversation", n=self.numero), self.t.langue)
-        nouvelle.domaines_publics = self.options.domaines_publics  # réglage par défaut des Options
+        nouvelle.domaines_publics = self.options.domaines_publics  # réglages par défaut des Options
+        nouvelle.types = set(self.options.types)
         self.conversations.insert(0, nouvelle)
         self.courante = 0
         self.charger_zones()
@@ -1264,9 +1337,6 @@ class Application:
                              command=self.basculer_epingle)
             menu.add_command(label=t("renommer"), command=self.renommer_conversation)
             menu.add_command(label=t("rp_exporter"), command=self.exporter_rapport)
-            self.var_domaines = tk.BooleanVar(value=self.conv.domaines_publics)
-            menu.add_checkbutton(label=t("domaines_publics_conv"), variable=self.var_domaines,
-                                 command=self.basculer_domaines_publics)
             menu.add_command(label=t("fermer"), command=self.fermer_conversation)
             menu.add_separator()
         menu.add_command(label=t("nouvelle_conversation").lstrip("+ "), command=self.nouvelle_conversation)
@@ -1274,9 +1344,8 @@ class Application:
 
     def basculer_domaines_publics(self):
         """Pour cette conversation : laisser lisibles, ou masquer, les domaines publics connus."""
-        self.conv.domaines_publics = not self.conv.domaines_publics
-        self.actualiser()
-        self.sauvegarder()
+        self.var_domaines.set(not self.conv.domaines_publics)
+        self.options_conversation_changees()
 
     def renommer_conversation(self):
         nom = simpledialog.askstring(self.t("renommer_titre"), self.t("renommer_question"),
