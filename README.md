@@ -22,6 +22,8 @@ Au premier lancement, un écran d'accueil présente le principe. Ensuite, tant q
 2. Cliquez sur **Copier pour l'IA** et collez le texte dans votre conversation.
 3. **Onglet « Restaurer la réponse de l'IA »** : collez la réponse de l'IA à gauche. À droite, les jetons comme `[NOM_1]` sont remplacés par les vraies valeurs. Cliquez sur **Copier**.
 
+Dans les deux onglets, **passez la souris sur un élément surligné** : une bulle affiche le jeton correspondant (côté texte original ou réponse restaurée) ou la vraie valeur (côté jetons), avec son type. Les deux zones **défilent ensemble**, ligne à ligne.
+
 ![Onglet Restaurer](docs/clair-restaurer.png)
 
 ### Une conversation par discussion avec l'IA
@@ -30,15 +32,15 @@ La colonne de gauche liste vos conversations, classées comme dans Claude : d'ab
 
 **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Un jeton inconnu de cette conversation apparaît en rouge.
 
-Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour l'épingler, la renommer ou la fermer.
+Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour l'épingler, la renommer ou la fermer. Le bouton **«** à côté du titre réduit la colonne à une barre d'icônes (déplier, nouvelle conversation, Options, À propos) pour laisser plus de place au texte ; **»** la déplie. Ce choix est conservé.
 
 ### Ce qui est masqué
 
 - **Automatiquement** :
   - données personnelles : e-mails, téléphones (France et international), IBAN, cartes bancaires, numéros de sécurité sociale ;
-  - réseau : adresses IP, adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`) ;
-  - **secrets** : `password=…`, `pwd:`, `token=`, `api_key=`, chaînes de connexion, `Authorization: Bearer …`, identifiants dans une URL (`https://user:motdepasse@…`), clés AWS, GitHub, GitLab, Slack, OpenAI, Anthropic et Google, jetons JWT, clés privées. Seule la valeur est masquée (`password=[SECRET_1]`), pour que l'IA comprenne encore de quoi il s'agit ;
-  - **comptes et annuaire** : `ACME\mlefevre`, `User Id=…`, `login=…`, le compte dans une URL (`https://deploy:…@`), le nom d'utilisateur dans `C:\Users\…` et `/home/…`, les SID Windows ;
+  - réseau : adresses IP (IPv4 et IPv6 ; `127.0.0.1` et `::1` restent en clair), adresses MAC, noms de domaine (FQDN, par exemple `srv01.acme.local`) ;
+  - **secrets** : `password=…`, `pwd:`, `token=`, `api_key=`, chaînes de connexion, `Authorization: Bearer …`, identifiants dans une URL (`https://user:motdepasse@…`), mot de passe de `net use`, clés AWS, GitHub, GitLab, Slack, OpenAI, Anthropic et Google, jetons JWT, clés privées. Seule la valeur est masquée (`password=[SECRET_1]`), pour que l'IA comprenne encore de quoi il s'agit ;
+  - **comptes et annuaire** : `ACME\mlefevre`, `User Id=…`, `login=…`, le compte dans une URL (`https://deploy:…@`), le nom d'utilisateur dans `C:\Users\…` et `/home/…`, les comptes des journaux SQL Server (`Login failed for user '…'`), SSH, PAM et sudo, les SID Windows ;
   - **DN Active Directory**, masqués partie par partie : `CN=Sophie Bernard,OU=Compta,DC=acme,DC=local` devient `CN=[NOM_3],OU=Compta,[DN_1]`. Le nom garde le même jeton qu'ailleurs dans la conversation, donc l'IA sait de qui il s'agit ; l'OU reste lisible.
 - **Une valeur déjà masquée l'est partout** : si `slefevre` a été masqué dans un chemin, il l'est aussi dans « user slefevre », et un mot de passe recopié plus tard dans une phrase est masqué lui aussi.
 - **Motifs personnalisés** : vos conventions de nommage, sous forme d'expressions régulières, dans **Options → Motifs personnalisés**. Par exemple `PC-\d{4}` pour les postes, `INC-\d{4}-\d+` pour les tickets, `SRV-[A-Z]+\d*` pour les serveurs.

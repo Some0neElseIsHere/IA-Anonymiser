@@ -10,6 +10,14 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.4** : correspondance au survol, colonne repliable, et détection complétée grâce à un long log d'incident :
+  - **survol** : passez la souris sur un élément surligné pour voir son équivalent. Sur une valeur en jaune (texte original, réponse restaurée), la bulle montre le jeton, par exemple `[IP_3]` ; sur un jeton en vert, elle montre la vraie valeur. Le type est indiqué dessous, et un jeton inconnu en rouge est expliqué ;
+  - **colonne repliable** : le bouton **«** à côté du titre réduit la colonne des conversations à une fine barre d'icônes (déplier, nouvelle conversation, Options, À propos), pour laisser plus de place au texte. **»** la déplie à sa largeur précédente. Le choix est conservé d'un lancement à l'autre ;
+  - **IPv6** : `2a01:e0a:1f3:9a40::17`, `fe80::1%eth0` et les adresses complètes sont masquées. Les heures (`08:39:38`), les adresses MAC et `std::vector` ne sont pas confondues avec des IPv6 ;
+  - **mot de passe de `net use`** : `net use \\fs01\C$ /user:ACME\svc MotDePasse` (dans les deux ordres) ; le `*` qui demande le mot de passe reste en clair ;
+  - **comptes des journaux** : `Login failed for user 'app_paie'` (SQL Server), `Accepted publickey for jdupont from` et `Failed password for invalid user oracle from` (SSH), `session opened for user` (PAM), `sudo: pmartin :` ;
+  - **adresses de bouclage en clair** : `127.0.0.1`, `::1`, `0.0.0.0` ne sont plus masquées : elles ne révèlent rien et l'IA les comprend mieux telles quelles.
+
 - **v1.10.3** : **un seul ascenseur pour les deux zones**. Dans « Anonymiser mon texte » et « Restaurer la réponse de l'IA », faire défiler une zone (molette, ascenseur ou clavier) fait défiler l'autre. Les deux restent alignées sur la même ligne, même si les jetons sont plus courts que les valeurs d'origine : chaque ligne du texte original reste en face de sa version anonymisée.
 
 - **v1.10.2** : détection plus fiable, corrigée grâce à une campagne de tests massifs (10 000 documents générés : logs Windows, Linux, pare-feu, AD, SQL, tickets, mails, en français et en anglais) :
