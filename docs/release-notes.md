@@ -10,6 +10,10 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.12.4** : dans « 3. Éléments masqués », le **masquage personnalisé de la conversation** est plus compact. Les boutons « Toujours masquer » et « Supprimer » sous la liste sont retirés. À la place :
+  - une **3e colonne avec une croix ✕** sur chaque ligne : un clic supprime le terme, sans le charger dans les champs de saisie ;
+  - **Toujours masquer** et **Supprimer** restent disponibles par un **clic droit** sur un terme (ou plusieurs, sélectionnés avec Ctrl ou Maj). La touche Suppr fonctionne toujours.
+
 - **v1.12.3** : **troisième batterie de tests, après les changements récents**. Tout a été repassé : 129 tests unitaires, 3 000 journaux Windows et Linux générés, les 37 journaux réels des séries précédentes, le journal de rançongiciel, et le scénario dans la vraie application sous Windows. S'y ajoutent **126 nouveaux journaux** tirés des échantillons de Microsoft Sentinel : CEF de pare-feu et de WAF (Fortinet, Palo Alto, Cisco Firepower, Barracuda, SonicWall, Forcepoint, Zscaler…), Syslog (Cisco ISE, Meraki, Stealthwatch, McAfee ePO, Symantec, Juniper, Veeam, VMware ESXi, OpenVPN…), EDR (CrowdStrike, SentinelOne, Carbon Black, Trend Micro), Exchange, Netwrix, Oracle, vCenter. Corrections :
   - **champs CEF** : `suser=`, `duser=` (comptes), `shost=`, `dhost=`, `dvchost=`, `sntdom=`, `dntdom=` (machines et domaines) sont masqués ;
   - **JSON des EDR et SIEM** : toute clé qui se termine par « user », « username » ou « accountname » (`SrcUserName`, `DstUserName`, `targetUser`…) ou par « hostname », « devicename », « endpointname »… (`SrcHostName`, `DstDvcHostname`, `endpoint_name`, `EndpointName`, `VbrHostName`) est reconnue ;
