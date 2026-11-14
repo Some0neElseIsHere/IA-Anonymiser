@@ -633,16 +633,17 @@ class Application:
         loupe.configure(style="Toolbutton", width=3)
         self.info_bulle(loupe, t("rechercher_bulle"))
         barre = self.barre_recherche = ttk.Frame(z)
-        self.champ_recherche = ttk.Entry(barre, font=self.police)
-        self.champ_recherche.pack(side="left", fill="x", expand=True)
-        self.compte_recherche = ttk.Label(barre, style="Aide.TLabel", width=14, anchor="center")
-        self.compte_recherche.pack(side="left", padx=(8, 4))
-        for texte, commande, bulle in (("↑", lambda: self.aller_recherche(-1), t("recherche_precedent")),
+        # Boutons et compteur placés d'abord, à droite : le champ prend la place restante et rétrécit seul
+        for texte, commande, bulle in (("✕", self.fermer_recherche, t("recherche_fermer")),
                                        ("↓", lambda: self.aller_recherche(1), t("recherche_suivant")),
-                                       ("✕", self.fermer_recherche, t("recherche_fermer"))):
+                                       ("↑", lambda: self.aller_recherche(-1), t("recherche_precedent"))):
             b = ttk.Button(barre, text=texte, width=3, style="Toolbutton", command=commande)
-            b.pack(side="left")
+            b.pack(side="right")
             self.info_bulle(b, bulle)
+        self.compte_recherche = ttk.Label(barre, style="Aide.TLabel", width=12, anchor="center")
+        self.compte_recherche.pack(side="right", padx=(6, 2))
+        self.champ_recherche = ttk.Entry(barre, font=self.police, width=8)
+        self.champ_recherche.pack(side="left", fill="x", expand=True)
         c = self.champ_recherche
         c.bind("<KeyRelease>", lambda e: e.keysym not in ("Return", "Escape", "Up", "Down", "Shift_L", "Shift_R")
                and self.chercher())
