@@ -145,6 +145,26 @@ class Rapport(unittest.TestCase):
         self.assertIn('<details class="avec-fuite" open>', page)
         self.assertIn('<span class="jeton">[SECRET_1]</span>', page)
 
+    def test_consigne_et_annonce_ne_comptent_pas(self):
+        from textes import CONSIGNES
+        moteur = Anonymiseur("fr")
+        moteur.anonymiser("Acme SAS et jean@acme.fr", ["Acme SAS"], None, [])
+        moteur.valider()
+        envoi1 = CONSIGNES["fr"].rstrip() + "\n\n[NOM_1] et [EMAIL_1]"
+        envoi2 = (CONSIGNES["fr"].rstrip() + "\n\nChangement de jeton : [NOM_1] s'appelle désormais [X]. "
+                  "C'est le même élément.\n\nRien d'autre.")
+        conv = SimpleNamespace(nom="x", moteur=moteur, termes=[], cree=None, activite=time.time(),
+                               envois=[{"date": 1, "texte": envoi1}, {"date": 2, "texte": envoi2}])
+        page = html.unescape(generer(conv))
+        for jeton in ("[NOM_1]", "[EMAIL_1]"):
+            ligne = page[page.index(f"<code>{jeton}</code>"):].split("</tr>")[0]
+            self.assertIn('<td data-tri="1">1</td><td>1</td>', ligne)
+        self.assertRegex(page, r"Envoi 2, le [\d-]+ [\d:]+ · 0 jeton\(s\)")
+
+    def test_barre_oblique_hors_du_jeton(self):
+        self.assertEqual(rapport._texte_envoi("C:\\Users\\[COMPTE_1]\\x", [], ["[COMPTE_1]"]),
+                         'C:\\Users\\<span class="jeton">[COMPTE_1]</span>\\x')
+
 
 if __name__ == "__main__":
     unittest.main()

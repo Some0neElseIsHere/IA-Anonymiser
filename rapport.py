@@ -8,6 +8,7 @@ import getpass
 import hashlib
 import html
 import os
+import re
 
 from moteur import JETON_RE, TYPES_AUTO, Anonymiseur, _cle, jeton_canonique
 
@@ -157,7 +158,7 @@ def jetons_dans(texte, jetons):
 def _texte_envoi(texte, fuites, jetons):
     """Texte d'un envoi en HTML : jetons en vert, valeurs parties en clair en rouge à leur place exacte."""
     e = html.escape
-    marques = [(d, f, "jeton") for d, f, _ in jetons_dans(texte, jetons)]
+    marques = [(d + (texte[d] == "\\"), f, "jeton") for d, f, _ in jetons_dans(texte, jetons)]
     marques += [(d, f, "fuite-texte") for d, f, _, _ in Anonymiseur._occurrences_connues(texte, fuites, None)]
     marques.sort(key=lambda x: (x[0], x[2] != "fuite-texte"))
     sortie, pos = [], 0
@@ -171,11 +172,22 @@ def _texte_envoi(texte, fuites, jetons):
     return "".join(sortie)
 
 
-def presence(jetons, envois):
+def contenu_utile(texte, consignes=()):
+    """Texte réellement soumis à l'IA : sans la consigne en tête (ses exemples [NOM_1], [EMAIL_1] ne
+    désignent rien) ni les lignes d'annonce de changement de jeton."""
+    for consigne in consignes:
+        if consigne and texte.startswith(consigne.rstrip()):
+            texte = texte[len(consigne.rstrip()):]
+            break
+    return "\n".join(l for l in texte.split("\n")
+                     if not re.match(r"(?:Changement de jeton|Token change) ?: ", l))
+
+
+def presence(jetons, envois, consignes=()):
     """Pour chaque jeton : (premier envoi où il apparaît, nombre d'envois qui le contiennent)."""
     vus = {j: [] for j in jetons}
     for i, envoi in enumerate(envois, 1):
-        presents = {j for _, _, j in jetons_dans(envoi["texte"], jetons)}
+        presents = {j for _, _, j in jetons_dans(contenu_utile(envoi["texte"], consignes), jetons)}
         for j in presents & set(vus):
             vus[j].append(i)
     return {j: (n[0] if n else None, len(n)) for j, n in vus.items()}
@@ -208,7 +220,10 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     titre = e(t("rp_titre", c=conversation.nom))
     en_clair = {j: envois_en_clair(moteur.valide[j][1], moteur.valide[j][0], envois) for j in jetons}
     fuites = [j for j in jetons if en_clair[j] and j not in moteur.exclus]
-    presences = presence(jetons, envois)
+    from textes import CONSIGNES
+    consignes = [getattr(options, "consigne_texte", None)] + [c for c in CONSIGNES.values()]
+    consignes = [c for c in consignes if c]
+    presences = presence(jetons, envois, consignes)
     remplaces = renommages(moteur, {j: p[0] for j, p in presences.items()})
     etiquettes_conv = getattr(conversation, "etiquettes", {}) or {}
     publics = getattr(conversation, "domaines_publics", False)
@@ -303,7 +318,7 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
         texte = envoi["texte"]
         fuites_ici = [j for j in fuites if i in en_clair[j]]
         resume = t("rp_envoi", n=i, d=_date(envoi["date"]))
-        resume += " · " + t("rp_envoi_jetons", n=len(jetons_dans(texte, jetons)))
+        resume += " · " + t("rp_envoi_jetons", n=len(jetons_dans(contenu_utile(texte, consignes), jetons)))
         if fuites_ici:
             resume += " · " + t("rp_envoi_fuites", n=len(fuites_ici))
         lignes += [
