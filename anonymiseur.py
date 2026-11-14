@@ -1502,194 +1502,149 @@ class Application:
             ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
                 anchor="w", padx=(int(28 * e), 0))
 
-        # Termes permanents, avec un jeton personnalisé facultatif
+        # Masquage personnalisé : termes exacts (jeton parlant facultatif) et expressions régulières (titre)
         o = ttk.Frame(onglets, padding=18)
-        onglets.add(o, text=t("opt_termes"))
-        ttk.Label(o, text=t("opt_termes_titre"), style="Section.TLabel").pack(anchor="w")
-        ttk.Label(o, text=t("opt_termes_aide"), style="Aide.TLabel", wraplength=largeur_texte,
-                  justify="left").pack(anchor="w", pady=(2, 4))
-        ttk.Label(o, text=t("opt_jeton_aide"), style="Aide.TLabel", wraplength=largeur_texte,
-                  justify="left").pack(anchor="w", pady=(0, 10))
-        permanents = [{"terme": p, "jeton": self.options.etiquettes.get(p, "")} for p in self.options.permanents]
-
-        saisie_t = ttk.Frame(o)
-        saisie_t.pack(fill="x", pady=(0, 8))
-        ttk.Label(saisie_t, text=t("opt_terme")).grid(row=0, column=0, sticky="w")
-        ttk.Label(saisie_t, text=t("opt_jeton")).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        champ_terme = ttk.Entry(saisie_t, font=self.police, width=28)
-        champ_terme.grid(row=1, column=0, sticky="ew")
-        champ_jeton = ttk.Entry(saisie_t, font=("Consolas", 11), width=22)
-        champ_jeton.grid(row=1, column=1, sticky="ew", padx=(8, 0))
-        bouton_terme = ttk.Button(saisie_t, text=t("ajouter"))
-        bouton_terme.grid(row=1, column=2, padx=(8, 0))
-        saisie_t.columnconfigure(0, weight=1)
-
-        zone_t = ttk.Frame(o)
-        zone_t.pack(fill="both", expand=True)
-        arbre_termes = ttk.Treeview(zone_t, columns=("terme", "jeton"), show="headings", selectmode="extended",
-                                    height=6)
-        arbre_termes.heading("terme", text=t("opt_terme"), anchor="w")
-        arbre_termes.heading("jeton", text=t("opt_jeton"), anchor="w")
-        arbre_termes.column("terme", width=int(300 * e), stretch=True)
-        arbre_termes.column("jeton", width=int(200 * e), stretch=False)
-        barre_t = ttk.Scrollbar(zone_t, command=arbre_termes.yview)
-        arbre_termes.configure(yscrollcommand=barre_t.set)
-        barre_t.pack(side="right", fill="y", padx=(4, 0))
-        arbre_termes.pack(side="left", fill="both", expand=True)
-        retour_terme = ttk.Label(o, style="Aide.TLabel", wraplength=largeur_texte, justify="left")
-
-        def remplir_termes():
-            permanents.sort(key=lambda x: x["terme"].casefold())
-            arbre_termes.delete(*arbre_termes.get_children())
-            for i, x in enumerate(permanents):
-                arbre_termes.insert("", "end", iid=str(i),
-                                    values=(x["terme"], f"[{x['jeton']}]" if x["jeton"] else t("opt_jeton_auto")))
-
-        def choisir_terme(_=None):
-            selection = arbre_termes.selection()
-            if len(selection) != 1:
-                bouton_terme.configure(text=t("ajouter"))
-                return
-            x = permanents[int(selection[0])]
-            champ_terme.delete(0, "end")
-            champ_terme.insert(0, x["terme"])
-            champ_jeton.delete(0, "end")
-            champ_jeton.insert(0, x["jeton"])
-            bouton_terme.configure(text=t("opt_motif_maj"))
-
-        def ajouter(_=None):
-            terme = normaliser(champ_terme.get())
-            jeton = normaliser_etiquette(champ_jeton.get())
-            if len(terme) < 2:
-                retour_terme.configure(text=t("msg_terme_court"))
-                return
-            if jeton and etiquette_reservee(jeton):
-                retour_terme.configure(text=t("opt_jeton_reserve", j=jeton))
-                return
-            selection = arbre_termes.selection()
-            courant = permanents[int(selection[0])] if len(selection) == 1 else next(
-                (x for x in permanents if x["terme"].casefold() == terme.casefold()), None)
-            autre = next((x for x in permanents if jeton and x["jeton"] == jeton and x is not courant), None)
-            if autre:
-                retour_terme.configure(text=t("opt_jeton_pris", j=jeton, t=autre["terme"]))
-                return
-            if courant:
-                courant.update(terme=terme, jeton=jeton)
-            else:
-                permanents.append({"terme": terme, "jeton": jeton})
-            champ_terme.delete(0, "end")
-            champ_jeton.delete(0, "end")
-            arbre_termes.selection_remove(*arbre_termes.selection())
-            remplir_termes()
-            bouton_terme.configure(text=t("ajouter"))
-            retour_terme.configure(text="")
-
-        def supprimer(_=None):
-            retires = {int(i) for i in arbre_termes.selection()}
-            permanents[:] = [x for i, x in enumerate(permanents) if i not in retires]
-            remplir_termes()
-            bouton_terme.configure(text=t("ajouter"))
-
-        bouton_terme.configure(command=ajouter)
-        champ_jeton.bind("<Return>", ajouter)
-        champ_terme.bind("<Return>", ajouter)
-        arbre_termes.bind("<<TreeviewSelect>>", choisir_terme)
-        arbre_termes.bind("<Delete>", supprimer)
-        remplir_termes()
-        retour_terme.pack(anchor="w", pady=(8, 0))
-        ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer).pack(anchor="e", pady=(8, 0))
-
-        # Motifs personnalisés
-        o = ttk.Frame(onglets, padding=18)
-        onglets.add(o, text=t("opt_motifs"))
-        ttk.Label(o, text=t("opt_motifs_titre"), style="Section.TLabel").pack(anchor="w")
+        onglets.add(o, text=t("opt_perso"))
+        ttk.Label(o, text=t("opt_perso_titre"), style="Section.TLabel").pack(anchor="w")
         # Largeur fixe : dans une fenêtre qui prend la taille de son contenu, un texte qui se recoupe
         # selon la largeur disponible ferait rétrécir la fenêtre par à-coups.
-        for cle, marge in (("opt_motifs_aide", (2, 4)), ("opt_motifs_memo", (0, 10))):
+        for cle, marge in (("opt_perso_aide", (2, 4)), ("opt_jeton_aide", (0, 10))):
             ttk.Label(o, text=t(cle), style="Aide.TLabel", wraplength=largeur_texte,
                       justify="left").pack(anchor="w", pady=marge)
-        motifs = [dict(m) for m in self.options.motifs]
+        elements = ([{"texte": p, "regex": False, "nom": self.options.etiquettes.get(p, "")}
+                     for p in self.options.permanents]
+                    + [{"texte": m["motif"], "regex": True, "nom": m["titre"]} for m in self.options.motifs])
 
         saisie = ttk.Frame(o)
         saisie.pack(fill="x", pady=(0, 8))
-        ttk.Label(saisie, text=t("opt_motif_titre")).grid(row=0, column=0, sticky="w")
-        ttk.Label(saisie, text=t("opt_motif_expression")).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        champ_titre = ttk.Entry(saisie, font=self.police, width=18)
-        champ_titre.grid(row=1, column=0, sticky="ew")
-        champ_motif = ttk.Entry(saisie, font=("Consolas", 11), width=30)
-        champ_motif.grid(row=1, column=1, sticky="ew", padx=(8, 0))
-        bouton_motif = ttk.Button(saisie, text=t("ajouter"))
-        bouton_motif.grid(row=1, column=2, padx=(8, 0))
-        saisie.columnconfigure(1, weight=1)
+        ttk.Label(saisie, text=t("opt_perso_valeur")).grid(row=0, column=0, sticky="w")
+        etiquette_nom = ttk.Label(saisie, text=t("opt_jeton"))
+        etiquette_nom.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        champ_texte = ttk.Entry(saisie, font=self.police, width=30)
+        champ_texte.grid(row=1, column=0, sticky="ew")
+        champ_nom = ttk.Entry(saisie, font=("Consolas", 11), width=22)
+        champ_nom.grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        bouton = ttk.Button(saisie, text=t("ajouter"))
+        bouton.grid(row=1, column=2, padx=(8, 0))
+        saisie.columnconfigure(0, weight=1)
+        ligne_regex = ttk.Frame(saisie)
+        ligne_regex.grid(row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        est_regex = tk.BooleanVar(value=False)
+
+        def type_change(*_):
+            regex = est_regex.get()
+            etiquette_nom.configure(text=t("opt_motif_titre_facultatif" if regex else "opt_jeton"))
+            champ_texte.configure(font=("Consolas", 11) if regex else self.police)
+            champ_nom.configure(font=self.police if regex else ("Consolas", 11))
+
+        ttk.Checkbutton(ligne_regex, text=t("opt_regex"), variable=est_regex, command=type_change).pack(side="left")
+        icone = self.icone_info()
+        aide_regex = (ttk.Label(ligne_regex, image=icone, cursor="question_arrow") if icone
+                      else ttk.Label(ligne_regex, text="ⓘ", style="LienDiscret.TLabel"))
+        aide_regex.pack(side="left", padx=(8, 0))
+        self.info_bulle(aide_regex, "\n\n".join(self.t(c) for c in ("opt_motifs_aide", "opt_motifs_memo")),
+                        largeur=int(460 * e))
 
         zone = ttk.Frame(o)
         zone.pack(fill="both", expand=True)
-        arbre_motifs = ttk.Treeview(zone, columns=("titre", "motif"), show="headings", selectmode="extended",
-                                    height=4)
-        arbre_motifs.heading("titre", text=t("opt_motif_titre"), anchor="w")
-        arbre_motifs.heading("motif", text=t("opt_motif_expression"), anchor="w")
-        arbre_motifs.column("titre", width=int(170 * e), stretch=False)
-        arbre_motifs.column("motif", width=int(300 * e), stretch=True)
-        barre = ttk.Scrollbar(zone, command=arbre_motifs.yview)
-        arbre_motifs.configure(yscrollcommand=barre.set)
+        arbre = ttk.Treeview(zone, columns=("texte", "type", "nom"), show="headings", selectmode="extended",
+                             height=7)
+        for col, titre, largeur, etire in (("texte", t("opt_perso_valeur"), 280, True),
+                                           ("type", t("opt_perso_type"), 150, False),
+                                           ("nom", t("opt_perso_nom"), 170, False)):
+            arbre.heading(col, text=titre, anchor="w")
+            arbre.column(col, width=int(largeur * e), stretch=etire)
+        barre = ttk.Scrollbar(zone, command=arbre.yview)
+        arbre.configure(yscrollcommand=barre.set)
         barre.pack(side="right", fill="y", padx=(4, 0))
-        arbre_motifs.pack(side="left", fill="both", expand=True)
-        retour_motif = ttk.Label(o, style="Aide.TLabel", wraplength=largeur_texte, justify="left")
+        arbre.pack(side="left", fill="both", expand=True)
+        retour = ttk.Label(o, style="Aide.TLabel", wraplength=largeur_texte, justify="left")
 
-        def remplir_motifs():
-            arbre_motifs.delete(*arbre_motifs.get_children())
-            for i, m in enumerate(motifs):
-                arbre_motifs.insert("", "end", iid=str(i), values=(m["titre"] or "—", m["motif"]))
+        def remplir():
+            elements.sort(key=lambda x: (x["regex"], x["texte"].casefold()))
+            arbre.delete(*arbre.get_children())
+            for i, x in enumerate(elements):
+                if x["regex"]:
+                    nom = x["nom"] or "—"
+                else:
+                    nom = f"[{x['nom']}]" if x["nom"] else t("opt_jeton_auto")
+                arbre.insert("", "end", iid=str(i), values=(
+                    x["texte"], t("opt_type_regex" if x["regex"] else "opt_type_texte"), nom))
 
-        def choisir_motif(_=None):
-            selection = arbre_motifs.selection()
+        def vider_saisie():
+            champ_texte.delete(0, "end")
+            champ_nom.delete(0, "end")
+            arbre.selection_remove(*arbre.selection())
+            bouton.configure(text=t("ajouter"))
+
+        def choisir(_=None):
+            selection = arbre.selection()
             if len(selection) != 1:
-                bouton_motif.configure(text=t("ajouter"))
+                bouton.configure(text=t("ajouter"))
                 return
-            m = motifs[int(selection[0])]
-            champ_titre.delete(0, "end")
-            champ_titre.insert(0, m["titre"])
-            champ_motif.delete(0, "end")
-            champ_motif.insert(0, m["motif"])
-            bouton_motif.configure(text=t("opt_motif_maj"))
+            x = elements[int(selection[0])]
+            champ_texte.delete(0, "end")
+            champ_texte.insert(0, x["texte"])
+            champ_nom.delete(0, "end")
+            champ_nom.insert(0, x["nom"])
+            est_regex.set(x["regex"])
+            type_change()
+            bouton.configure(text=t("opt_motif_maj"))
 
-        def ajouter_motif(_=None):
-            titre, motif = champ_titre.get().strip(), champ_motif.get().strip()
-            if not motif:
-                return
-            try:
-                rx = compiler_motif(motif)
-            except Exception as exc:
-                retour_motif.configure(text=t("opt_motif_invalide", e=exc))
-                return
-            selection = arbre_motifs.selection()
-            if len(selection) == 1:  # mise à jour du motif sélectionné
-                motifs[int(selection[0])] = {"titre": titre, "motif": motif}
-            elif all(m["motif"] != motif for m in motifs):
-                motifs.append({"titre": titre, "motif": motif})
+        def ajouter(_=None):
+            regex = est_regex.get()
+            selection = arbre.selection()
+            courant = elements[int(selection[0])] if len(selection) == 1 else None
+            if regex:
+                texte, nom = champ_texte.get().strip(), champ_nom.get().strip()
+                if not texte:
+                    return
+                try:
+                    rx = compiler_motif(texte)
+                except Exception as exc:
+                    retour.configure(text=t("opt_motif_invalide", e=exc))
+                    return
+                courant = courant or next((x for x in elements if x["regex"] and x["texte"] == texte), None)
+                message = t("opt_motif_trouve", m=nom or texte, n=sum(1 for _ in rx.finditer(self.source.lire())))
             else:
-                next(m for m in motifs if m["motif"] == motif)["titre"] = titre
-            champ_titre.delete(0, "end")
-            champ_motif.delete(0, "end")
-            remplir_motifs()
-            bouton_motif.configure(text=t("ajouter"))
-            n = sum(1 for _ in rx.finditer(self.source.lire()))
-            retour_motif.configure(text=t("opt_motif_trouve", m=titre or motif, n=n))
+                texte, nom = normaliser(champ_texte.get()), normaliser_etiquette(champ_nom.get())
+                if len(texte) < 2:
+                    retour.configure(text=t("msg_terme_court"))
+                    return
+                if nom and etiquette_reservee(nom):
+                    retour.configure(text=t("opt_jeton_reserve", j=nom))
+                    return
+                courant = courant or next((x for x in elements if not x["regex"]
+                                           and x["texte"].casefold() == texte.casefold()), None)
+                autre = next((x for x in elements if not x["regex"] and nom and x["nom"] == nom
+                              and x is not courant), None)
+                if autre:
+                    retour.configure(text=t("opt_jeton_pris", j=nom, t=autre["texte"]))
+                    return
+                message = ""
+            if courant:
+                courant.update(texte=texte, regex=regex, nom=nom)
+            else:
+                elements.append({"texte": texte, "regex": regex, "nom": nom})
+            vider_saisie()
+            remplir()
+            retour.configure(text=message)
 
-        def supprimer_motifs(_=None):
-            retires = {int(i) for i in arbre_motifs.selection()}
-            motifs[:] = [m for i, m in enumerate(motifs) if i not in retires]
-            remplir_motifs()
-            bouton_motif.configure(text=t("ajouter"))
+        def supprimer(_=None):
+            retires = {int(i) for i in arbre.selection()}
+            elements[:] = [x for i, x in enumerate(elements) if i not in retires]
+            remplir()
+            bouton.configure(text=t("ajouter"))
 
-        bouton_motif.configure(command=ajouter_motif)
-        champ_motif.bind("<Return>", ajouter_motif)
-        champ_titre.bind("<Return>", lambda _: champ_motif.focus_set())
-        arbre_motifs.bind("<<TreeviewSelect>>", choisir_motif)
-        arbre_motifs.bind("<Delete>", supprimer_motifs)
-        remplir_motifs()
-        retour_motif.pack(anchor="w", pady=(8, 0))
-        ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer_motifs).pack(anchor="e", pady=(8, 0))
+        bouton.configure(command=ajouter)
+        champ_texte.bind("<Return>", ajouter)
+        champ_nom.bind("<Return>", ajouter)
+        arbre.bind("<<TreeviewSelect>>", choisir)
+        arbre.bind("<Delete>", supprimer)
+        remplir()
+        retour.pack(anchor="w", pady=(8, 0))
+        ttk.Button(o, text=t("opt_supprimer_selection"), command=supprimer).pack(anchor="e", pady=(8, 0))
+        self.saisie_perso = (champ_texte, champ_nom, est_regex, type_change, ajouter, arbre, elements)
 
         # Consigne pour l'IA
         o = ttk.Frame(onglets, padding=18)
@@ -1736,9 +1691,11 @@ class Application:
         def enregistrer():
             ancienne_langue = self.t.langue
             self.options.types = {k for k, v in cases.items() if v.get()}
-            self.options.permanents = stockage.trier([x["terme"] for x in permanents])
-            self.options.etiquettes = {x["terme"]: x["jeton"] for x in permanents if x["jeton"]}
-            self.options.motifs = stockage.motifs_valides(motifs)
+            termes = [x for x in elements if not x["regex"]]
+            self.options.permanents = stockage.trier([x["texte"] for x in termes])
+            self.options.etiquettes = {x["texte"]: x["nom"] for x in termes if x["nom"]}
+            self.options.motifs = stockage.motifs_valides(
+                [{"titre": x["nom"], "motif": x["texte"]} for x in elements if x["regex"]])
             self.options.consigne = avec_consigne.get()
             texte = zone_consigne.lire().strip()
             self.options.consigne_texte = None if not texte or texte == CONSIGNES[t.langue] else texte
@@ -1762,9 +1719,9 @@ class Application:
                 self.actualiser()
             self.message(self.t("msg_options_ok"))
 
-        # Ordre affiché : Général, Détection, Motifs personnalisés, Termes permanents, Consigne pour l'IA
-        detection, termes_perm, motifs_onglet, consigne_onglet, general = onglets.tabs()
-        for position, onglet in enumerate((general, detection, motifs_onglet, termes_perm, consigne_onglet)):
+        # Ordre affiché : Général, Détection, Masquage personnalisé, Consigne pour l'IA
+        detection, perso, consigne_onglet, general = onglets.tabs()
+        for position, onglet in enumerate((general, detection, perso, consigne_onglet)):
             onglets.insert(position, onglet)
         onglets.select(0)
 
@@ -1785,8 +1742,8 @@ class Application:
                 self.icones_info[nom] = None
         return self.icones_info[nom]
 
-    def info_bulle(self, widget, texte):
-        """Info-bulle affichée au survol."""
+    def info_bulle(self, widget, texte, largeur=0):
+        """Info-bulle affichée au survol (texte replié à « largeur » pixels si donnée)."""
         bulle = {}
 
         def montrer(_):
@@ -1797,7 +1754,7 @@ class Application:
             fen.wm_attributes("-topmost", True)
             p = self.palette
             tk.Label(fen, text=texte, background=p["fond"], foreground=p["texte"], relief="solid", borderwidth=1,
-                     padx=6, pady=2, font=(self.famille, 9)).pack()
+                     padx=6, pady=2, font=(self.famille, 9), wraplength=largeur, justify="left").pack()
             fen.geometry(f"+{widget.winfo_rootx() + widget.winfo_width() + 4}+{widget.winfo_rooty() - 2}")
             bulle["fen"] = fen
 
@@ -2108,10 +2065,10 @@ def capture(app, chemin):
         lambda: photo(app.fenetre_expression, "expression-secret.png"), lambda: app.fenetre_expression.destroy(),
         lambda: app.voir_expression("FQDN", app.fenetre_options),
         lambda: photo(app.fenetre_expression, "expression-fqdn.png"), lambda: app.fenetre_expression.destroy(),
-        lambda: app.onglets_options.select(2), lambda: mesurer("onglet Motifs"),
-        lambda: photo(app.fenetre_options, "options-motifs.png"), lambda: mesurer("onglet Motifs, 1 s après"),
-        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-termes.png"),
-        lambda: app.onglets_options.select(4), lambda: photo(app.fenetre_options, "options-consigne.png"),
+        lambda: app.onglets_options.select(2), lambda: mesurer("onglet Masquage personnalisé"),
+        lambda: photo(app.fenetre_options, "options-perso.png"),
+        lambda: mesurer("onglet Masquage personnalisé, 1 s après"),
+        lambda: app.onglets_options.select(3), lambda: photo(app.fenetre_options, "options-consigne.png"),
         lambda: app.onglets_options.select(0), lambda: photo(app.fenetre_options, "options-general.png"),
         lambda: app.fenetre_options.destroy(),
         app.ouvrir_a_propos, lambda: photo(app.fenetre_a_propos, "a-propos.png"),

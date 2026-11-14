@@ -127,6 +127,49 @@ def lancer():
         app.options.motifs = [{"titre": "Postes", "motif": r"PC-\d{4}"}, {"titre": "Tickets", "motif": r"INC-\d{4}-\d+"}]
         app.sauver_options()
 
+    def masquage_personnalise():
+        avant = (list(app.options.permanents), dict(app.options.etiquettes), [dict(m) for m in app.options.motifs])
+        app.ouvrir_options()
+        fen = app.fenetre_options
+        noms = [app.onglets_options.tab(i, "text") for i in range(len(app.onglets_options.tabs()))]
+        verifier(noms == ["Général", "Détection", "Masquage personnalisé", "Consigne pour l'IA"], f"onglets : {noms}")
+        app.onglets_options.select(2)
+        champ_texte, champ_nom, est_regex, type_change, ajouter, arbre, elements = app.saisie_perso
+        verifier(len(arbre.get_children()) == 3, f"termes et motifs existants : {len(arbre.get_children())}")
+        champ_texte.insert(0, "Vallorie Logistique")
+        champ_nom.insert(0, "client principal")
+        ajouter()
+        est_regex.set(True)
+        type_change()
+        champ_texte.insert(0, r"SRV-[A-Z]+\d*")
+        champ_nom.insert(0, "Serveurs")
+        ajouter()
+        est_regex.set(True)
+        champ_texte.insert(0, "SRV-(")
+        ajouter()  # expression invalide : refusée
+        valeurs = [arbre.item(i, "values") for i in arbre.get_children()]
+        verifier(len(valeurs) == 5, f"lignes : {valeurs}")
+        verifier(("Vallorie Logistique", "Texte exact", "[CLIENT_PRINCIPAL]") in valeurs, f"terme : {valeurs}")
+        verifier((r"SRV-[A-Z]+\d*", "Expression régulière", "Serveurs") in valeurs, f"motif : {valeurs}")
+        app.root.update()
+        photo_fenetre = fen
+        try:
+            from PIL import ImageGrab
+            x, y = photo_fenetre.winfo_rootx(), photo_fenetre.winfo_rooty()
+            ImageGrab.grab(bbox=(x, y, x + photo_fenetre.winfo_width(), y + photo_fenetre.winfo_height())).save(
+                os.path.join(SORTIE, "p1-0-options-perso.png"))
+        except Exception:
+            pass
+        trouver_bouton(fen, ("Enregistrer", "Save")).invoke()
+        racine.update()
+        o = app.options
+        verifier("Vallorie Logistique" in o.permanents and o.etiquettes.get("Vallorie Logistique") == "CLIENT_PRINCIPAL",
+                 f"terme mal enregistré : {o.permanents} {o.etiquettes}")
+        verifier({"titre": "Serveurs", "motif": r"SRV-[A-Z]+\d*"} in o.motifs and len(o.motifs) == 3,
+                 f"motifs : {o.motifs}")
+        o.permanents, o.etiquettes, o.motifs = avant
+        app.sauver_options()
+
     def renommer():
         app.renommer_conversation()
         verifier(app.conv.nom == "Incident AD", f"renommage : {app.conv.nom!r}")
@@ -448,7 +491,7 @@ def lancer():
         app.quitter()
 
     etapes = {
-        1: [accueil, langue_fr, reglages, renommer, termes_conversation, coller_log, verifier_anonymisation, recherche,
+        1: [accueil, langue_fr, reglages, masquage_personnalise, renommer, termes_conversation, coller_log, verifier_anonymisation, recherche,
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
