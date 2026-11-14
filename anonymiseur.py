@@ -1784,7 +1784,7 @@ class Application:
         ttk.Label(cadre, text=t("expr_nombre", n=len(lignes)), style="Aide.TLabel").pack(anchor="w", pady=(0, 6))
         bloc = ttk.Frame(cadre)
         bloc.pack(fill="both", expand=True)
-        zone = tk.Text(bloc, wrap="char", font=("Consolas", 10), height=min(20, 3 + 3 * len(lignes)), width=90,
+        zone = tk.Text(bloc, wrap="char", font=("Consolas", 10), height=min(15, 3 + 3 * len(lignes)), width=90,
                        relief="flat", padx=10, pady=8, highlightthickness=1)
         barre = ttk.Scrollbar(bloc, command=zone.yview)
         zone.configure(yscrollcommand=barre.set)

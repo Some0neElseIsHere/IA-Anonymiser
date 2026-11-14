@@ -10,6 +10,11 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.11.2** : **fenêtre des expressions (Options → Détection → ⓘ) mise à jour**. Les expressions affichées sont toujours celles que l'outil applique réellement, mais leurs explications dataient d'avant les tests sur les journaux réels :
+  - **un titre pour chaque expression**, par exemple « Kerberos : utilisateur/ROYAUME (Zeek, klist) » ou « Événement Windows : compte (Account Name…) », avec le nombre d'expressions du type. « Compte » en compte 24, « Nom de machine ou de domaine » 10 ;
+  - **explications réécrites** pour tous les types : clés de contrôle des cartes, IBAN et n° de sécurité sociale, règles des téléphones, adresses IP laissées lisibles, exclusions des comptes et des noms de domaine, écritures d'une même adresse MAC ;
+  - **barre de défilement** pour parcourir les longues listes.
+
 - **v1.11.1** : **deuxième série de tests sur de vrais journaux**. Cette fois : 10 autres jeux loghub (supercalculateurs BGL et HPC, Hadoop, HDFS, Spark, Zookeeper, OpenStack, Proxifier, Android, HealthApp), 11 autres jeux Windows d'OTRF (attaques Covenant, Empire et Metasploit sur plusieurs machines), des journaux réels AWS CloudTrail et S3, Zeek (Kerberos, DNS, SMB, TLS) et auditd Linux. S'y ajoutent 11 nouveaux formats générés : FortiGate, Cisco ASA, IIS, Exchange, Postfix, Squid, Entra ID (Azure AD), DNS et DHCP Windows, événements Windows en français, Kubernetes. Corrections :
   - **plus de faux téléphones** : un numéro français doit utiliser le même séparateur partout et ne pas faire partie d'une date (`2023-08-16-01-28-55`, `2005-06-03-15.42.50`). Le journal BGL en comptait 1 539 ;
   - **cartes et n° de sécurité sociale écrits avec des espaces** : masqués si la clé est valide, si le NIR a sa présentation officielle (`1 85 05 78 006 084 36`), ou si « carte », « CB », « Visa », « NIR », « sécu »… les précède. Les séries de nombres (vitesses de ventilateurs, registres) ne sont plus prises pour des cartes ;
