@@ -991,7 +991,7 @@ class Application:
         self.cases_conv = {}
         for i, type_ in enumerate(TYPES_AUTO):
             self.cases_conv[type_] = var = tk.BooleanVar(value=True)
-            ligne = ttk.Frame(grille, padding=(0, 2, 16, 2))
+            ligne = ttk.Frame(grille, padding=(0, 2, 8, 2))
             ligne.grid(row=i // 2, column=i % 2, sticky="w")
             case = ttk.Checkbutton(ligne, text=t(f"type_{type_}"), variable=var,
                                    command=self.options_conversation_changees)
