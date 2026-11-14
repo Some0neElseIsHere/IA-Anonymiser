@@ -20,7 +20,8 @@ PREFIXES = {
 TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()}, key=len, reverse=True)
 
 # Types détectés automatiquement (les termes et les motifs personnalisés sont à part).
-TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "IPPUB", "MAC", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
+# Ordre d'affichage dans Options → Détection (deux colonnes) : IP locales et publiques côte à côte
+TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "MAC", "IP", "IPPUB", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
 # Les deux types d'adresse IP sont trouvés par les mêmes expressions, puis classés selon la plage d'adresses
 TYPES_IP = ("IP", "IPPUB")
 # Types de la version 1.3 : les types ajoutés depuis sont activés pour les utilisateurs existants.
@@ -35,7 +36,7 @@ EXEMPLES = {
     "IP": "192.168.1.10, 10.0.0.5, fe80::1",
     "IPPUB": "185.220.101.47, 2a01:e0a:1f3::17",
     "MAC": "00:1A:2B:3C:4D:5E",
-    "FQDN": "srv-paie01.acme.local, intranet.acme.fr, WORKSTATION5 (événement, syslog, ipconfig, \\\\srv)",
+    "FQDN": "srv-paie01.acme.local, WORKSTATION5",
     "SECRET": "password=…, AKIA…, ghp_…, eyJ… (JWT), BEGIN PRIVATE KEY",
     "COMPTE": r"ACME\mlefevre, C:\Users\mlefevre, /home/mlefevre",
     "DN": "CN=Marc Lefevre,OU=Compta,DC=acme,DC=local",
