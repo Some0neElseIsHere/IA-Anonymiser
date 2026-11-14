@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.12.2** : **jeton personnalisé pour les termes d'une conversation**. Dans « 3. Éléments masqués », la liste à droite s'appelle désormais **Masquage personnalisé de cette conversation**, pendant d'Options → Masquage personnalisé qui vaut pour toutes les conversations :
+  - deux colonnes, **Terme** et **Jeton**, et un champ **Jeton** à côté de la saisie : « Sophie Bernard » peut devenir `[VICTIME]` au lieu de `[NOM_2]` ;
+  - **cliquez sur un terme** pour le modifier, lui ou son jeton, puis **Mettre à jour** (Échap annule). Si le terme a déjà été envoyé à l'IA, la copie suivante la prévient du changement, comme pour les termes permanents ;
+  - un jeton déjà utilisé par un autre terme, permanent ou de la conversation, est refusé ;
+  - **Toujours masquer** emporte le jeton avec le terme dans les Options ;
+  - le jeton est enregistré avec la conversation.
+
 - **v1.12.1** : **jeton des IP privées : `[IP_privée_1]`** (`[IP_private_1]` en anglais), à côté de `[IP_PUB_1]` pour les IP publiques. L'IA lit directement la nature de l'adresse.
   - **restauration tolérante** : la réponse de l'IA est restaurée même si elle réécrit le jeton sans accent (`[IP_PRIVEE_1]`), en minuscules, avec des espaces (`[IP privée 1]`) ou échappé en Markdown (`[IP\_privée\_1]`). Cette tolérance s'applique désormais à tous les jetons, y compris `[IP_PUB_1]` ;
   - **conversations en cours** : les anciens jetons `[IP_1]` restent restaurés, et une adresse déjà envoyée garde son jeton.
