@@ -73,6 +73,8 @@ Pour garder une trace de ce qui a été envoyé à l'IA, cliquez sur **Exporter 
 
 ![Options](docs/options-detection.png)
 
+![Masquage personnalisé](docs/options-perso.png)
+
 - **Détection** : cochez les types de données à masquer automatiquement.
 - **Masquage personnalisé** : la liste des termes et motifs toujours masqués. Saisissez le terme ou le motif, cochez **Expression régulière** pour un motif, puis donnez si vous le souhaitez un jeton (texte exact) ou un titre (expression régulière). L'icône ⓘ à côté de la case rappelle la syntaxe. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours. Cliquez sur une ligne pour la modifier.
 

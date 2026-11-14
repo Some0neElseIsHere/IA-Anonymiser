@@ -168,8 +168,8 @@ MOTIFS = [
     ("FQDN", re.compile(
         r"(?<![\w.-])\"?(?:[a-z_]*?(?:host[_-]?name|dvc[_-]?host[_-]?name|computer[_-]?name|device[_-]?name|"
         r"endpoint[_-]?name|machine[_-]?name|workstation[_-]?name)|host|computer|workstation|[sd]host|dvchost|"
-        r"[sd]ntdom|client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name)"
-        r"\\?\"?[ \t]*[:=][ \t]*(?![^\s\"';,|&]*=)\\?\"?(?P<v>[A-Za-z0-9][\w.-]*)",
+        r"[sd]ntdom|client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name|server|data[ _]source|db[_-]?host)"
+        r"\\?\"?[ \t]*[:=][ \t]*(?![^\s\"';,|&]*=)\\?\"?(?:tcp:|np:)?(?P<v>[A-Za-z0-9][\w.-]*)",
         re.IGNORECASE)),
     # Entra ID (Azure AD) : nom de l'appareil dans deviceDetail
     ("FQDN", re.compile(r'"deviceDetail"\s*:\s*\{[^{}]*?"displayName"\s*:\s*"(?P<v>[^"]+)"')),
@@ -261,8 +261,8 @@ DESCRIPTIONS = [
     ("ipconfig /all, systeminfo, hostnamectl : Host Name, Domain…", "ipconfig /all, systeminfo, hostnamectl: Host Name, Domain…"),
     ("Transcript PowerShell : Machine:", "PowerShell transcript: Machine:"),
     ("Serveur d'un chemin réseau (\\\\fs01\\partage)", "Server in a network path (\\\\fs01\\share)"),
-    ("Clé = machine : hostname=, CEF (shost, dhost, dvchost, dntdom), JSON (SrcHostName, EndpointName…)",
-     "Key = machine: hostname=, CEF (shost, dhost, dvchost, dntdom), JSON (SrcHostName, EndpointName…)"),
+    ("Clé = machine : hostname=, Server= (chaîne de connexion), CEF (shost, dhost…), JSON (SrcHostName…)",
+     "Key = machine: hostname=, Server= (connection string), CEF (shost, dhost…), JSON (SrcHostName…)"),
     ("Entra ID : appareil dans deviceDetail", "Entra ID: device in deviceDetail"),
     ("DNS Windows : (5)srv01(4)acme(5)local(0)", "Windows DNS: (5)srv01(4)acme(5)local(0)"),
     ("DHCP Windows : adresse MAC sans séparateurs", "Windows DHCP: MAC address without separators"),
@@ -409,6 +409,8 @@ def _accepte(type_, m, valeur):
         return True
     if type_ == "FQDN":
         if "tld" not in m.re.groupindex:  # nom de machine ou de domaine NetBIOS (champ d'événement, NOM$)
+            if re.fullmatch(r"[\d.]+", valeur):
+                return False  # « server = 10.1.1.5 » : c'est une adresse IP, laissée à sa propre expression
             return valeur.upper() not in MACHINES_NEUTRES and not re.fullmatch(r"(?:DWM|UMFD)-\d+", valeur)
         tld = m.group("tld")
         etiquettes = valeur.split(".")

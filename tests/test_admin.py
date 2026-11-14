@@ -24,7 +24,7 @@ class Secrets(unittest.TestCase):
             "MYSQL_ROOT_PASSWORD: 'p@ss w0rd'": "MYSQL_ROOT_PASSWORD: '[SECRET_1]'",
             '"password": "Azerty123"': '"password": "[SECRET_1]"',
             "spring.datasource.password=Xy9#k": "spring.datasource.password=[SECRET_1]",
-            "Server=sql01;User Id=sa;Password=Mdp2026!;": "Server=sql01;User Id=[COMPTE_1];Password=[SECRET_1];",
+            "Server=sql01;User Id=sa;Password=Mdp2026!;": "Server=[FQDN_1];User Id=[COMPTE_1];Password=[SECRET_1];",
             "pwd: Lili2024": "pwd: [SECRET_1]",
             "mot de passe : Printemps2026": "mot de passe : [SECRET_1]",
             "api_key=ABCD1234efgh": "api_key=[SECRET_1]",
@@ -474,6 +474,15 @@ class Cef(unittest.TestCase):
             '"SrcUserName": "[COMPTE_1]", "DstUserName": "NT AUTHORITY\\\\SYSTEM", "SrcHostName": "[FQDN_1]", '
             '"endpoint_name": "[FQDN_2]", "DeviceName": "localhost", "userAgent": "Mozilla/5.0"')
         self.assertEqual(anon("|targetUser=admin|targetHostname=ws-12|"), "|targetUser=[COMPTE_1]|targetHostname=[FQDN_1]|")
+
+    def test_chaine_de_connexion(self):
+        self.assertEqual(anon("Server=sql01;User Id=paie;Password=Paie2026!;"),
+                         "Server=[FQDN_1];User Id=[COMPTE_1];Password=[SECRET_1];")
+        self.assertEqual(anon("Data Source=tcp:sqlprod02,1433;Initial Catalog=Paie"),
+                         "Data Source=tcp:[FQDN_1],1433;Initial Catalog=Paie")
+        self.assertEqual(anon("Server=localhost;Database=x"), "Server=localhost;Database=x")
+        self.assertEqual(anon("AAA user authentication Successful : server =  10.1.1.5"),
+                         "AAA user authentication Successful : server =  [IP_privée_1]")
 
     def test_pas_de_faux_secrets(self):
         for texte in ("token={fsn=-1}", 'secret="\\"'):
