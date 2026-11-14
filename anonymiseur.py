@@ -145,12 +145,12 @@ class Zone(ttk.Frame):
     def __init__(self, app, parent, titre, lecture_seule=False, marge=(0, 0, 0, 0)):
         super().__init__(parent, padding=marge)
         self.entete = ttk.Frame(self)
-        self.entete.pack(fill="x", pady=(0, 8))
+        self.entete.pack(fill="x", pady=(0, 6))
         ttk.Label(self.entete, text=titre, style="Titre.TLabel").pack(side="left")
         cadre = self.cadre = ttk.Frame(self)
         cadre.pack(fill="both", expand=True)
         self.texte = tk.Text(cadre, wrap="word", font=app.police, undo=not lecture_seule, relief="flat",
-                             borderwidth=0, padx=14, pady=10, highlightthickness=1, spacing1=3, spacing3=3)
+                             borderwidth=0, padx=10, pady=6, highlightthickness=1, spacing1=2, spacing3=2)
         self.barre = barre = ttk.Scrollbar(cadre, command=self.texte.yview)
         self.texte.configure(yscrollcommand=self._defile)
         barre.pack(side="right", fill="y", padx=(4, 0))
@@ -222,7 +222,7 @@ class Zone(ttk.Frame):
     def bouton(self, texte, commande, accent=False):
         """Ajoute un bouton à droite du titre (le premier ajouté est le plus à droite)."""
         b = ttk.Button(self.entete, text=texte, command=commande, style="Accent.TButton" if accent else "TButton")
-        b.pack(side="right", padx=(8, 0))
+        b.pack(side="right", padx=(6, 0))
         return b
 
     def colorer(self, p):
@@ -504,8 +504,8 @@ class Application:
         style.configure("Statut.TLabel", foreground=p["aide"])
         style.configure("Lien.TLabel", foreground=p["lien"], font=(f, 10, "underline"))
         style.configure("LienDiscret.TLabel", foreground=p["lien"], font=(f, 9))
-        style.configure("TNotebook.Tab", padding=(16, 6))
-        hauteur = self.police.metrics("linespace") + int(12 * self.echelle)
+        style.configure("TNotebook.Tab", padding=(14, 5))
+        hauteur = self.police.metrics("linespace") + int(10 * self.echelle)
         style.configure("Treeview", rowheight=hauteur, font=self.police)
         style.configure("Treeview.Heading", font=(f, 10, "bold"))
         self.arbre_elements_couleurs()
@@ -555,22 +555,24 @@ class Application:
         root.title(f"IA-Anonymiser {VERSION}")
 
 
-        self.lateral = lateral = ttk.Panedwindow(root, orient="horizontal")
-        lateral.pack(fill="both", expand=True, padx=18, pady=12)
-        lateral.add(self.construire_conversations(lateral), weight=0)
+        # Colonne des conversations à largeur fixe (pleine ou réduite), pas de séparateur à faire glisser
+        self.lateral = lateral = ttk.Frame(root)
+        lateral.pack(fill="both", expand=True, padx=10, pady=8)
+        self.colonne = self.construire_conversations(lateral)
+        self.colonne.pack(side="left", fill="y")
 
         self.onglets = ttk.Notebook(lateral)
-        lateral.add(self.onglets, weight=1)
+        self.onglets.pack(side="left", fill="both", expand=True)
 
-        o1 = ttk.Frame(self.onglets, padding=12)
+        o1 = ttk.Frame(self.onglets, padding=8)
         self.onglets.add(o1, text=t("onglet_anonymiser"))
         self.p1 = p1 = ttk.Panedwindow(o1, orient="horizontal")
         p1.pack(fill="both", expand=True)
-        self.source = Zone(self, p1, t("texte_original"), marge=(0, 0, 10, 0))
+        self.source = Zone(self, p1, t("texte_original"), marge=(0, 0, 6, 0))
         self.source.indiquer(t("ind_source"), self.police)
         self.source.bouton(t("effacer"), lambda: self.vider(self.source))
         self.source.bouton(t("coller"), lambda: self.coller(self.source))
-        self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(10, 0, 0, 0))
+        self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(6, 0, 0, 0))
         self.bouton_copier_ia = self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
         p1.add(self.source, weight=1)
         p1.add(self.sortie, weight=1)
@@ -578,15 +580,15 @@ class Application:
         self.source.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=True)
         self.sortie.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=False)
 
-        o2 = ttk.Frame(self.onglets, padding=12)
+        o2 = ttk.Frame(self.onglets, padding=8)
         self.onglets.add(o2, text=t("onglet_restaurer"))
         self.p2 = p2 = ttk.Panedwindow(o2, orient="horizontal")
         p2.pack(fill="both", expand=True)
-        self.reponse = Zone(self, p2, t("reponse_ia"), marge=(0, 0, 10, 0))
+        self.reponse = Zone(self, p2, t("reponse_ia"), marge=(0, 0, 6, 0))
         self.reponse.indiquer(t("ind_reponse"), self.police)
         self.reponse.bouton(t("effacer"), lambda: self.vider(self.reponse))
         self.reponse.bouton(t("coller"), lambda: self.coller(self.reponse))
-        self.restauree = Zone(self, p2, t("reponse_restauree"), lecture_seule=True, marge=(10, 0, 0, 0))
+        self.restauree = Zone(self, p2, t("reponse_restauree"), lecture_seule=True, marge=(6, 0, 0, 0))
         self.bouton_copier = self.restauree.bouton(t("copier"), self.copier_restauree, accent=True)
         p2.add(self.reponse, weight=1)
         p2.add(self.restauree, weight=1)
@@ -594,7 +596,7 @@ class Application:
         self.reponse.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=False)
         self.restauree.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=True)
 
-        o3 = ttk.Frame(self.onglets, padding=12)
+        o3 = ttk.Frame(self.onglets, padding=8)
         self.onglets.add(o3, text=t("onglet_elements", n=0))
         self.p3 = p3 = ttk.Panedwindow(o3, orient="horizontal")
         p3.pack(fill="both", expand=True)
@@ -621,7 +623,6 @@ class Application:
             root.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
             for zone in (self.source, self.sortie, self.reponse, self.restauree):
                 zone.texte.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
-        self.proportion(self.lateral, lambda l, h: min(int(250 * self.echelle), l // 3))
         self.proportion(self.p3, lambda l, h: int(l * 0.62))
         self.proportion(self.p1, lambda l, h: l // 2)
         self.proportion(self.p2, lambda l, h: l // 2)
@@ -665,7 +666,7 @@ class Application:
             self.champ_recherche.delete(0, "end")
             self.champ_recherche.insert(0, selection)
         if not self.barre_recherche.winfo_ismapped():
-            self.barre_recherche.pack(fill="x", pady=(0, 8), before=z.cadre)
+            self.barre_recherche.pack(fill="x", pady=(0, 6), before=z.cadre)
         self.champ_recherche.focus_set()
         self.champ_recherche.select_range(0, "end")
         self.chercher()
@@ -740,9 +741,9 @@ class Application:
         """Colonne des conversations, avec sa version réduite (barre d'icônes) ; on bascule de l'une à l'autre."""
         t = self.t
         conteneur = ttk.Frame(parent)
-        cadre = self.colonne_pleine = ttk.Frame(conteneur, padding=(0, 0, 14, 0))
+        cadre = self.colonne_pleine = ttk.Frame(conteneur, padding=(0, 0, 10, 0))
         marque = ttk.Frame(cadre)
-        marque.pack(fill="x", pady=(0, 14))
+        marque.pack(fill="x", pady=(0, 10))
         if self.icone_petite:
             ttk.Label(marque, image=self.icone_petite).pack(side="left", padx=(0, 8))
         ttk.Label(marque, text="IA-Anonymiser", style="Marque.TLabel").pack(side="left")
@@ -751,14 +752,14 @@ class Application:
         self.info_bulle(reduire, t("reduire_colonne"))
 
         bas = ttk.Frame(cadre)
-        bas.pack(side="bottom", fill="x", pady=(10, 0))
+        bas.pack(side="bottom", fill="x", pady=(8, 0))
         ttk.Button(bas, text=t("a_propos"), command=self.ouvrir_a_propos).pack(side="bottom", fill="x")
-        ttk.Button(bas, text=t("options"), command=self.ouvrir_options).pack(side="bottom", fill="x", pady=(0, 8))
-        ttk.Separator(cadre).pack(side="bottom", fill="x", pady=(10, 0))
+        ttk.Button(bas, text=t("options"), command=self.ouvrir_options).pack(side="bottom", fill="x", pady=(0, 6))
+        ttk.Separator(cadre).pack(side="bottom", fill="x", pady=(8, 0))
 
-        ttk.Label(cadre, text=t("conversations"), style="Section.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(cadre, text=t("conversations"), style="Section.TLabel").pack(anchor="w", pady=(0, 6))
         ttk.Button(cadre, text=t("nouvelle_conversation"), command=self.nouvelle_conversation,
-                   style="Accent.TButton").pack(fill="x", pady=(0, 8))
+                   style="Accent.TButton").pack(fill="x", pady=(0, 6))
         self.arbre_conv = ttk.Treeview(cadre, show="tree", selectmode="browse", columns=("n",))
         self.arbre_conv.column("#0", width=int(170 * self.echelle), stretch=True)
         self.arbre_conv.column("n", width=int(44 * self.echelle), stretch=False, anchor="e")
@@ -770,9 +771,9 @@ class Application:
         self.arbre_conv.bind("<Button-3>", self.menu_conversation)
 
         # Version réduite : logo, déplier, nouvelle conversation ; Options et À propos en bas
-        mini = self.colonne_mini = ttk.Frame(conteneur, padding=(0, 0, 10, 0))
+        mini = self.colonne_mini = ttk.Frame(conteneur, padding=(0, 0, 8, 0))
         if self.icone_petite:
-            ttk.Label(mini, image=self.icone_petite).pack(pady=(0, 14))
+            ttk.Label(mini, image=self.icone_petite).pack(pady=(0, 10))
         boutons = [("»", self.basculer_colonne, t("deplier_colonne"), "Mini.Toolbutton", (0, 8)),
                    ("+", self.nouvelle_conversation, t("nouvelle_conversation").lstrip("+ "), "Mini.Accent.TButton",
                     (0, 0))]
@@ -783,13 +784,13 @@ class Application:
         for texte, commande, bulle in (("ⓘ", self.ouvrir_a_propos, t("a_propos")),
                                        ("⚙", self.ouvrir_options, t("options"))):
             b = ttk.Button(mini, text=texte, width=3, command=commande)
-            b.pack(side="bottom", pady=(8, 0))
+            b.pack(side="bottom", pady=(6, 0))
             self.info_bulle(b, bulle)
-        ttk.Separator(mini).pack(side="bottom", fill="x", pady=(10, 0))
+        ttk.Separator(mini).pack(side="bottom", fill="x", pady=(8, 0))
         # Conversations en initiales (épinglées d'abord), nom complet au survol
         self.arbre_mini = ttk.Treeview(mini, show="", selectmode="browse", columns=("i",))
         self.arbre_mini.column("i", width=int(48 * self.echelle), minwidth=int(48 * self.echelle), anchor="center")
-        self.arbre_mini.pack(fill="y", expand=True, pady=(12, 0))
+        self.arbre_mini.pack(fill="y", expand=True, pady=(8, 0))
         self.arbre_mini.bind("<<TreeviewSelect>>", self.choisir_mini)
         self.arbre_mini.bind("<Button-3>", self.menu_conversation)
         self.arbre_mini.bind("<Double-1>", lambda e: self.renommer_conversation())
@@ -798,8 +799,6 @@ class Application:
         self._bulle_mini = None
 
         (mini if self.options.colonne_reduite else cadre).pack(fill="both", expand=True)
-        if self.options.colonne_reduite:
-            self.proportion(parent, lambda l, h: self.colonne_mini.winfo_reqwidth())
         return conteneur
 
     @staticmethod
@@ -849,25 +848,13 @@ class Application:
         """Réduit la colonne des conversations à une barre d'icônes, ou la déplie."""
         reduite = not self.options.colonne_reduite
         self.options.colonne_reduite = reduite
-        try:
-            if reduite:
-                self._largeur_colonne = self.lateral.sashpos(0)
-        except tk.TclError:
-            pass
         (self.colonne_pleine if reduite else self.colonne_mini).pack_forget()
         (self.colonne_mini if reduite else self.colonne_pleine).pack(fill="both", expand=True)
-        self.root.update_idletasks()
-        largeur = (self.colonne_mini.winfo_reqwidth() if reduite
-                   else getattr(self, "_largeur_colonne", None) or self.colonne_pleine.winfo_reqwidth())
-        try:
-            self.lateral.sashpos(0, largeur)
-        except tk.TclError:
-            pass
         self.sauver_options()
 
     def construire_elements(self, parent):
         t = self.t
-        cadre = ttk.Frame(parent, padding=(0, 0, 10, 0))
+        cadre = ttk.Frame(parent, padding=(0, 0, 6, 0))
         self.titre_elements = ttk.Label(cadre, style="Titre.TLabel")
         self.titre_elements.pack(anchor="w", pady=(0, 8))
         actions = ttk.Frame(cadre)
@@ -902,7 +889,7 @@ class Application:
 
     def construire_termes(self, parent):
         t = self.t
-        cadre = ttk.Frame(parent, padding=(10, 0, 0, 0))
+        cadre = ttk.Frame(parent, padding=(6, 0, 0, 0))
         self.titre_termes = ttk.Label(cadre, style="Titre.TLabel")
         self.titre_termes.pack(anchor="w", pady=(0, 8))
 

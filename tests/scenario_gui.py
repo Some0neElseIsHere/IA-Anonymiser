@@ -377,11 +377,13 @@ def lancer():
         photo("3b-defilement")
 
     def colonne_reduite():
-        largeur = app.lateral.sashpos(0)
+        racine.update()
+        largeur = app.colonne.winfo_width()
+        verifier(str(app.lateral.winfo_class()) == "TFrame", "la colonne ne doit plus être redimensionnable")
         app.basculer_colonne()
         racine.update()
         verifier(app.colonne_mini.winfo_ismapped() and not app.colonne_pleine.winfo_ismapped(), "colonne non réduite")
-        verifier(app.lateral.sashpos(0) < largeur / 2, f"largeur réduite : {app.lateral.sashpos(0)} / {largeur}")
+        verifier(app.colonne.winfo_width() < largeur / 2, f"largeur réduite : {app.colonne.winfo_width()} / {largeur}")
         lignes = [i for i in app.arbre_mini.get_children() if not i.startswith("sep-")]
         verifier(len(lignes) == len(app.conversations), f"conversations dans la colonne réduite : {len(lignes)}")
         verifier(app.arbre_mini.selection() == (app.conv.id,), "conversation courante non sélectionnée")
@@ -397,7 +399,7 @@ def lancer():
         photo("3c-colonne-reduite")
         app.basculer_colonne()
         racine.update()
-        verifier(abs(app.lateral.sashpos(0) - largeur) <= 2, "largeur non retrouvée en dépliant")
+        verifier(abs(app.colonne.winfo_width() - largeur) <= 2, "largeur non retrouvée en dépliant")
         app.basculer_colonne()  # laissée réduite : la relance doit s'en souvenir
         racine.update()
 
@@ -427,7 +429,7 @@ def lancer():
         verifier(len(app.conv.envois) == 3, f"envois perdus : {len(app.conv.envois)}")
         racine.update()
         verifier(app.options.colonne_reduite and app.colonne_mini.winfo_ismapped(), "colonne réduite non conservée")
-        verifier(app.lateral.sashpos(0) < 120 * app.echelle, f"colonne réduite trop large : {app.lateral.sashpos(0)}")
+        verifier(app.colonne.winfo_width() < 120 * app.echelle, f"colonne réduite trop large : {app.colonne.winfo_width()}")
         app.basculer_colonne()
         racine.update()
         verifier(app.colonne_pleine.winfo_ismapped(), "colonne non dépliée à la relance")
