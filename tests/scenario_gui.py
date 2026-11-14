@@ -219,6 +219,38 @@ def lancer():
         racine.update()
         verifier(not app.recherche_ouverte() and not app.source.texte.tag_ranges("recherche"), "Échap ne ferme pas")
 
+    def tri_elements():
+        app.onglets.select(2)
+        racine.update()
+        arbre = app.arbre
+        valeurs = lambda col: [arbre.set(i, col) for i in arbre.get_children()]
+        depart = list(arbre.get_children())
+        import unicodedata
+        cle = lambda x: "".join(c for c in unicodedata.normalize("NFD", x) if unicodedata.category(c) != "Mn").casefold()
+        arbre.event_generate("<Button-1>")  # clic neutre
+        app.trier_elements("valeur")
+        racine.update()
+        v = valeurs("valeur")
+        verifier([cle(x) for x in v] == sorted(cle(x) for x in v), f"tri croissant : {v[:6]}")
+        verifier(arbre.heading("valeur", "text").endswith("▲"), "flèche ▲ absente")
+        photo("1d-tri")
+        app.trier_elements("valeur")
+        racine.update()
+        verifier([cle(x) for x in valeurs("valeur")] == sorted((cle(x) for x in v), reverse=True), "tri décroissant")
+        verifier(arbre.heading("valeur", "text").endswith("▼"), "flèche ▼ absente")
+        app.trier_elements("valeur")
+        racine.update()
+        verifier(list(arbre.get_children()) == depart, "retour à l'ordre d'apparition")
+        verifier(not arbre.heading("valeur", "text").endswith(("▲", "▼")), "flèche restée")
+        app.trier_elements("jeton")
+        racine.update()
+        jetons = valeurs("jeton")
+        ip = [j for j in jetons if j.startswith("[IP_")]
+        verifier(ip == sorted(ip, key=lambda j: int(j[4:-1])), f"ordre naturel des jetons : {ip}")
+        app.trier_elements("type")  # laissé trié par type : la relance doit s'en souvenir
+        racine.update()
+        app.onglets.select(0)
+
     def copier_pour_ia():
         app.bouton_copier_ia.invoke()
         envoye = presse_papiers()
@@ -470,6 +502,7 @@ def lancer():
         verifier(app.options.langue == "en" and app.theme_applique == "sombre", "langue ou thème perdus")
         verifier(len(app.options.motifs) == 2 and app.options.motifs[0]["titre"] == "Postes", "motifs perdus")
         verifier(len(app.conv.envois) == 3, f"envois perdus : {len(app.conv.envois)}")
+        verifier(app.options.tri_elements == ["type", False], f"tri non conservé : {app.options.tri_elements}")
         racine.update()
         verifier(app.options.colonne_reduite and app.colonne_mini.winfo_ismapped(), "colonne réduite non conservée")
         verifier(app.colonne.winfo_width() < 120 * app.echelle, f"colonne réduite trop large : {app.colonne.winfo_width()}")
@@ -491,7 +524,7 @@ def lancer():
         app.quitter()
 
     etapes = {
-        1: [accueil, langue_fr, reglages, masquage_personnalise, renommer, termes_conversation, coller_log, verifier_anonymisation, recherche,
+        1: [accueil, langue_fr, reglages, masquage_personnalise, renommer, termes_conversation, coller_log, verifier_anonymisation, recherche, tri_elements,
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,

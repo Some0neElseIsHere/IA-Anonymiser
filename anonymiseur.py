@@ -9,6 +9,7 @@ import json
 import os
 import platform
 import re
+import unicodedata
 import sys
 import threading
 import time
@@ -103,6 +104,16 @@ def version_tuple(v):
 
 
 TEXTES_CLES = set(TEXTES["fr"])
+
+
+def cle_tri(colonne, valeur):
+    """Clé de tri d'une colonne de « Éléments masqués » : ordre alphabétique sans casse ni accents,
+    numéro des jetons dans l'ordre naturel ([IP_2] avant [IP_10]), nombre d'occurrences numérique."""
+    if colonne == "nb":
+        return (0, int(valeur)) if str(valeur).isdigit() else (0, 0)
+    texte = unicodedata.normalize("NFD", str(valeur))
+    texte = "".join(c for c in texte if unicodedata.category(c) != "Mn").casefold()
+    return [(0, int(x)) if x.isdigit() else (1, x) for x in re.split(r"(\d+)", texte)]
 
 
 class Conversation:
@@ -874,8 +885,10 @@ class Application:
             ("valeur", t("col_valeur"), 200, True, "w"),
             ("nb", t("col_fois"), 50, False, "center"),
         ):
-            self.arbre.heading(col, text=titre, anchor=ancre)
+            self.arbre.heading(col, text=titre, anchor=ancre, command=lambda c=col: self.trier_elements(c))
             self.arbre.column(col, width=int(largeur * e), minwidth=int(44 * e), stretch=etire, anchor=ancre)
+        self.titres_colonnes = {"jeton": t("col_jeton"), "type": t("col_type"), "valeur": t("col_valeur"),
+                                "nb": t("col_fois")}
         barre = ttk.Scrollbar(zone, command=self.arbre.yview)
         self.arbre.configure(yscrollcommand=barre.set)
         barre.pack(side="right", fill="y", padx=(4, 0))
@@ -1003,14 +1016,22 @@ class Application:
         selection = self.arbre.selection()
         self.arbre.delete(*self.arbre.get_children())
         presents = set(res.ordre)
+        lignes = []
         for jeton in res.ordre + [j for j in self.moteur.jetons() if j not in presents]:
             type_, valeur = self.moteur.info(jeton)
             exclu = jeton in self.moteur.exclus
             nb = res.ignores[jeton] if exclu else res.compte[jeton]
             tags = ("exclu",) if exclu else () if nb else ("absent",)
-            self.arbre.insert("", "end", iid=jeton, tags=tags,
-                              values=(jeton, self.libelle(type_, valeur) + (self.t("en_clair") if exclu else ""),
-                                      normaliser(valeur), nb or "–"))
+            lignes.append((jeton, tags, (jeton, self.libelle(type_, valeur) + (self.t("en_clair") if exclu else ""),
+                                         normaliser(valeur), nb or "–")))
+        tri = self.options.tri_elements
+        if tri:
+            colonne, decroissant = tri
+            i = ("jeton", "type", "valeur", "nb").index(colonne)
+            lignes.sort(key=lambda l: cle_tri(colonne, l[2][i]), reverse=decroissant)
+        for jeton, tags, valeurs in lignes:
+            self.arbre.insert("", "end", iid=jeton, tags=tags, values=valeurs)
+        self.indiquer_tri()
         garde = [s for s in selection if self.arbre.exists(s)]
         if garde:
             self.arbre.selection_set(garde)
@@ -1018,6 +1039,25 @@ class Application:
         self.titre_elements.configure(text=self.t("elements", n=n))
         self.onglets.tab(2, text=self.t("onglet_elements", n=n))
         self.selection_element()
+
+    def trier_elements(self, colonne):
+        """Clic sur un en-tête : croissant, puis décroissant, puis retour à l'ordre d'apparition."""
+        tri = self.options.tri_elements
+        if not tri or tri[0] != colonne:
+            self.options.tri_elements = [colonne, False]
+        elif not tri[1]:
+            self.options.tri_elements = [colonne, True]
+        else:
+            self.options.tri_elements = None
+        self.sauver_options()
+        if self.resultat is not None:
+            self.remplir_elements(self.resultat)
+
+    def indiquer_tri(self):
+        tri = self.options.tri_elements
+        for colonne, titre in self.titres_colonnes.items():
+            fleche = (" ▼" if tri[1] else " ▲") if tri and tri[0] == colonne else ""
+            self.arbre.heading(colonne, text=titre + fleche)
 
     def selection_element(self):
         selection = self.arbre.selection()

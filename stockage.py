@@ -136,6 +136,7 @@ class Options:
         self.theme = "auto"          # auto, clair, sombre
         self.conserver = True        # conversations gardées entre deux lancements
         self.colonne_reduite = False  # colonne des conversations réduite à une barre d'icônes
+        self.tri_elements = None      # tri de « Éléments masqués » : [colonne, décroissant] ou None (apparition)
         # Première installation : aucun réglage enregistré (sert à afficher l'écran d'accueil une seule fois)
         self.premier_lancement = not os.path.exists(self.chemin)
         self.charger()
@@ -173,6 +174,9 @@ class Options:
         self.theme = d.get("theme") if d.get("theme") in ("auto", "clair", "sombre") else "auto"
         self.conserver = bool(d.get("conserver", True))
         self.colonne_reduite = bool(d.get("colonne_reduite", False))
+        tri = d.get("tri_elements")
+        self.tri_elements = ([tri[0], bool(tri[1])] if isinstance(tri, list) and len(tri) == 2
+                             and tri[0] in ("jeton", "type", "valeur", "nb") else None)
 
     def sauver(self):
         with open(self.chemin, "w", encoding="utf-8") as f:
@@ -181,7 +185,8 @@ class Options:
                        "motifs": self.motifs,
                        "consigne": self.consigne, "consigne_texte": self.consigne_texte,
                        "langue": self.langue, "theme": self.theme, "conserver": self.conserver,
-                       "colonne_reduite": self.colonne_reduite},
+                       "colonne_reduite": self.colonne_reduite,
+                       "tri_elements": self.tri_elements},
                       f, ensure_ascii=False, indent=2)
 
 
