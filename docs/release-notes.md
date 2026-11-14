@@ -10,6 +10,10 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.7** : interface plus compacte :
+  - **colonne des conversations à largeur fixe** : le séparateur qu'on pouvait faire glisser à la souris (curseur ↔) entre la colonne et les onglets est retiré. La colonne est soit dépliée, soit réduite avec les boutons **«** / **»** ;
+  - **marges et espacements resserrés** dans toute la fenêtre principale (bords de la fenêtre, onglets, zones de texte, colonne, boutons) : plus de place pour le texte, surtout sur un écran de portable.
+
 - **v1.10.6** :
   - **recherche dans le texte original** : **Ctrl+F**, ou la loupe à côté de « Coller », ouvre une barre de recherche au-dessus du texte. Toutes les occurrences sont surlignées en bleu et la courante en orange, avec un compteur (« 3 / 12 »). **Entrée** ou **↓** passe à la suivante, **Maj+Entrée** ou **↑** à la précédente, **Échap** ferme. La recherche ignore les majuscules, se met à jour quand le texte change, et la zone de droite suit pour montrer la version anonymisée. Un mot sélectionné avant Ctrl+F est recherché directement ;
   - **colonne réduite** : initiales des conversations bien centrées, boutons **»** et **+** agrandis.
