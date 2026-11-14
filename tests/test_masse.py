@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from generateur import Univers, document  # noqa: E402
-from moteur import JETON_RE, Anonymiseur  # noqa: E402
+from moteur import JETON_RE, jeton_canonique, Anonymiseur  # noqa: E402
 
 NB_DOCUMENTS = 400
 
@@ -66,7 +66,7 @@ class Masse(unittest.TestCase):
         for n, _, r, _, _ in self.resultats:
             for m in JETON_RE.finditer(r.texte):
                 with self.subTest(document=n, jeton=m.group(0)):
-                    self.assertIsNotNone(self.a.info(f"[{m.group(1).upper()}_{int(m.group(2))}]"))
+                    self.assertIsNotNone(self.a.info(jeton_canonique(m.group(1), m.group(2))))
 
     def test_reponse_ia_simulee(self):
         """Une « réponse d'IA » qui reprend des jetons en les déformant un peu est bien restaurée."""

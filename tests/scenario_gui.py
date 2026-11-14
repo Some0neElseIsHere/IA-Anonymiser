@@ -245,8 +245,9 @@ def lancer():
         app.trier_elements("jeton")
         racine.update()
         jetons = valeurs("jeton")
-        ip = [j for j in jetons if j.startswith("[IP_")]
-        verifier(ip == sorted(ip, key=lambda j: int(j[4:-1])), f"ordre naturel des jetons : {ip}")
+        ip = [j for j in jetons if j.startswith("[IP_privée_")]
+        verifier(ip == sorted(ip, key=lambda j: int(re.search(r"(\d+)\]$", j).group(1))),
+                 f"ordre naturel des jetons : {ip}")
         app.trier_elements("nb")
         racine.update()
         nb = [int(x) if x.isdigit() else 0 for x in valeurs("nb")]
@@ -379,7 +380,7 @@ def lancer():
         contexte["premiere"] = premiere
 
     def epingler():
-        verifier("[IP_1]" in app.sortie.lire(), "chaque conversation doit avoir ses propres jetons")
+        verifier("[IP_privée_1]" in app.sortie.lire(), "chaque conversation doit avoir ses propres jetons")
         app.arbre_conv.selection_set(contexte["premiere"].id)
         app.changer_conversation()
         verifier(app.conv is contexte["premiere"], "changement de conversation")

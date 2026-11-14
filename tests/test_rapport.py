@@ -92,7 +92,7 @@ class Rapport(unittest.TestCase):
 
     def test_element_laisse_en_clair(self):
         conv, _ = conversation()
-        conv.moteur.exclus.add("[IP_1]")
+        conv.moteur.exclus.add("[IP_privée_1]")
         page = generer(conv)
         self.assertIn("laissé en clair par l'utilisateur", html.unescape(page))
 

@@ -108,7 +108,7 @@ TEXTES_CLES = set(TEXTES["fr"])
 
 def cle_tri(colonne, valeur):
     """Clé de tri d'une colonne de « Éléments masqués » : ordre alphabétique sans casse ni accents,
-    numéro des jetons dans l'ordre naturel ([IP_2] avant [IP_10]), nombre d'occurrences numérique."""
+    numéro des jetons dans l'ordre naturel ([IP_privée_2] avant [IP_privée_10]), nombre d'occurrences numérique."""
     if colonne == "nb":
         return (0, int(valeur)) if str(valeur).isdigit() else (0, 0)
     texte = unicodedata.normalize("NFD", str(valeur))

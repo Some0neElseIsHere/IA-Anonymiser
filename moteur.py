@@ -11,13 +11,45 @@ from dataclasses import dataclass, field
 # Préfixe des jetons selon la langue de l'interface : [NOM_1] en français, [NAME_1] en anglais.
 PREFIXES = {
     "fr": {"EMAIL": "EMAIL", "TEL": "TEL", "IBAN": "IBAN", "CARTE": "CARTE", "SECU": "SECU",
-           "IP": "IP", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "COMPTE",
+           "IP": "IP_privée", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "COMPTE",
            "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NOM"},
     "en": {"EMAIL": "EMAIL", "TEL": "PHONE", "IBAN": "IBAN", "CARTE": "CARD", "SECU": "SSN",
-           "IP": "IP", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "ACCOUNT",
+           "IP": "IP_private", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "ACCOUNT",
            "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NAME"},
 }
-TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()}, key=len, reverse=True)
+# Préfixes reconnus à la restauration : ceux d'aujourd'hui, et « IP » des versions avant la 1.12.1
+TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()} | {"IP"}, key=len, reverse=True)
+
+
+def _plat(texte):
+    """Sans accents ni casse : « IP_privée », « IP_PRIVEE » et « ip_privee » désignent le même préfixe."""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", texte) if unicodedata.category(c) != "Mn").casefold()
+
+
+# Forme canonique de chaque préfixe, retrouvée quelle que soit la façon dont l'IA l'a réécrit
+PREFIXE_CANONIQUE = {_plat(p): p for p in TOUS_PREFIXES}
+
+
+def _alternative_prefixes():
+    """Expression des préfixes : accents facultatifs (é ou e), « _ » éventuellement échappé par le Markdown."""
+    morceaux = []
+    for p in TOUS_PREFIXES:
+        motif = ""
+        for c in p:
+            if c == "_":
+                motif += r"(?:\\?_|-|\s)"
+            elif _plat(c) != c.casefold():
+                motif += f"[{c}{_plat(c)}]"
+            else:
+                motif += re.escape(c)
+        morceaux.append(motif)
+    return "|".join(morceaux)
+
+
+def jeton_canonique(prefixe, numero):
+    cle = re.sub(r"[\s-]+", "_", _plat(prefixe.replace(chr(92), "")))  # « IP privée », « IP-PRIVEE » -> ip_privee
+    return f"[{PREFIXE_CANONIQUE.get(cle, prefixe.upper())}_{int(numero)}]"
 
 # Types détectés automatiquement (les termes et les motifs personnalisés sont à part).
 # Ordre d'affichage dans Options → Détection (deux colonnes) : IP locales et publiques côte à côte
@@ -477,7 +509,7 @@ def normaliser_etiquette(texte):
 
 def etiquette_reservee(nom):
     """Un jeton personnalisé ne doit pas ressembler à un jeton automatique ([NOM_3], [IP_1]…)."""
-    return bool(re.fullmatch(r"(?:" + "|".join(TOUS_PREFIXES) + r")_\d+", nom))
+    return bool(re.fullmatch(r"(?:" + _alternative_prefixes() + r")_\d+", nom, re.IGNORECASE))
 
 
 def compiler_motif(motif):
@@ -494,7 +526,7 @@ def compiler_motif(motif):
 
 # Tolère les variantes qu'une IA peut produire : [nom_1], [ NOM_1 ], [NOM 1], \[NOM\_1\] (Markdown)…
 JETON_RE = re.compile(
-    r"\\?\[\s*(" + "|".join(TOUS_PREFIXES) + r")\s*(?:\\?_|-|\s)?\s*(\d+)\s*\\?\]",
+    r"\\?\[\s*(" + _alternative_prefixes() + r")\s*(?:\\?_|-|\s)?\s*(\d+)\s*\\?\]",
     re.IGNORECASE,
 )
 
@@ -649,7 +681,7 @@ class Anonymiseur:
         self._apercu, self._apercu_index, self._renommages = {}, {}, {}
         self._compteurs = Counter(t for t, _ in self.valide.values())
         # Jetons écrits tels quels dans le texte d'origine et inconnus de la conversation : réservés
-        self._reserves = {f"[{m.group(1).upper()}_{int(m.group(2))}]" for m in JETON_RE.finditer(texte)} - set(self.valide)
+        self._reserves = {jeton_canonique(m.group(1), m.group(2)) for m in JETON_RE.finditer(texte)} - set(self.valide)
 
         trouves = []
         termes_cf = {" ".join(t.split()).casefold() for t in termes}
@@ -783,7 +815,7 @@ class Anonymiseur:
 
     def _jetons_trouves(self, texte):
         """(match, jeton canonique) pour les jetons automatiques et personnalisés, dans l'ordre du texte."""
-        trouves = [(m, f"[{m.group(1).upper()}_{int(m.group(2))}]") for m in JETON_RE.finditer(texte)]
+        trouves = [(m, jeton_canonique(m.group(1), m.group(2))) for m in JETON_RE.finditer(texte)]
         perso = {j[1:-1] for j in (*self.valide, *self._apercu) if not JETON_RE.fullmatch(j)}
         if perso:
             noms = sorted(perso, key=len, reverse=True)

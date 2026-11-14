@@ -23,7 +23,7 @@ class Detection(unittest.TestCase):
 
     def test_iban_carte_ip(self):
         _, r = anon("FR76 3000 6000 0112 3456 7890 189 / 4111 1111 1111 1111 / 192.168.1.10.")
-        self.assertEqual(r.texte, "[IBAN_1] / [CARTE_1] / [IP_1].")
+        self.assertEqual(r.texte, "[IBAN_1] / [CARTE_1] / [IP_privée_1].")
 
     def test_securite_sociale(self):
         _, r = anon("NIR : 1 85 05 78 006 084 36")
@@ -60,7 +60,7 @@ class Detection(unittest.TestCase):
     def test_types_choisis(self):
         a = Anonymiseur()
         r = a.anonymiser("a@b.fr, 10.0.0.1, srv.acme.fr, Acme", ["Acme"], types={"IP"})
-        self.assertEqual(r.texte, "a@b.fr, [IP_1], srv.[NOM_1].fr, [NOM_1]")
+        self.assertEqual(r.texte, "a@b.fr, [IP_privée_1], srv.[NOM_1].fr, [NOM_1]")
 
     def test_texte_sans_donnee(self):
         _, r = anon("Bonjour, version 2.0 du 12/03/2024.")
