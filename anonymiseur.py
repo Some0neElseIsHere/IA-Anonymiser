@@ -8,6 +8,7 @@ import datetime
 import json
 import os
 import platform
+import re
 import sys
 import threading
 import time
@@ -46,12 +47,14 @@ PALETTES = {
         "focus": "#005fb8", "selection": "#b9d6f2", "aide": "#5f6368", "lien": "#005fb8",
         "masque": ("#fff0a6", "#1b1b1b"), "actif": ("#ffc94d", "#1b1b1b"),
         "jeton": ("#d2f0dc", "#0f5132"), "inconnu": ("#ffd6d6", "#8b0000"), "absent": "#8a8a8a",
+        "ligne": "#e8f0fb",
     },
     "sombre": {
         "fond": "#262626", "fond_lecture": "#1f1f1f", "texte": "#e8e8e8", "bordure": "#3d3d3d",
         "focus": "#57c8ff", "selection": "#1f4e79", "aide": "#a3a3a3", "lien": "#57c8ff",
         "masque": ("#5a4a00", "#fff2b3"), "actif": ("#8f6c00", "#ffffff"),
         "jeton": ("#1d4a32", "#c9f2d6"), "inconnu": ("#5c2020", "#ffd6d6"), "absent": "#7a7a7a",
+        "ligne": "#30363e",
     },
 }
 
@@ -161,7 +164,8 @@ class Zone(ttk.Frame):
         # Survol d'un élément surligné : bulle avec la valeur ou le jeton correspondant
         self.app, self.survol, self._plages, self._lignes, self._bulle = app, None, {}, [0], None
         self.texte.bind("<Motion>", self._survoler, add="+")
-        self.texte.bind("<Leave>", lambda _: self._cacher_bulle(), add="+")
+        self.texte.bind("<Leave>", lambda _: self._quitter(), add="+")
+        self._ligne = None
         self.texte.bind("<MouseWheel>", lambda _: self._cacher_bulle(), add="+")
         self.lecture_seule = lecture_seule
         if lecture_seule:
@@ -230,6 +234,8 @@ class Zone(ttk.Frame):
         for nom in ("masque", "actif", "jeton", "inconnu"):
             fond, texte = p[nom]
             self.texte.tag_configure(nom, background=fond, foreground=texte)
+        self.texte.tag_configure("ligne", background=p["ligne"])
+        self.texte.tag_lower("ligne")  # sous les surlignages : les éléments restent visibles
         self.texte.tag_raise("actif")
         self.texte.tag_raise("sel")
         if self.indication:
@@ -273,7 +279,33 @@ class Zone(ttk.Frame):
                     return tag, plages[i][2]
         return None
 
+    def marquer_ligne(self, ligne):
+        """Met en surbrillance une ligne (numéro de ligne du texte), ou aucune avec None."""
+        if ligne == self._ligne:
+            return
+        self._ligne = ligne
+        self.texte.tag_remove("ligne", "1.0", "end")
+        if ligne and int(self.texte.index("end-1c").split(".")[0]) >= ligne:
+            self.texte.tag_add("ligne", f"{ligne}.0", f"{ligne + 1}.0")
+
+    def _ligne_sous(self, y):
+        index = self.texte.index(f"@0,{y}")
+        info = self.texte.dlineinfo(index)
+        if not info or y > info[1] + info[3] or not self.texte.get("1.0", "end-1c"):
+            return None  # sous la dernière ligne, ou zone vide
+        return int(index.split(".")[0])
+
+    def _quitter(self):
+        self._cacher_bulle()
+        self.marquer_ligne(None)
+        if self.jumelle:
+            self.jumelle.marquer_ligne(None)
+
     def _survoler(self, e):
+        ligne = self._ligne_sous(e.y)
+        self.marquer_ligne(ligne)
+        if self.jumelle:
+            self.jumelle.marquer_ligne(ligne)
         element = self._element_sous(e.x, e.y) if self.survol else None
         texte = self.survol(*element) if element else None
         if not texte:
@@ -649,11 +681,65 @@ class Application:
             b = ttk.Button(mini, text=texte, width=3, command=commande)
             b.pack(side="bottom", pady=(8, 0))
             self.info_bulle(b, bulle)
+        ttk.Separator(mini).pack(side="bottom", fill="x", pady=(10, 0))
+        # Conversations en initiales (épinglées d'abord), nom complet au survol
+        self.arbre_mini = ttk.Treeview(mini, show="tree", selectmode="browse")
+        self.arbre_mini.column("#0", width=int(44 * self.echelle), minwidth=int(44 * self.echelle), anchor="center")
+        self.arbre_mini.pack(fill="y", expand=True, pady=(12, 0))
+        self.arbre_mini.bind("<<TreeviewSelect>>", self.choisir_mini)
+        self.arbre_mini.bind("<Button-3>", self.menu_conversation)
+        self.arbre_mini.bind("<Double-1>", lambda e: self.renommer_conversation())
+        self.arbre_mini.bind("<Motion>", self.survol_mini, add="+")
+        self.arbre_mini.bind("<Leave>", lambda e: self.cacher_bulle_mini(), add="+")
+        self._bulle_mini = None
 
         (mini if self.options.colonne_reduite else cadre).pack(fill="both", expand=True)
         if self.options.colonne_reduite:
             self.proportion(parent, lambda l, h: self.colonne_mini.winfo_reqwidth())
         return conteneur
+
+    @staticmethod
+    def initiales(nom):
+        """« Incident AD » -> IA, « Conversation 3 » -> C3, « Paie » -> PA."""
+        mots = [m for m in re.split(r"[\s_\-–.]+", nom) if m]
+        if not mots:
+            return "?"
+        if len(mots) == 1:
+            return mots[0][:2].upper()
+        return (mots[0][0] + mots[1][0]).upper()
+
+    def choisir_mini(self, _=None):
+        selection = self.arbre_mini.selection()
+        if selection and selection[0].startswith("sep-"):
+            self.arbre_mini.selection_set(self.conv.id)  # le séparateur ne se sélectionne pas
+            return
+        if selection and selection[0] != self.conv.id:
+            self.arbre_conv.selection_set(selection[0])
+            self.changer_conversation()
+
+    def survol_mini(self, e):
+        iid = self.arbre_mini.identify_row(e.y)
+        conv = next((c for c in self.conversations if c.id == iid), None)
+        texte = (("📌 " if conv.epingle else "") + conv.nom) if conv else None
+        if self._bulle_mini and (not texte or self._bulle_mini[1] != texte):
+            self.cacher_bulle_mini()
+        if not texte or self._bulle_mini:
+            return
+        fen = tk.Toplevel(self.arbre_mini)
+        fen.wm_overrideredirect(True)
+        fen.wm_attributes("-topmost", True)
+        p = self.palette
+        tk.Label(fen, text=texte, background=p["fond"], foreground=p["texte"], relief="solid", borderwidth=1,
+                 padx=8, pady=3, font=(self.famille, 10)).pack()
+        _, y, _, h = self.arbre_mini.bbox(iid) or (0, e.y, 0, 20)
+        fen.geometry(f"+{self.arbre_mini.winfo_rootx() + self.arbre_mini.winfo_width() + 6}"
+                     f"+{self.arbre_mini.winfo_rooty() + y + h // 2 - 12}")
+        self._bulle_mini = (fen, texte)
+
+    def cacher_bulle_mini(self):
+        if getattr(self, "_bulle_mini", None):
+            self._bulle_mini[0].destroy()
+            self._bulle_mini = None
 
     def basculer_colonne(self):
         """Réduit la colonne des conversations à une barre d'icônes, ou la déplie."""
@@ -888,6 +974,17 @@ class Application:
                                       font=(self.famille, 9, "bold"))
         self.arbre_conv.selection_set(self.conv.id)
         self.arbre_conv.see(self.conv.id)
+        # Version réduite : mêmes conversations, même ordre, sans les rubriques
+        self.arbre_mini.delete(*self.arbre_mini.get_children())
+        epinglees = {c.id for c in self.conversations if c.epingle}
+        for i, (_, iid) in enumerate(self.ordre_affiche):
+            c = next(c for c in self.conversations if c.id == iid)
+            if i and iid not in epinglees and self.ordre_affiche[i - 1][1] in epinglees:
+                self.arbre_mini.insert("", "end", iid=f"sep-{i}", text="―", tags=("rubrique",))
+            self.arbre_mini.insert("", "end", iid=iid, text=self.initiales(c.nom))
+        self.arbre_mini.tag_configure("rubrique", foreground=self.palette["aide"])
+        self.arbre_mini.selection_set(self.conv.id)
+        self.arbre_mini.see(self.conv.id)
 
     def activite(self, evenement=None):
         """L'utilisateur agit sur la conversation : elle remonte en tête de sa rubrique."""
@@ -948,8 +1045,8 @@ class Application:
         self.message(self.t("msg_conversation_choisie", c=self.conv.nom))
 
     def menu_conversation(self, evenement):
-        ligne = self.arbre_conv.identify_row(evenement.y)
-        if ligne.startswith("rubrique-"):
+        ligne = evenement.widget.identify_row(evenement.y)  # colonne complète ou réduite
+        if ligne.startswith(("rubrique-", "sep-")):
             ligne = ""
         if ligne:
             self.arbre_conv.selection_set(ligne)

@@ -207,6 +207,18 @@ def lancer():
         ip = jeton_de("10.20.40.17")
         verifier(bulle_sur(app.source, "10.20.40.17").startswith(ip), "survol côté original : jeton attendu")
         verifier(bulle_sur(app.sortie, ip).startswith("10.20.40.17"), "survol côté IA : valeur attendue")
+        # Ligne survolée : en surbrillance des deux côtés
+        app.source.texte.see("1.0")
+        racine.update()
+        x, y, w, h = app.source.texte.bbox("3.5")
+        app.source._survoler(type("E", (), {"x": x, "y": y + h // 2, "x_root": 50, "y_root": 50})())
+        app.source._cacher_bulle()
+        for zone in (app.source, app.sortie):
+            plage = [str(i) for i in zone.texte.tag_ranges("ligne")]
+            verifier(plage == ["3.0", "4.0"], f"surbrillance de ligne : {plage}")
+        photo("1b-ligne-survolee")
+        app.source._quitter()
+        verifier(not app.sortie.texte.tag_ranges("ligne"), "surbrillance non retirée en quittant la zone")
         app.onglets.select(1)
         racine.update()
         verifier(bulle_sur(app.restauree, "10.20.40.17").startswith(ip), "survol réponse restaurée")
@@ -346,6 +358,18 @@ def lancer():
         racine.update()
         verifier(app.colonne_mini.winfo_ismapped() and not app.colonne_pleine.winfo_ismapped(), "colonne non réduite")
         verifier(app.lateral.sashpos(0) < largeur / 2, f"largeur réduite : {app.lateral.sashpos(0)} / {largeur}")
+        lignes = [i for i in app.arbre_mini.get_children() if not i.startswith("sep-")]
+        verifier(len(lignes) == len(app.conversations), f"conversations dans la colonne réduite : {len(lignes)}")
+        verifier(app.arbre_mini.selection() == (app.conv.id,), "conversation courante non sélectionnée")
+        verifier(app.arbre_mini.item(contexte["premiere"].id, "text") == "IA", "initiales de « Incident AD »")
+        autre = next(i for i in lignes if i != app.conv.id)
+        depart = app.conv.id
+        app.arbre_mini.selection_set(autre)
+        racine.update()
+        verifier(app.conv.id == autre, "choisir une conversation dans la colonne réduite")
+        app.arbre_mini.selection_set(depart)
+        racine.update()
+        verifier(app.conv.id == depart, "retour à la conversation de départ")
         photo("3c-colonne-reduite")
         app.basculer_colonne()
         racine.update()
