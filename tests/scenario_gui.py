@@ -225,13 +225,13 @@ def lancer():
         arbre = app.arbre
         valeurs = lambda col: [arbre.set(i, col) for i in arbre.get_children()]
         depart = list(arbre.get_children())
-        import unicodedata
-        cle = lambda x: "".join(c for c in unicodedata.normalize("NFD", x) if unicodedata.category(c) != "Mn").casefold()
+        cle = lambda x: anonymiseur.cle_tri("valeur", x)
         arbre.event_generate("<Button-1>")  # clic neutre
         app.trier_elements("valeur")
         racine.update()
         v = valeurs("valeur")
         verifier([cle(x) for x in v] == sorted(cle(x) for x in v), f"tri croissant : {v[:6]}")
+        verifier(cle("élodie") < cle("Etienne") < cle("zoé"), "accents et majuscules ignorés")
         verifier(arbre.heading("valeur", "text").endswith("▲"), "flèche ▲ absente")
         photo("1d-tri")
         app.trier_elements("valeur")
