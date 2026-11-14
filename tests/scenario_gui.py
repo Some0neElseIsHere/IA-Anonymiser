@@ -180,6 +180,33 @@ def lancer():
             app.ajouter_terme()
         verifier(app.conv.termes == ["Marc Lefèvre", "Sophie Bernard"], f"termes : {app.conv.termes}")
 
+    def jeton_terme_conversation():
+        # Jeton parlant pour un terme de la conversation : sélection, modification, mise à jour
+        i = app.conv.termes.index("Sophie Bernard")
+        app.termes.arbre.selection_set(f"t{i}")
+        racine.update()
+        verifier(app.termes.champ.get() == "Sophie Bernard", "terme non chargé dans le champ")
+        verifier(app.termes.bouton.cget("text") in ("Mettre à jour", "Update"), "bouton « Mettre à jour » absent")
+        app.termes.champ_jeton.insert(0, "victime")
+        app.ajouter_terme()
+        racine.update()
+        verifier(app.conv.etiquettes == {"Sophie Bernard": "VICTIME"}, f"jeton : {app.conv.etiquettes}")
+        verifier(app.conv.termes == ["Marc Lefèvre", "Sophie Bernard"], f"termes : {app.conv.termes}")
+        valeurs = [app.termes.arbre.item(x, "values") for x in app.termes.arbre.get_children()]
+        verifier(("Sophie Bernard", "[VICTIME]") in valeurs, f"liste : {valeurs}")
+        verifier(app.titre_termes.cget("text").startswith("Masquage personnalisé de cette conversation"),
+                 f"titre : {app.titre_termes.cget('text')}")
+        # Jeton déjà pris par un terme permanent : refusé
+        app.termes.arbre.selection_set(f"t{app.conv.termes.index('Marc Lefèvre')}")
+        racine.update()
+        app.options.etiquettes = {"Acme Industries": "ENTREPRISE"}
+        app.termes.champ_jeton.insert(0, "ENTREPRISE")
+        app.ajouter_terme()
+        verifier("Marc Lefèvre" not in app.conv.etiquettes, "jeton déjà pris accepté")
+        app.options.etiquettes = {}
+        app.termes.vider()
+        photo("0b-jeton-conversation")
+
     def coller_log():
         coller(app.source, LOG)
 
@@ -190,6 +217,7 @@ def lancer():
         abimes = [p for p in PIEGES if p not in sortie]
         verifier(not abimes, f"pièges masqués : {abimes}")
         verifier("[ENTREPRISE]" not in sortie and "[NOM_1]" in sortie, "jeton automatique attendu pour l'entreprise")
+        verifier("[VICTIME]" in sortie and "Sophie Bernard" not in sortie, "jeton de conversation non appliqué")
         contexte["nb_elements"] = len(app.moteur.jetons())
         verifier(contexte["nb_elements"] >= 15, f"trop peu d'éléments : {contexte['nb_elements']}")
         verifier(app.onglets.tab(2, "text").endswith(f"({contexte['nb_elements']})"), "compteur de l'onglet 3")
@@ -503,6 +531,7 @@ def lancer():
         verifier(app.conv.id == etat["premiere_id"], "conversation courante non restaurée")
         verifier(app.conv.epingle, "épinglage perdu")
         verifier(app.conv.nom == "Incident AD", "nom perdu")
+        verifier(app.conv.etiquettes == {"Sophie Bernard": "VICTIME"}, f"jeton de conversation perdu : {app.conv.etiquettes}")
         verifier(len(app.conv.moteur.valide) == etat["nb_elements"], "jetons perdus")
         verifier(app.options.etiquettes == {"Acme Industries": "ENTREPRISE"}, "jeton personnalisé perdu")
         verifier(app.options.langue == "en" and app.theme_applique == "sombre", "langue ou thème perdus")
@@ -530,7 +559,7 @@ def lancer():
         app.quitter()
 
     etapes = {
-        1: [accueil, langue_fr, reglages, masquage_personnalise, renommer, termes_conversation, coller_log, verifier_anonymisation, recherche, tri_elements,
+        1: [accueil, langue_fr, reglages, masquage_personnalise, renommer, termes_conversation, jeton_terme_conversation, coller_log, verifier_anonymisation, recherche, tri_elements,
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,

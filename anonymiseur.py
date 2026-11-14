@@ -128,11 +128,12 @@ class Conversation:
         self.cree = time.time()
         self.epingle = False
         self.envois = []  # textes exacts copiés pour l'IA (déjà anonymisés), pour le rapport de preuve
+        self.etiquettes = {}  # jeton personnalisé des termes de la conversation : {terme: "CLIENT"}
 
     def etat(self):
         return {"nom": self.nom, "termes": self.termes, "source": self.source, "reponse": self.reponse,
                 "moteur": self.moteur.etat(), "id": self.id, "activite": self.activite,
-                "epingle": self.epingle, "cree": self.cree, "envois": self.envois}
+                "epingle": self.epingle, "cree": self.cree, "envois": self.envois, "etiquettes": self.etiquettes}
 
     @classmethod
     def depuis_etat(cls, d, langue):
@@ -147,6 +148,9 @@ class Conversation:
         c.cree = float(d["cree"]) if d.get("cree") else None  # inconnue avant la version 1.6
         c.envois = [{"date": float(x["date"]), "texte": str(x["texte"])}
                     for x in d.get("envois", []) if isinstance(x, dict) and "texte" in x]
+        etiquettes = d.get("etiquettes", {})
+        c.etiquettes = {t: str(j) for t, j in etiquettes.items() if t in c.termes and str(j).strip()} \
+            if isinstance(etiquettes, dict) else {}
         return c
 
 
@@ -378,40 +382,81 @@ class Zone(ttk.Frame):
 
 
 class ListeTermes(ttk.Frame):
-    """Champ de saisie, bouton Ajouter et liste de termes."""
+    """Saisie d'un terme et de son jeton facultatif, et liste Terme / Jeton (cliquer une ligne pour la modifier)."""
 
     def __init__(self, app, parent, ajouter, supprimer, hauteur=6):
         super().__init__(parent)
-        ligne = ttk.Frame(self)
-        ligne.pack(fill="x", pady=(0, 8))
-        self.champ = ttk.Entry(ligne, font=app.police)
-        self.champ.pack(side="left", fill="x", expand=True)
-        self.champ.bind("<Return>", lambda e: ajouter())
-        ttk.Button(ligne, text=app.t("ajouter"), command=ajouter).pack(side="left", padx=(8, 0))
+        self.app = app
+        t = app.t
+        saisie = ttk.Frame(self)
+        saisie.pack(fill="x", pady=(0, 8))
+        ttk.Label(saisie, text=t("opt_terme"), style="Aide.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(saisie, text=t("opt_jeton"), style="Aide.TLabel").grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.champ = ttk.Entry(saisie, font=app.police, width=14)
+        self.champ.grid(row=1, column=0, sticky="ew")
+        self.champ_jeton = ttk.Entry(saisie, font=("Consolas", 11), width=12)
+        self.champ_jeton.grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        self.bouton = ttk.Button(saisie, text=t("ajouter"), command=ajouter)
+        self.bouton.grid(row=1, column=2, padx=(8, 0))
+        saisie.columnconfigure(0, weight=3)
+        saisie.columnconfigure(1, weight=2)
+        for champ in (self.champ, self.champ_jeton):
+            champ.bind("<Return>", lambda e: ajouter())
+            champ.bind("<Escape>", lambda e: self.vider())
         zone = ttk.Frame(self)
         zone.pack(fill="both", expand=True)
-        self.arbre = ttk.Treeview(zone, show="tree", selectmode="extended", height=hauteur)
-        self.arbre.column("#0", width=200)
+        self.arbre = ttk.Treeview(zone, columns=("terme", "jeton"), show="headings", selectmode="extended",
+                                  height=hauteur)
+        e = app.echelle
+        self.arbre.heading("terme", text=t("opt_terme"), anchor="w")
+        self.arbre.heading("jeton", text=t("col_jeton"), anchor="w")
+        self.arbre.column("terme", width=int(150 * e), stretch=True)
+        self.arbre.column("jeton", width=int(120 * e), stretch=False)
         barre = ttk.Scrollbar(zone, command=self.arbre.yview)
         self.arbre.configure(yscrollcommand=barre.set)
         barre.pack(side="right", fill="y", padx=(4, 0))
         self.arbre.pack(side="left", fill="both", expand=True)
         self.arbre.bind("<Delete>", lambda e: supprimer())
-        self.termes = []
+        self.arbre.bind("<<TreeviewSelect>>", lambda e: self.choisir())
+        self.termes, self.etiquettes = [], {}
 
-    def remplir(self, termes):
-        self.termes = list(termes)
+    def remplir(self, termes, etiquettes):
+        self.termes, self.etiquettes = list(termes), dict(etiquettes)
         self.arbre.delete(*self.arbre.get_children())
-        for i, t in enumerate(self.termes):
-            self.arbre.insert("", "end", iid=f"t{i}", text=t)
+        for i, terme in enumerate(self.termes):
+            jeton = self.etiquettes.get(terme)
+            self.arbre.insert("", "end", iid=f"t{i}",
+                              values=(terme, f"[{jeton}]" if jeton else self.app.t("opt_jeton_auto")))
+        self.bouton.configure(text=self.app.t("ajouter"))
 
     def selection(self):
         return [self.termes[int(i[1:])] for i in self.arbre.selection()]
 
-    def saisie(self):
-        texte = normaliser(self.champ.get())
+    def choisir(self):
+        """Une seule ligne sélectionnée : elle passe dans les champs, pour modifier le terme ou son jeton."""
+        choisis = self.selection()
+        if len(choisis) != 1:
+            self.bouton.configure(text=self.app.t("ajouter"))
+            return
         self.champ.delete(0, "end")
-        return texte
+        self.champ.insert(0, choisis[0])
+        self.champ_jeton.delete(0, "end")
+        self.champ_jeton.insert(0, self.etiquettes.get(choisis[0], ""))
+        self.bouton.configure(text=self.app.t("opt_motif_maj"))
+
+    def en_modification(self):
+        choisis = self.selection()
+        return choisis[0] if len(choisis) == 1 else None
+
+    def saisie(self):
+        """(terme, jeton) saisis ; les champs sont vidés par l'appelant si la saisie est acceptée."""
+        return normaliser(self.champ.get()), normaliser_etiquette(self.champ_jeton.get())
+
+    def vider(self):
+        self.champ.delete(0, "end")
+        self.champ_jeton.delete(0, "end")
+        self.arbre.selection_remove(*self.arbre.selection())
+        self.bouton.configure(text=self.app.t("ajouter"))
 
 
 class Application:
@@ -964,7 +1009,8 @@ class Application:
 
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
-        self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in self.options.etiquettes.items() if j}
+        self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in
+                                  {**self.options.etiquettes, **self.conv.etiquettes}.items() if j}
         res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types,
                                      stockage.expressions(self.options.motifs))
         self.resultat = res
@@ -1079,7 +1125,7 @@ class Application:
                 self.source.texte.see(premier[0])
 
     def maj_termes(self):
-        self.termes.remplir(self.conv.termes)
+        self.termes.remplir(self.conv.termes, self.conv.etiquettes)
         self.titre_termes.configure(text=self.t("termes_conv", n=len(self.conv.termes)))
 
     def ordre_conversations(self):
@@ -1322,18 +1368,41 @@ class Application:
         self.actualiser()
 
     def ajouter_terme(self, terme=None, permanent=False):
-        terme = normaliser(self.termes.saisie() if terme is None else terme)
+        jeton, ancien = "", None
+        if terme is None:  # saisie du panneau : terme + jeton facultatif, ou modification d'une ligne
+            terme, jeton = self.termes.saisie()
+            ancien = self.termes.en_modification()
+        terme = normaliser(terme)
         if len(terme) < 2:
             self.message(self.t("msg_terme_court"))
             return
+        if jeton:
+            if etiquette_reservee(jeton):
+                self.message(self.t("opt_jeton_reserve", j=jeton))
+                return
+            pris = {**self.options.etiquettes, **{t: j for t, j in self.conv.etiquettes.items() if t != ancien}}
+            autre = next((t for t, j in pris.items() if j == jeton and t.casefold() != terme.casefold()), None)
+            if autre:
+                self.message(self.t("opt_jeton_pris", j=jeton, t=autre))
+                return
         if permanent:
             self.options.permanents = stockage.trier(self.options.permanents + [terme])
             self.sauver_options()
             self.message(self.t("msg_terme_permanent", t=terme))
         else:
-            self.conv.termes = stockage.trier(self.conv.termes + [terme])
+            termes = [t for t in self.conv.termes if t != ancien]
+            existant = next((t for t in termes if t.casefold() == terme.casefold()), None)
+            if ancien is not None or existant:  # modification : on garde un seul exemplaire du terme
+                termes = [t for t in termes if t.casefold() != terme.casefold()]
+                self.conv.etiquettes.pop(ancien, None)
+                self.conv.etiquettes.pop(existant, None)
+            self.conv.termes = stockage.trier(termes + [terme])
+            if jeton:
+                self.conv.etiquettes[terme] = jeton
+            self.termes.vider()
             self.maj_termes()
-            self.message(self.t("msg_terme_conv", t=terme, c=self.conv.nom))
+            if ancien is None and not existant:
+                self.message(self.t("msg_terme_conv", t=terme, c=self.conv.nom))
         self.moteur.reinclure("NOM", terme)
         self.actualiser()
 
@@ -1343,6 +1412,8 @@ class Application:
             self.message(self.t("msg_selection_termes"))
             return
         self.conv.termes = [t for t in self.conv.termes if t not in retires]
+        self.conv.etiquettes = {t: j for t, j in self.conv.etiquettes.items() if t not in retires}
+        self.termes.vider()
         self.maj_termes()
         self.actualiser()
 
@@ -1352,8 +1423,12 @@ class Application:
             self.message(self.t("msg_selection_termes"))
             return
         self.options.permanents = stockage.trier(self.options.permanents + choisis)
+        for terme in choisis:  # le jeton personnalisé suit le terme
+            if self.conv.etiquettes.get(terme):
+                self.options.etiquettes[terme] = self.conv.etiquettes.pop(terme)
         self.conv.termes = [t for t in self.conv.termes if t not in choisis]
         self.sauver_options()
+        self.termes.vider()
         self.maj_termes()
         self.actualiser()
         self.message(self.t("msg_rendus_permanents", n=len(choisis)))
