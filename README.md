@@ -64,10 +64,13 @@ Pour laisser un élément en clair, faites un clic droit dessus → **Ne pas mas
 Pour garder une trace de ce qui a été envoyé à l'IA, cliquez sur **Exporter le rapport…** dans l'onglet **3. Éléments masqués**, ou faites un clic droit sur la conversation. Le rapport est une page HTML, lisible dans un navigateur et imprimable en PDF. Il contient :
 
 - la date de l'export, le compte Windows qui l'a généré (`DOMAINE\utilisateur`) et la version de l'application ;
-- la conversation et les réglages actifs (types détectés, nombre de termes et de motifs) ;
-- chaque élément masqué : jeton, **valeur d'origine**, type, et s'il a été masqué ou laissé en clair volontairement ;
-- le texte exact de chaque envoi à l'IA, tel qu'il est parti (anonymisé), avec sa date et son empreinte SHA-256 ;
-- **les valeurs parties en clair par erreur** : chaque envoi est vérifié, et une valeur retrouvée en clair est signalée en rouge, avec le numéro de l'envoi (par exemple un terme ajouté après coup, ou un envoi fait avec une ancienne version).
+- une **synthèse** : nombre d'éléments masqués, d'envois, de valeurs parties en clair par erreur ou laissées en clair volontairement, et le nombre d'éléments par type ;
+- la conversation et ses réglages propres (jetons personnalisés, domaines publics lisibles), puis les réglages généraux (types détectés, nombre de termes et de motifs) ;
+- chaque élément masqué : jeton, **valeur d'origine**, type, **premier envoi** où il est parti, **nombre d'envois** qui le contiennent, et son statut. Un jeton remplacé par un jeton personnalisé en cours de route est indiqué (« renommé en [ENTREPRISE] à l'envoi 2 ») et n'est compté qu'une fois. Le tableau se **trie** d'un clic sur un en-tête et se **filtre** avec le champ au-dessus ;
+- le texte exact de chaque envoi à l'IA, tel qu'il est parti (anonymisé), avec sa date et son empreinte SHA-256. Les envois sont **repliés** (Tout déplier / Tout replier), les jetons y sont en vert ;
+- **les valeurs parties en clair par erreur** : chaque envoi est vérifié ; une valeur retrouvée en clair est signalée en rouge dans le tableau **et surlignée en rouge à l'endroit exact du texte**, et l'envoi concerné s'ouvre tout seul.
+
+Pour l'enregistrer en PDF, imprimez-le depuis le navigateur (Ctrl+P → « Enregistrer au format PDF ») : tous les envois sont dépliés et les couleurs conservées.
 
 **C'est un document confidentiel** : il réunit les valeurs d'origine de la conversation (noms, adresses, secrets…). Conservez-le dans un emplacement sécurisé. Les envois sont enregistrés à chaque « Copier pour l'IA » (ou copie depuis le texte à envoyer), à partir de la version 1.6.
 

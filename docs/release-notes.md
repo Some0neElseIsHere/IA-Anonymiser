@@ -10,6 +10,15 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.14.0** : **rapport amélioré** (Exporter le rapport…) :
+  - **synthèse en tête** : nombre d'éléments masqués, d'envois, de valeurs parties en clair par erreur et laissées en clair volontairement (en rouge s'il y a une fuite), puis le nombre d'éléments par type ;
+  - **réglages propres à la conversation** : jetons personnalisés de la conversation (« Sophie Bernard → [VICTIME] ») et domaines publics lisibles ou non ;
+  - **changements de jeton expliqués** : un jeton remplacé par un jeton personnalisé indique « renommé en [ENTREPRISE] à l'envoi 2 », et l'élément n'est compté qu'une fois ;
+  - **pour chaque élément**, le **premier envoi** où il est parti et le **nombre d'envois** qui le contiennent. Les exemples de la consigne (« des jetons comme [NOM_1] ») et les annonces de changement de jeton ne sont pas comptés ;
+  - **textes envoyés repliables** (Tout déplier / Tout replier), avec le nombre de jetons de chacun. Les jetons sont en vert, y compris les jetons personnalisés, et **une valeur partie en clair est surlignée en rouge à l'endroit exact du texte** ; l'envoi concerné s'ouvre tout seul ;
+  - **tableau triable** d'un clic sur un en-tête, et **filtrable** avec un champ de recherche, sans accents ni majuscules ;
+  - **impression et PDF** (Ctrl+P) : tous les envois sont dépliés, le champ de filtre et les boutons disparaissent, les couleurs (fuites, jetons) sont conservées, les lignes ne sont pas coupées entre deux pages.
+
 - **v1.13.0** :
   - **ouvrir un fichier de log** : bouton **Ouvrir…** dans le texte original, raccourci **Ctrl+O**, ou **glisser-déposer** d'un ou plusieurs fichiers depuis l'Explorateur sur la fenêtre. Plusieurs fichiers sont mis bout à bout, chacun précédé de `==> nom <==`. L'encodage est reconnu tout seul : UTF-8 avec ou sans BOM, UTF-16 (fichiers créés par `>` dans PowerShell), Windows-1252. Un fichier binaire (`.evtx`, archive, document Office) est refusé avec la commande `wevtutil` pour l'exporter en texte. Au-delà de 20 Mo, une confirmation est demandée ;
   - **domaines publics connus lisibles, au choix pour chaque conversation** : `microsoft.com`, `windowsupdate.com`, `login.microsoftonline.com`, `google.com`, `github.com`, autorités de certification, éditeurs de sécurité, organismes de normes… peuvent rester en clair pour que l'IA garde le contexte. Réglage par défaut des nouvelles conversations dans Options → Détection, et pour une conversation précise par clic droit sur son nom → **Domaines publics lisibles**. Seuls les domaines dont tous les sous-domaines appartiennent à l'éditeur sont concernés : `acme.sharepoint.com`, `acme.onmicrosoft.com`, `x.blob.core.windows.net`, `acme.okta.com`, vos domaines internes et les adresses e-mail restent toujours masqués. Désactivé par défaut ;
