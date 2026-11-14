@@ -10,6 +10,10 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.12.1** : **jeton des IP privées : `[IP_privée_1]`** (`[IP_private_1]` en anglais), à côté de `[IP_PUB_1]` pour les IP publiques. L'IA lit directement la nature de l'adresse.
+  - **restauration tolérante** : la réponse de l'IA est restaurée même si elle réécrit le jeton sans accent (`[IP_PRIVEE_1]`), en minuscules, avec des espaces (`[IP privée 1]`) ou échappé en Markdown (`[IP\_privée\_1]`). Cette tolérance s'applique désormais à tous les jetons, y compris `[IP_PUB_1]` ;
+  - **conversations en cours** : les anciens jetons `[IP_1]` restent restaurés, et une adresse déjà envoyée garde son jeton.
+
 - **v1.12.0** : **adresses IP locales et publiques distinguées**. L'IA voit d'un coup d'œil ce qui est interne et ce qui vient d'Internet :
   - **IP locale (privée)**, jeton `[IP_1]` : 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 (CGNAT), 169.254.0.0/16 (lien local), multicast, plages de documentation, et en IPv6 fc00::/7, fe80::/10, ff00::/8 ;
   - **IP publique**, jeton `[IP_PUB_1]` : toutes les autres, IPv4 et IPv6 ;
