@@ -193,6 +193,65 @@ MOTIFS = [
         re.IGNORECASE)),
 ]
 
+# Titre de chaque expression, dans l'ordre de MOTIFS, pour la fenêtre « Voir l'expression » des Options
+DESCRIPTIONS = [
+    ("Clé privée (BEGIN … PRIVATE KEY)", "Private key (BEGIN … PRIVATE KEY)"),
+    ("Mot de passe dans une URL (https://user:motdepasse@…)", "Password in a URL (https://user:password@…)"),
+    ("Jeton après Bearer ou Basic", "Token after Bearer or Basic"),
+    ("Balise XML <password>, <token>…", "XML tag <password>, <token>…"),
+    ("Clé = valeur : password=, pwd:, api_key=, token=…", "Key = value: password=, pwd:, api_key=, token=…"),
+    ("Clés connues : AWS, GitHub, GitLab, Slack, OpenAI, Google, JWT", "Known keys: AWS, GitHub, GitLab, Slack, OpenAI, Google, JWT"),
+    ("Mot de passe de net use, après /user:", "net use password, after /user:"),
+    ("Mot de passe de net use, avant /user:", "net use password, before /user:"),
+    ("Utilisateur dans une URL (https://user@…)", "User in a URL (https://user@…)"),
+    ("DN Active Directory / LDAP", "Active Directory / LDAP DN"),
+    ("SID de domaine Windows (S-1-5-21-…)", "Windows domain SID (S-1-5-21-…)"),
+    ("Adresse e-mail", "Email address"),
+    ("IBAN (longueur du pays vérifiée)", "IBAN (country length checked)"),
+    ("N° de sécurité sociale (NIR)", "Social security number (French NIR)"),
+    ("Carte bancaire (16 chiffres)", "Credit card (16 digits)"),
+    ("Téléphone français ou international", "French or international phone number"),
+    ("Compte d'ordinateur (PC-0815$) : le nom de la machine", "Computer account (PC-0815$): the machine name"),
+    ("En-tête syslog : la machine après l'heure", "Syslog header: the machine after the time"),
+    ("ipconfig /all, systeminfo, hostnamectl : Host Name, Domain…", "ipconfig /all, systeminfo, hostnamectl: Host Name, Domain…"),
+    ("Transcript PowerShell : Machine:", "PowerShell transcript: Machine:"),
+    ("Serveur d'un chemin réseau (\\\\fs01\\partage)", "Server in a network path (\\\\fs01\\share)"),
+    ("Clé = machine : hostname=, srcname=, deviceName…", "Key = machine: hostname=, srcname=, deviceName…"),
+    ("Entra ID : appareil dans deviceDetail", "Entra ID: device in deviceDetail"),
+    ("DNS Windows : (5)srv01(4)acme(5)local(0)", "Windows DNS: (5)srv01(4)acme(5)local(0)"),
+    ("DHCP Windows : adresse MAC sans séparateurs", "Windows DHCP: MAC address without separators"),
+    ("Événement Windows : domaine et poste (Account Domain, Workstation Name…)",
+     "Windows event: domain and workstation (Account Domain, Workstation Name…)"),
+    ("Événement Windows : compte (Account Name, Nom du compte…)", "Windows event: account (Account Name…)"),
+    ("DOMAINE\\utilisateur (domaine en majuscules)", "DOMAIN\\user (upper-case domain)"),
+    ("Profil Windows : C:\\Users\\…", "Windows profile: C:\\Users\\…"),
+    ("Profil Linux / macOS : /home/…, /Users/…", "Linux / macOS profile: /home/…, /Users/…"),
+    ("Clé = compte : user=, login=, uid=, acct=, accountId…", "Key = account: user=, login=, uid=, acct=, accountId…"),
+    ("AWS : numéro de compte dans un ARN", "AWS: account number in an ARN"),
+    ("AWS : utilisateur ou rôle dans un ARN", "AWS: user or role in an ARN"),
+    ("Kerberos : utilisateur/ROYAUME (Zeek, klist)", "Kerberos: user/REALM (Zeek, klist)"),
+    ("SQL Server : for user '…'", "SQL Server: for user '…'"),
+    ("SSH : for invalid user … from", "SSH: for invalid user … from"),
+    ("SSH : Accepted / Failed … for … from", "SSH: Accepted / Failed … for … from"),
+    ("PAM : session opened for user …", "PAM: session opened for user …"),
+    ("sudo : l'utilisateur qui lance la commande", "sudo: the user running the command"),
+    ("Cisco ASA : User <…>", "Cisco ASA: User <…>"),
+    ("Squid : colonne utilisateur", "Squid: user column"),
+    ("systemd : Session … of user …", "systemd: Session … of user …"),
+    ("passwd : password changed for …", "passwd: password changed for …"),
+    ("su : by …(uid=…)", "su: by …(uid=…)"),
+    ("useradd / userdel : new user: name=…", "useradd / userdel: new user: name=…"),
+    ("Journal d'accès Apache / nginx : utilisateur authentifié", "Apache / nginx access log: authenticated user"),
+    ("net user … (commande)", "net user … (command)"),
+    ("net user : User name …", "net user: User name …"),
+    ("net use : utilisateur après /user:", "net use: user after /user:"),
+    ("Adresse IPv4", "IPv4 address"),
+    ("Adresse IPv6", "IPv6 address"),
+    ("Adresse MAC (00:1A:2B:… ou 00-1A-2B-…)", "MAC address (00:1A:2B:… or 00-1A-2B-…)"),
+    ("Nom de domaine (srv01.acme.local, intranet.acme.fr)", "Domain name (srv01.acme.local, intranet.acme.fr)"),
+]
+assert len(DESCRIPTIONS) == len(MOTIFS), "une description par expression"
+
 DOMAINES_SYSTEME = {"BUILTIN", "NT", "AUTHORITY", "SERVICE", "APPPOOL", "WORKGROUP", "HKLM", "HKCU", "HKCR",
                     "HKU", "HKCC", "SYSTEM", "LOCAL",
                     # Identifiants de périphériques Windows : PCI\VEN_8086, USB\VID_80EE, SCSI\DISK…
@@ -382,9 +441,10 @@ def _plage(m):
     return debut, fin
 
 
-def expressions(type_):
-    """Expressions appliquées pour un type : [(motif, insensible_a_la_casse)], pour les afficher."""
-    return [(m.pattern, bool(m.flags & re.IGNORECASE)) for t, m in MOTIFS if t == type_]
+def expressions(type_, langue="fr"):
+    """Expressions appliquées pour un type : [(motif, insensible_a_la_casse, titre)], pour les afficher."""
+    i = 0 if langue == "fr" else 1
+    return [(m.pattern, bool(m.flags & re.IGNORECASE), d[i]) for (t, m), d in zip(MOTIFS, DESCRIPTIONS) if t == type_]
 
 
 def normaliser_etiquette(texte):

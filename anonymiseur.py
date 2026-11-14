@@ -1778,16 +1778,30 @@ class Application:
         cadre.pack(fill="both", expand=True)
         ttk.Label(cadre, text=t(f"type_{type_}"), style="Section.TLabel").pack(anchor="w", pady=(0, 8))
         lignes, groupe = [], False
-        for motif, insensible in expressions(type_):
-            lignes.append(f"# {t('expr_casse') if insensible else t('expr_sensible')}\n{motif}")
+        for motif, insensible, titre in expressions(type_, t.langue):
+            lignes.append(f"# {titre} · {t('expr_casse') if insensible else t('expr_sensible')}\n{motif}")
             groupe = groupe or "(?P<v>" in motif
-        zone = tk.Text(cadre, wrap="char", font=("Consolas", 10), height=min(14, 3 + 3 * len(lignes)), width=90,
+        ttk.Label(cadre, text=t("expr_nombre", n=len(lignes)), style="Aide.TLabel").pack(anchor="w", pady=(0, 6))
+        bloc = ttk.Frame(cadre)
+        bloc.pack(fill="both", expand=True)
+        zone = tk.Text(bloc, wrap="char", font=("Consolas", 10), height=min(20, 3 + 3 * len(lignes)), width=90,
                        relief="flat", padx=10, pady=8, highlightthickness=1)
+        barre = ttk.Scrollbar(bloc, command=zone.yview)
+        zone.configure(yscrollcommand=barre.set)
+        barre.pack(side="right", fill="y", padx=(4, 0))
         zone.insert("1.0", "\n\n".join(lignes))
         p = self.palette
+        zone.tag_configure("titre", foreground=p["aide"])
+        debut = "1.0"
+        while True:  # titres (# …) en couleur discrète, pour séparer les expressions
+            debut = zone.search("# ", debut, "end")
+            if not debut:
+                break
+            zone.tag_add("titre", debut, f"{debut} lineend")
+            debut = f"{debut} lineend"
         zone.configure(state="disabled", background=p["fond_lecture"], foreground=p["texte"],
                        highlightbackground=p["bordure"], selectbackground=p["selection"])
-        zone.pack(fill="both", expand=True)
+        zone.pack(side="left", fill="both", expand=True)
         notes = [t(f"expr_note_{type_}")] if f"expr_note_{type_}" in TEXTES_CLES else []
         if groupe:
             notes.append(t("expr_groupe"))
