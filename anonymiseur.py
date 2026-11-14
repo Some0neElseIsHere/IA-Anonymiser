@@ -391,7 +391,7 @@ class ListeTermes(ttk.Frame):
         saisie = ttk.Frame(self)
         saisie.pack(fill="x", pady=(0, 8))
         ttk.Label(saisie, text=t("opt_terme"), style="Aide.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(saisie, text=t("opt_jeton"), style="Aide.TLabel").grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Label(saisie, text=t("col_jeton"), style="Aide.TLabel").grid(row=0, column=1, sticky="w", padx=(8, 0))
         self.champ = ttk.Entry(saisie, font=app.police, width=14)
         self.champ.grid(row=1, column=0, sticky="ew")
         self.champ_jeton = ttk.Entry(saisie, font=("Consolas", 11), width=12)
@@ -948,8 +948,10 @@ class Application:
     def construire_termes(self, parent):
         t = self.t
         cadre = ttk.Frame(parent, padding=(6, 0, 0, 0))
-        self.titre_termes = ttk.Label(cadre, style="Titre.TLabel")
-        self.titre_termes.pack(anchor="w", pady=(0, 8))
+        self.titre_termes = ttk.Label(cadre, style="Titre.TLabel", justify="left")
+        self.titre_termes.pack(anchor="w", fill="x", pady=(0, 8))
+        # Titre long dans une colonne étroite : il passe à la ligne au lieu d'être coupé
+        self.titre_termes.bind("<Configure>", lambda e: self.titre_termes.configure(wraplength=max(e.width, 100)))
 
         self.termes = ListeTermes(self, cadre, self.ajouter_terme, self.supprimer_termes, hauteur=4)
         self.termes.pack(fill="both", expand=True)
