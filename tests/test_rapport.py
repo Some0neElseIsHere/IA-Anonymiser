@@ -79,7 +79,10 @@ class Rapport(unittest.TestCase):
     def test_valeur_echappee(self):
         conv, _ = conversation()
         conv.moteur.valide["[NOM_9]"] = ("NOM", "<script>alert(1)</script>")
-        self.assertNotIn("<script>", generer(conv))
+        page = generer(conv)
+        self.assertNotIn("<script>alert", page)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", page)
+        self.assertEqual(page.count("<script>"), 1)  # seul le script de tri du rapport
 
     def test_contenu(self):
         conv, envoi = conversation()
@@ -102,6 +105,45 @@ class Rapport(unittest.TestCase):
         page = generer(conv)
         self.assertIn("Aucun envoi enregistré", page)
         self.assertIn("inconnue", page)
+
+    def test_synthese(self):
+        conv, _ = conversation()
+        page = html.unescape(generer(conv))
+        self.assertIn("<h2>Synthèse</h2>", page)
+        self.assertIn('<div class="n">13</div><div class="l">éléments masqués</div>', page)
+        self.assertIn("E-mail : 1", page)
+        self.assertIn("<tr><th>Domaines publics connus laissés lisibles</th><td>non</td></tr>", page)
+
+    def test_premier_envoi_et_nombre(self):
+        conv, envoi = conversation()
+        conv.envois.append({"date": time.time() + 60, "texte": "Encore [IBAN_1] et [NOM_1]"})
+        page = html.unescape(generer(conv))
+        ligne = page[page.index("<code>[IBAN_1]</code>"):].split("</tr>")[0]
+        self.assertIn('<td data-tri="1">1</td><td>2</td>', ligne)
+        ligne = page[page.index("<code>[SID_1]</code>"):].split("</tr>")[0]
+        self.assertIn('<td data-tri="1">1</td><td>1</td>', ligne)
+
+    def test_renommage_explique(self):
+        moteur = Anonymiseur("fr")
+        moteur.anonymiser("Acme SAS signe.", ["Acme SAS"], None, [])
+        moteur.valider()
+        envoi1 = "[NOM_1] signe."
+        moteur.etiquettes = {"acme sas": "ENTREPRISE"}
+        moteur.anonymiser("Acme SAS paie.", ["Acme SAS"], None, [])
+        moteur.valider()
+        conv = SimpleNamespace(nom="x", moteur=moteur, termes=[], cree=None, activite=time.time(),
+                               envois=[{"date": 1, "texte": envoi1}, {"date": 2, "texte": "[ENTREPRISE] paie."}])
+        page = html.unescape(generer(conv))
+        self.assertIn("renommé en [ENTREPRISE] à l'envoi 2", page)
+        self.assertIn('<div class="n">1</div><div class="l">éléments masqués</div>', page)
+
+    def test_fuite_surlignee_dans_le_texte(self):
+        conv, _ = conversation()
+        conv.envois.insert(0, {"date": time.time() - 60, "texte": "Login for 'jdupont' from 10.20.30.41"})
+        page = generer(conv)
+        self.assertIn('<span class="fuite-texte">10.20.30.41</span>', page)
+        self.assertIn('<details class="avec-fuite" open>', page)
+        self.assertIn('<span class="jeton">[SECRET_1]</span>', page)
 
 
 if __name__ == "__main__":
