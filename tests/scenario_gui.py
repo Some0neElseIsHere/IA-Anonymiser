@@ -192,8 +192,8 @@ def lancer():
         racine.update()
         verifier(app.conv.etiquettes == {"Sophie Bernard": "VICTIME"}, f"jeton : {app.conv.etiquettes}")
         verifier(app.conv.termes == ["Marc Lefèvre", "Sophie Bernard"], f"termes : {app.conv.termes}")
-        valeurs = [app.termes.arbre.item(x, "values") for x in app.termes.arbre.get_children()]
-        verifier(("Sophie Bernard", "[VICTIME]") in valeurs, f"liste : {valeurs}")
+        valeurs = [tuple(app.termes.arbre.item(x, "values")) for x in app.termes.arbre.get_children()]
+        verifier(("Sophie Bernard", "[VICTIME]", "✕") in valeurs, f"liste : {valeurs}")
         verifier(app.titre_termes.cget("text").startswith("Masquage personnalisé de cette conversation"),
                  f"titre : {app.titre_termes.cget('text')}")
         # Jeton déjà pris par un terme permanent : refusé
