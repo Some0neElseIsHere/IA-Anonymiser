@@ -15,7 +15,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
   - **domaines publics lisibles** : la case est maintenant dans cet onglet, à la place du clic droit sur le nom de la conversation ;
   - **Rétablir les réglages par défaut** remet la conversation sur Options → Détection ; une ligne indique si la conversation a des réglages propres ;
   - le **masquage personnalisé de la conversation** (termes et jetons parlants) passe dans cet onglet ; **« 4. Éléments masqués »** occupe désormais toute la largeur ;
-  - le **rapport** indique les types détectés dans la conversation, et non plus les réglages généraux.
+  - le **rapport** indique les types détectés dans la conversation, et non plus les réglages généraux ;
+  - onglets renommés plus courts (« 1. Anonymiser », « 2. Restaurer la réponse ») pour que les quatre titres tiennent en entier, même fenêtre réduite.
 
 - **v1.14.0** : **rapport amélioré** (Exporter le rapport…) :
   - **synthèse en tête** : nombre d'éléments masqués, d'envois, de valeurs parties en clair par erreur et laissées en clair volontairement (en rouge s'il y a une fuite), puis le nombre d'éléments par type ;

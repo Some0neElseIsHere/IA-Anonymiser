@@ -584,7 +584,7 @@ class Application:
         style.configure("Statut.TLabel", foreground=p["aide"])
         style.configure("Lien.TLabel", foreground=p["lien"], font=(f, 10, "underline"))
         style.configure("LienDiscret.TLabel", foreground=p["lien"], font=(f, 9))
-        style.configure("TNotebook.Tab", padding=(14, 5))
+        style.configure("TNotebook.Tab", padding=(12, 5))
         hauteur = self.police.metrics("linespace") + int(10 * self.echelle)
         style.configure("Treeview", rowheight=hauteur, font=self.police)
         style.configure("Treeview.Heading", font=(f, 10, "bold"))
@@ -680,10 +680,12 @@ class Application:
 
         o3 = ttk.Frame(self.onglets, padding=8)
         self.onglets.add(o3, text=t("onglet_conversation"))
-        self.p3 = p3 = ttk.Panedwindow(o3, orient="horizontal")
-        p3.pack(fill="both", expand=True)
-        p3.add(self.construire_options_conversation(p3), weight=3)
-        p3.add(self.construire_termes(p3), weight=2)
+        # Deux colonnes fixes, sans poignée : la détection à gauche, le masquage personnalisé à droite
+        o3.columnconfigure(0, weight=3, uniform="o3")
+        o3.columnconfigure(1, weight=2, uniform="o3")
+        o3.rowconfigure(0, weight=1)
+        self.construire_options_conversation(o3).grid(row=0, column=0, sticky="nsew", padx=(0, int(12 * self.echelle)))
+        self.construire_termes(o3).grid(row=0, column=1, sticky="nsew")
 
         o4 = ttk.Frame(self.onglets, padding=8)
         self.onglets.add(o4, text=t("onglet_elements", n=0))
@@ -711,7 +713,6 @@ class Application:
             root.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
             for zone in (self.source, self.sortie, self.reponse, self.restauree):
                 zone.texte.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
-        self.proportion(self.p3, lambda l, h: int(l * 0.62))
         self.proportion(self.p1, lambda l, h: l // 2)
         self.proportion(self.p2, lambda l, h: l // 2)
 
