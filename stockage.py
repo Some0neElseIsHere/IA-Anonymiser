@@ -161,7 +161,11 @@ class Options:
             return
         # Les types apparus depuis le dernier enregistrement sont activés
         connus = set(d.get("types_connus", TYPES_V13))
-        self.types = {t for t in d.get("types", TYPES_AUTO) if t in TYPES_AUTO} | (set(TYPES_AUTO) - connus)
+        nouveaux = set(TYPES_AUTO) - connus
+        enregistres = set(d.get("types", TYPES_AUTO))
+        if "IPPUB" in nouveaux and "IP" in connus and "IP" not in enregistres:
+            nouveaux.discard("IPPUB")  # IP publiques : suivent le réglage des IP qu'elles complètent
+        self.types = {t for t in enregistres if t in TYPES_AUTO} | nouveaux
         self.motifs = motifs_valides(d.get("motifs", []))
         self.permanents = trier(d.get("permanents", []))
         noms = {p.casefold(): p for p in self.permanents}

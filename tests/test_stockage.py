@@ -59,6 +59,17 @@ class Stockage(unittest.TestCase):
             self.assertEqual(o2.motifs, [{"titre": "", "motif": "PC-\\d{4}"},
                                          {"titre": "Tickets", "motif": "INC-\\d+"}])
 
+    def test_ip_publiques_suivent_le_reglage_des_ip(self):
+        import json
+        from moteur import TYPES_AUTO
+        anciens = [t for t in TYPES_AUTO if t != "IPPUB"]
+        for ip_active in (True, False):
+            with tempfile.TemporaryDirectory() as d:
+                with open(os.path.join(d, "options.json"), "w", encoding="utf-8") as f:
+                    json.dump({"types": [t for t in anciens if ip_active or t != "IP"], "types_connus": anciens}, f)
+                o = stockage.Options(d)
+                self.assertEqual("IPPUB" in o.types, ip_active)
+
 
 if __name__ == "__main__":
     unittest.main()

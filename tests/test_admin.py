@@ -8,7 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from moteur import Anonymiseur  # noqa: E402
+from moteur import TYPES_AUTO, Anonymiseur  # noqa: E402
 
 
 def anon(texte, termes=(), motifs=(), types=None):
@@ -288,9 +288,9 @@ class JournauxV1104(unittest.TestCase):
     """Trous trouvés avec le log d'incident « rançongiciel » (v1.10.4)."""
 
     def test_ipv6(self):
-        self.assertEqual(anon("depuis 2a01:e0a:1f3:9a40::17 port 50122"), "depuis [IP_1] port 50122")
+        self.assertEqual(anon("depuis 2a01:e0a:1f3:9a40::17 port 50122"), "depuis [IP_PUB_1] port 50122")
         self.assertEqual(anon("fe80::1c2b:3cff:fe4d:5e6f%eth0"), "[IP_1]")
-        self.assertEqual(anon("2001:0db8:85a3:0000:0000:8a2e:0370:7334"), "[IP_1]")
+        self.assertEqual(anon("2001:0db8:85a3:0000:0000:8a2e:0370:7334"), "[IP_PUB_1]")
 
     def test_pas_ipv6(self):
         for texte in ("à 08:39:38", "std::vector", "MAC 00:1A:2B:3C:4D:5E", "dead:beef:", "a::b"):
@@ -398,7 +398,7 @@ class JournauxReels2(unittest.TestCase):
     def test_kerberos(self):
         self.assertEqual(anon("stevie.marie/PANDALAB.COM\tkrbtgt/PANDALAB.COM"),
                          "[COMPTE_1]/[FQDN_1]\tkrbtgt/[FQDN_1]")
-        self.assertEqual(anon("HIER_DIRECT/93.184.216.34"), "HIER_DIRECT/[IP_1]")
+        self.assertEqual(anon("HIER_DIRECT/93.184.216.34"), "HIER_DIRECT/[IP_PUB_1]")
 
     def test_pare_feu_et_proxy(self):
         self.assertEqual(anon('srcip=10.1.2.3 srcname="PC-0815" user="jdupont"'),
@@ -406,11 +406,11 @@ class JournauxReels2(unittest.TestCase):
         self.assertEqual(anon("AAA user authentication Successful : server =  10.1.1.5 : user = jdupont"),
                          "AAA user authentication Successful : server =  [IP_1] : user = [COMPTE_1]")
         self.assertEqual(anon("Group <GP-VPN> User <jdupont> IP <185.1.2.3>"),
-                         "Group <GP-VPN> User <[COMPTE_1]> IP <[IP_1]>")
+                         "Group <GP-VPN> User <[COMPTE_1]> IP <[IP_PUB_1]>")
         self.assertEqual(anon("1711169010.546    458 10.1.2.3 TCP_MISS/200 69715 GET http://x.example.com/ jdupont "
                               "HIER_DIRECT/93.184.216.34 text/html"),
                          "1711169010.546    458 [IP_1] TCP_MISS/200 69715 GET http://[FQDN_1]/ [COMPTE_1] "
-                         "HIER_DIRECT/[IP_2] text/html")
+                         "HIER_DIRECT/[IP_PUB_1] text/html")
 
     def test_entra_dns_dhcp(self):
         self.assertEqual(anon('"deviceDetail":{"deviceId":"","displayName":"PC-0815","operatingSystem":"Windows10"}'),
@@ -418,6 +418,36 @@ class JournauxReels2(unittest.TestCase):
         self.assertEqual(anon("A      (5)rds01(8)vallorie(5)local(0)"), "A      [FQDN_1]")
         self.assertEqual(anon("10,11/10/26,11:38:44,Assign,10.1.2.3,pc-1.acme.local,7C2886E5CF51,,685860"),
                          "10,11/10/26,11:38:44,Assign,[IP_1],[FQDN_1],[MAC_1],,685860")
+
+
+class IpLocalesEtPubliques(unittest.TestCase):
+    def test_classement(self):
+        texte = ("10.1.2.3 172.16.5.4 192.168.0.1 100.64.1.1 169.254.1.1 fe80::1c2b:3cff:fe4d:5e6f fd12:3456::1 "
+                 "185.220.101.47 8.8.8.8 172.32.0.1 2a01:e0a:1f3:9a40::17")
+        self.assertEqual(anon(texte), "[IP_1] [IP_2] [IP_3] [IP_4] [IP_5] [IP_6] [IP_7] "
+                                      "[IP_PUB_1] [IP_PUB_2] [IP_PUB_3] [IP_PUB_4]")
+
+    def test_publiques_laissees_en_clair(self):
+        a = Anonymiseur("fr")
+        types = [t for t in TYPES_AUTO if t != "IPPUB"]
+        self.assertEqual(a.anonymiser("10.0.0.1 -> 185.220.101.47", [], types, []).texte,
+                         "[IP_1] -> 185.220.101.47")
+
+    def test_ip_deja_envoyee_garde_son_jeton(self):
+        a = Anonymiseur("fr")
+        a.charger_etat({"valide": {"[IP_3]": ["IP", "185.220.101.47"]}, "exclus": [], "index": {}})
+        self.assertEqual(a.anonymiser("encore 185.220.101.47 et 8.8.8.8", [], TYPES_AUTO, []).texte,
+                         "encore [IP_3] et [IP_PUB_1]")
+
+    def test_anglais(self):
+        self.assertEqual(Anonymiseur("en").anonymiser("8.8.8.8", [], TYPES_AUTO, []).texte, "[IP_PUB_1]")
+
+    def test_restauration(self):
+        a = Anonymiseur("fr")
+        r = a.anonymiser("de 185.220.101.47 vers 10.0.0.1", [], TYPES_AUTO, [])
+        a.valider()
+        self.assertEqual(a.restaurer("[IP_PUB_1] attaque [IP_1] ; [ip_pub_1]").texte,
+                         "185.220.101.47 attaque 10.0.0.1 ; 185.220.101.47")
 
 
 if __name__ == "__main__":

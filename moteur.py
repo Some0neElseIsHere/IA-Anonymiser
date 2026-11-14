@@ -11,16 +11,18 @@ from dataclasses import dataclass, field
 # Préfixe des jetons selon la langue de l'interface : [NOM_1] en français, [NAME_1] en anglais.
 PREFIXES = {
     "fr": {"EMAIL": "EMAIL", "TEL": "TEL", "IBAN": "IBAN", "CARTE": "CARTE", "SECU": "SECU",
-           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "COMPTE",
+           "IP": "IP", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "COMPTE",
            "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NOM"},
     "en": {"EMAIL": "EMAIL", "TEL": "PHONE", "IBAN": "IBAN", "CARTE": "CARD", "SECU": "SSN",
-           "IP": "IP", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "ACCOUNT",
+           "IP": "IP", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "ACCOUNT",
            "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NAME"},
 }
 TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()}, key=len, reverse=True)
 
 # Types détectés automatiquement (les termes et les motifs personnalisés sont à part).
-TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
+TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "IPPUB", "MAC", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
+# Les deux types d'adresse IP sont trouvés par les mêmes expressions, puis classés selon la plage d'adresses
+TYPES_IP = ("IP", "IPPUB")
 # Types de la version 1.3 : les types ajoutés depuis sont activés pour les utilisateurs existants.
 TYPES_V13 = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "IP", "MAC", "FQDN"]
 
@@ -30,7 +32,8 @@ EXEMPLES = {
     "IBAN": "FR76 3000 6000 0112 3456 7890 189",
     "CARTE": "4111 1111 1111 1111",
     "SECU": "1 85 05 78 006 084 36",
-    "IP": "192.168.1.10",
+    "IP": "192.168.1.10, 10.0.0.5, fe80::1",
+    "IPPUB": "185.220.101.47, 2a01:e0a:1f3::17",
     "MAC": "00:1A:2B:3C:4D:5E",
     "FQDN": "srv-paie01.acme.local, intranet.acme.fr, WORKSTATION5 (événement, syslog, ipconfig, \\\\srv)",
     "SECRET": "password=…, AKIA…, ghp_…, eyJ… (JWT), BEGIN PRIVATE KEY",
@@ -294,6 +297,22 @@ _CONTEXTE = {
 DEBUTS_INVERSES = {"com", "org", "net", "edu", "gov", "io", "fr", "de", "uk", "eu", "ch", "be", "nl", "jp"}
 
 
+_PLAGES_LOCALES = [ipaddress.ip_network(r) for r in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "224.0.0.0/4",
+    "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "198.18.0.0/15", "fc00::/7", "fe80::/10", "ff00::/8")]
+
+
+def type_ip(valeur):
+    """« IP » pour une adresse locale (privée, CGNAT, lien local, multicast, documentation), « IPPUB » sinon."""
+    try:
+        adresse = ipaddress.ip_address(valeur.split("%")[0])
+    except ValueError:
+        return "IP"
+    if adresse.version == 6 and adresse.ipv4_mapped:
+        adresse = adresse.ipv4_mapped
+    return "IP" if any(adresse in plage for plage in _PLAGES_LOCALES if plage.version == adresse.version) else "IPPUB"
+
+
 def _luhn(chiffres):
     total = 0
     for i, c in enumerate(reversed(chiffres)):
@@ -444,6 +463,7 @@ def _plage(m):
 def expressions(type_, langue="fr"):
     """Expressions appliquées pour un type : [(motif, insensible_a_la_casse, titre)], pour les afficher."""
     i = 0 if langue == "fr" else 1
+    type_ = "IP" if type_ in TYPES_IP else type_
     return [(m.pattern, bool(m.flags & re.IGNORECASE), d[i]) for (t, m), d in zip(MOTIFS, DESCRIPTIONS) if t == type_]
 
 
@@ -549,6 +569,9 @@ class Anonymiseur:
     def _jeton(self, type_, valeur):
         cle = (type_, _cle(valeur, type_))
         existant = self.index.get(cle) or self._apercu_index.get(cle)
+        if not existant and type_ in TYPES_IP:  # IP envoyée avant la distinction locale / publique
+            autre = ("IPPUB" if type_ == "IP" else "IP", cle[1])
+            existant = self.index.get(autre) or self._apercu_index.get(autre)
         perso = None
         if type_ == "NOM":  # clés des jetons personnalisés comparées sans accents, comme les termes
             perso = next((j for t, j in self.etiquettes.items() if _cle(t, "NOM") == cle[1] and j), None)
@@ -642,7 +665,7 @@ class Anonymiseur:
             return True
 
         for type_, motif in MOTIFS:
-            if types is not None and type_ not in types:
+            if types is not None and type_ not in types and not (type_ == "IP" and set(TYPES_IP) & set(types)):
                 continue
             for m in motif.finditer(texte):
                 if type_ == "DN":
@@ -651,8 +674,10 @@ class Anonymiseur:
                             trouves.append((d, f, sous_type, valeur))
                     continue
                 d, f = _plage(m)
-                if f > d and _accepte(type_, m, texte[d:f]) and prendre(d, f):
-                    trouves.append((d, f, type_, texte[d:f]))
+                if f > d and _accepte(type_, m, texte[d:f]):
+                    sorte = type_ip(texte[d:f]) if type_ == "IP" else type_
+                    if (types is None or sorte in types) and prendre(d, f):
+                        trouves.append((d, f, sorte, texte[d:f]))
 
         for brut in motifs:
             try:
