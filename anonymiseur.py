@@ -47,14 +47,14 @@ PALETTES = {
         "focus": "#005fb8", "selection": "#b9d6f2", "aide": "#5f6368", "lien": "#005fb8",
         "masque": ("#fff0a6", "#1b1b1b"), "actif": ("#ffc94d", "#1b1b1b"),
         "jeton": ("#d2f0dc", "#0f5132"), "inconnu": ("#ffd6d6", "#8b0000"), "absent": "#8a8a8a",
-        "ligne": "#e8f0fb",
+        "ligne": "#e8f0fb", "recherche": ("#bcdcff", "#0b2e59"), "recherche_active": ("#ff9632", "#1b1b1b"),
     },
     "sombre": {
         "fond": "#262626", "fond_lecture": "#1f1f1f", "texte": "#e8e8e8", "bordure": "#3d3d3d",
         "focus": "#57c8ff", "selection": "#1f4e79", "aide": "#a3a3a3", "lien": "#57c8ff",
         "masque": ("#5a4a00", "#fff2b3"), "actif": ("#8f6c00", "#ffffff"),
         "jeton": ("#1d4a32", "#c9f2d6"), "inconnu": ("#5c2020", "#ffd6d6"), "absent": "#7a7a7a",
-        "ligne": "#30363e",
+        "ligne": "#30363e", "recherche": ("#2d5f9a", "#ffffff"), "recherche_active": ("#e07b1f", "#ffffff"),
     },
 }
 
@@ -147,7 +147,7 @@ class Zone(ttk.Frame):
         self.entete = ttk.Frame(self)
         self.entete.pack(fill="x", pady=(0, 8))
         ttk.Label(self.entete, text=titre, style="Titre.TLabel").pack(side="left")
-        cadre = ttk.Frame(self)
+        cadre = self.cadre = ttk.Frame(self)
         cadre.pack(fill="both", expand=True)
         self.texte = tk.Text(cadre, wrap="word", font=app.police, undo=not lecture_seule, relief="flat",
                              borderwidth=0, padx=14, pady=10, highlightthickness=1, spacing1=3, spacing3=3)
@@ -237,6 +237,10 @@ class Zone(ttk.Frame):
         self.texte.tag_configure("ligne", background=p["ligne"])
         self.texte.tag_lower("ligne")  # sous les surlignages : les éléments restent visibles
         self.texte.tag_raise("actif")
+        for nom in ("recherche", "recherche_active"):  # au-dessus des surlignages
+            fond, texte = p[nom]
+            self.texte.tag_configure(nom, background=fond, foreground=texte)
+            self.texte.tag_raise(nom)
         self.texte.tag_raise("sel")
         if self.indication:
             self.indication.configure(background=self.texte.cget("background"), foreground=p["aide"])
@@ -493,6 +497,8 @@ class Application:
         style.configure("Entete.TLabel", font=(f, 17, "bold"))
         style.configure("Numero.TLabel", font=(f, 16, "bold"), foreground=p["lien"])
         style.configure("Marque.TLabel", font=(f, 14, "bold"))
+        style.configure("Mini.Toolbutton", font=(f, 15, "bold"))
+        style.configure("Mini.Accent.TButton", font=(f, 15, "bold"))
         style.configure("Section.TLabel", font=(f, 12, "bold"))
         style.configure("Aide.TLabel", foreground=p["aide"])
         style.configure("Statut.TLabel", foreground=p["aide"])
@@ -610,10 +616,106 @@ class Application:
                             (self.restauree, lambda: self.resultat_reponse and self.resultat_reponse.spans_sortie)):
             zone.texte.bind("<Button-3>", lambda e, z=zone, s=spans: self.menu_contextuel(e, z, s() or []))
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
+        self.construire_recherche()
+        for sequence in ("<Control-f>", "<Control-F>"):
+            root.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
+            for zone in (self.source, self.sortie, self.reponse, self.restauree):
+                zone.texte.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
         self.proportion(self.lateral, lambda l, h: min(int(250 * self.echelle), l // 3))
         self.proportion(self.p3, lambda l, h: int(l * 0.62))
         self.proportion(self.p1, lambda l, h: l // 2)
         self.proportion(self.p2, lambda l, h: l // 2)
+
+    # --- recherche dans le texte original (Ctrl+F) ------------------------
+    def construire_recherche(self):
+        t, z = self.t, self.source
+        loupe = z.bouton("🔍", self.ouvrir_recherche)
+        loupe.configure(style="Toolbutton", width=3)
+        self.info_bulle(loupe, t("rechercher_bulle"))
+        barre = self.barre_recherche = ttk.Frame(z)
+        self.champ_recherche = ttk.Entry(barre, font=self.police)
+        self.champ_recherche.pack(side="left", fill="x", expand=True)
+        self.compte_recherche = ttk.Label(barre, style="Aide.TLabel", width=14, anchor="center")
+        self.compte_recherche.pack(side="left", padx=(8, 4))
+        for texte, commande, bulle in (("↑", lambda: self.aller_recherche(-1), t("recherche_precedent")),
+                                       ("↓", lambda: self.aller_recherche(1), t("recherche_suivant")),
+                                       ("✕", self.fermer_recherche, t("recherche_fermer"))):
+            b = ttk.Button(barre, text=texte, width=3, style="Toolbutton", command=commande)
+            b.pack(side="left")
+            self.info_bulle(b, bulle)
+        c = self.champ_recherche
+        c.bind("<KeyRelease>", lambda e: e.keysym not in ("Return", "Escape", "Up", "Down", "Shift_L", "Shift_R")
+               and self.chercher())
+        c.bind("<Return>", lambda e: self.aller_recherche(1))
+        c.bind("<Down>", lambda e: self.aller_recherche(1))
+        c.bind("<Shift-Return>", lambda e: (self.aller_recherche(-1), "break")[1])
+        c.bind("<Up>", lambda e: self.aller_recherche(-1))
+        c.bind("<Escape>", lambda e: self.fermer_recherche())
+        self.resultats_recherche, self.position_recherche = [], -1
+
+    def ouvrir_recherche(self):
+        self.onglets.select(0)
+        z = self.source
+        try:
+            selection = z.texte.get("sel.first", "sel.last")
+        except tk.TclError:
+            selection = ""
+        if selection and "\n" not in selection:
+            self.champ_recherche.delete(0, "end")
+            self.champ_recherche.insert(0, selection)
+        if not self.barre_recherche.winfo_ismapped():
+            self.barre_recherche.pack(fill="x", pady=(0, 8), before=z.cadre)
+        self.champ_recherche.focus_set()
+        self.champ_recherche.select_range(0, "end")
+        self.chercher()
+
+    def recherche_ouverte(self):
+        return self.barre_recherche.winfo_ismapped()
+
+    def chercher(self, garder=False):
+        """Surligne toutes les occurrences (sans tenir compte des majuscules) et va à la première."""
+        z, motif = self.source, self.champ_recherche.get()
+        z.texte.tag_remove("recherche_active", "1.0", "end")
+        if not motif:
+            z.surligner([], "recherche")
+            self.resultats_recherche, self.position_recherche = [], -1
+            self.compte_recherche.configure(text="")
+            return
+        contenu = z.lire()
+        self.resultats_recherche = [(m.start(), m.end(), None)
+                                    for m in re.finditer(re.escape(motif), contenu, re.IGNORECASE)]
+        z.surligner(self.resultats_recherche, "recherche", contenu)
+        if not self.resultats_recherche:
+            self.position_recherche = -1
+            self.compte_recherche.configure(text=self.t("recherche_aucun"))
+            return
+        position = self.position_recherche if garder and self.position_recherche >= 0 else 0
+        self.position_recherche = min(position, len(self.resultats_recherche) - 1)
+        self.montrer_recherche(defiler=not garder)
+
+    def aller_recherche(self, sens):
+        if not self.resultats_recherche:
+            return
+        self.position_recherche = (self.position_recherche + sens) % len(self.resultats_recherche)
+        self.montrer_recherche()
+
+    def montrer_recherche(self, defiler=True):
+        z = self.source
+        debut, fin, _ = self.resultats_recherche[self.position_recherche]
+        z.texte.tag_remove("recherche_active", "1.0", "end")
+        a, b = z.texte.index(f"1.0+{debut}c"), z.texte.index(f"1.0+{fin}c")
+        z.texte.tag_add("recherche_active", a, b)
+        if defiler:
+            z.prendre_main()  # la zone de droite suit
+            z.texte.see(a)
+        self.compte_recherche.configure(text=f"{self.position_recherche + 1} / {len(self.resultats_recherche)}")
+
+    def fermer_recherche(self):
+        self.barre_recherche.pack_forget()
+        self.source.surligner([], "recherche")
+        self.source.texte.tag_remove("recherche_active", "1.0", "end")
+        self.resultats_recherche, self.position_recherche = [], -1
+        self.source.texte.focus_set()
 
     def proportion(self, pan, position):
         """Place le séparateur d'un panneau dès qu'il a sa vraie taille, une seule fois.
@@ -670,8 +772,9 @@ class Application:
         mini = self.colonne_mini = ttk.Frame(conteneur, padding=(0, 0, 10, 0))
         if self.icone_petite:
             ttk.Label(mini, image=self.icone_petite).pack(pady=(0, 14))
-        boutons = [("»", self.basculer_colonne, t("deplier_colonne"), "Toolbutton", (0, 8)),
-                   ("+", self.nouvelle_conversation, t("nouvelle_conversation").lstrip("+ "), "Accent.TButton", (0, 0))]
+        boutons = [("»", self.basculer_colonne, t("deplier_colonne"), "Mini.Toolbutton", (0, 8)),
+                   ("+", self.nouvelle_conversation, t("nouvelle_conversation").lstrip("+ "), "Mini.Accent.TButton",
+                    (0, 0))]
         for texte, commande, bulle, style, marge in boutons:
             b = ttk.Button(mini, text=texte, width=3, style=style, command=commande)
             b.pack(pady=marge)
@@ -683,8 +786,8 @@ class Application:
             self.info_bulle(b, bulle)
         ttk.Separator(mini).pack(side="bottom", fill="x", pady=(10, 0))
         # Conversations en initiales (épinglées d'abord), nom complet au survol
-        self.arbre_mini = ttk.Treeview(mini, show="tree", selectmode="browse")
-        self.arbre_mini.column("#0", width=int(44 * self.echelle), minwidth=int(44 * self.echelle), anchor="center")
+        self.arbre_mini = ttk.Treeview(mini, show="", selectmode="browse", columns=("i",))
+        self.arbre_mini.column("i", width=int(48 * self.echelle), minwidth=int(48 * self.echelle), anchor="center")
         self.arbre_mini.pack(fill="y", expand=True, pady=(12, 0))
         self.arbre_mini.bind("<<TreeviewSelect>>", self.choisir_mini)
         self.arbre_mini.bind("<Button-3>", self.menu_conversation)
@@ -867,6 +970,8 @@ class Application:
         self.source.surligner(res.spans_source, "masque")
         self.sortie.ecrire(res.texte, res.spans_sortie, "jeton")
         self.remplir_elements(res)
+        if self.recherche_ouverte():
+            self.chercher(garder=True)
         if self.source.lire().strip():
             self.message(self.t("msg_compte", r=sum(res.compte.values()), e=len(res.compte)))
 
@@ -980,8 +1085,8 @@ class Application:
         for i, (_, iid) in enumerate(self.ordre_affiche):
             c = next(c for c in self.conversations if c.id == iid)
             if i and iid not in epinglees and self.ordre_affiche[i - 1][1] in epinglees:
-                self.arbre_mini.insert("", "end", iid=f"sep-{i}", text="―", tags=("rubrique",))
-            self.arbre_mini.insert("", "end", iid=iid, text=self.initiales(c.nom))
+                self.arbre_mini.insert("", "end", iid=f"sep-{i}", values=("―",), tags=("rubrique",))
+            self.arbre_mini.insert("", "end", iid=iid, values=(self.initiales(c.nom),))
         self.arbre_mini.tag_configure("rubrique", foreground=self.palette["aide"])
         self.arbre_mini.selection_set(self.conv.id)
         self.arbre_mini.see(self.conv.id)

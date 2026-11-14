@@ -152,6 +152,30 @@ def lancer():
         verifier(app.onglets.tab(2, "text").endswith(f"({contexte['nb_elements']})"), "compteur de l'onglet 3")
         photo("1-anonymise")
 
+    def recherche():
+        app.source.texte.event_generate("<Control-f>")
+        racine.update()
+        verifier(app.recherche_ouverte(), "Ctrl+F n'ouvre pas la recherche")
+        app.champ_recherche.insert(0, "ACME")
+        app.chercher()
+        attendu = len(re.findall("acme", app.source.lire(), re.IGNORECASE))
+        verifier(len(app.resultats_recherche) == attendu and attendu > 5, f"résultats : {len(app.resultats_recherche)}/{attendu}")
+        verifier(app.compte_recherche.cget("text") == f"1 / {attendu}", f"compteur : {app.compte_recherche.cget('text')}")
+        app.champ_recherche.event_generate("<Return>")
+        app.champ_recherche.event_generate("<Return>")
+        racine.update()
+        verifier(app.position_recherche == 2, "Entrée ne passe pas au suivant")
+        app.aller_recherche(-3)
+        verifier(app.position_recherche == attendu - 1, "précédent depuis le premier : retour au dernier")
+        photo("1c-recherche")
+        app.champ_recherche.delete(0, "end")
+        app.champ_recherche.insert(0, "introuvable-xyz")
+        app.chercher()
+        verifier(app.compte_recherche.cget("text") in ("Aucun résultat", "No results"), "message sans résultat")
+        app.champ_recherche.event_generate("<Escape>")
+        racine.update()
+        verifier(not app.recherche_ouverte() and not app.source.texte.tag_ranges("recherche"), "Échap ne ferme pas")
+
     def copier_pour_ia():
         app.bouton_copier_ia.invoke()
         envoye = presse_papiers()
@@ -361,7 +385,7 @@ def lancer():
         lignes = [i for i in app.arbre_mini.get_children() if not i.startswith("sep-")]
         verifier(len(lignes) == len(app.conversations), f"conversations dans la colonne réduite : {len(lignes)}")
         verifier(app.arbre_mini.selection() == (app.conv.id,), "conversation courante non sélectionnée")
-        verifier(app.arbre_mini.item(contexte["premiere"].id, "text") == "IA", "initiales de « Incident AD »")
+        verifier(app.arbre_mini.item(contexte["premiere"].id, "values")[0] == "IA", "initiales de « Incident AD »")
         autre = next(i for i in lignes if i != app.conv.id)
         depart = app.conv.id
         app.arbre_mini.selection_set(autre)
@@ -422,7 +446,7 @@ def lancer():
         app.quitter()
 
     etapes = {
-        1: [accueil, langue_fr, reglages, renommer, termes_conversation, coller_log, verifier_anonymisation,
+        1: [accueil, langue_fr, reglages, renommer, termes_conversation, coller_log, verifier_anonymisation, recherche,
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
