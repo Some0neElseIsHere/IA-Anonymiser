@@ -542,6 +542,15 @@ def lancer():
         app.charger_fichiers([evtx])
         verifier(len(APPELS) > avant and APPELS[-1][0] == "showwarning", "fichier .evtx accepté")
         photo("3d-fichiers")
+        # Domaines publics connus : bascule propre à cette conversation
+        app.source.ecrire("Le poste contacte login.microsoftonline.com et intranet.acme.local")
+        app.actualiser()
+        verifier(not app.conv.domaines_publics and "microsoftonline" not in app.sortie.lire(), "masqué par défaut")
+        app.basculer_domaines_publics()
+        racine.update()
+        verifier("login.microsoftonline.com" in app.sortie.lire() and "intranet.acme.local" not in app.sortie.lire(),
+                 f"domaines publics : {app.sortie.lire()!r}")
+        contexte["conv_domaines"] = app.conv.id
 
     def colonne_reduite():
         racine.update()
@@ -573,7 +582,7 @@ def lancer():
     def quitter_phase1():
         app.arbre_conv.selection_set(contexte["premiere"].id)
         app.changer_conversation()
-        etat = {"premiere_id": contexte["premiere"].id, "reponse": contexte["reponse"],
+        etat = {"premiere_id": contexte["premiere"].id, "conv_domaines": contexte.get("conv_domaines"), "reponse": contexte["reponse"],
                 "nb_conversations": len(app.conversations), "nb_elements": len(contexte["premiere"].moteur.valide)}
         with open(os.path.join(SORTIE, "etat-phase1.json"), "w", encoding="utf-8") as f:
             json.dump(etat, f)
@@ -596,6 +605,8 @@ def lancer():
         verifier(len(app.options.motifs) == 2 and app.options.motifs[0]["titre"] == "Postes", "motifs perdus")
         verifier(len(app.conv.envois) == 3, f"envois perdus : {len(app.conv.envois)}")
         verifier(app.options.tri_elements == ["type", False], f"tri non conservé : {app.options.tri_elements}")
+        autre = next(c for c in app.conversations if c.id == etat["conv_domaines"])
+        verifier(autre.domaines_publics and not app.conv.domaines_publics, "choix des domaines publics non conservé")
         racine.update()
         verifier(app.options.colonne_reduite and app.colonne_mini.winfo_ismapped(), "colonne réduite non conservée")
         verifier(app.colonne.winfo_width() < 120 * app.echelle, f"colonne réduite trop large : {app.colonne.winfo_width()}")

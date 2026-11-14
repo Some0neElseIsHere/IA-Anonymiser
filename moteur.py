@@ -358,6 +358,46 @@ def type_ip(valeur):
     return "IP" if any(adresse in plage for plage in _PLAGES_LOCALES if plage.version == adresse.version) else "IPPUB"
 
 
+# Domaines publics connus, laissés lisibles si la conversation le demande : l'IA garde le contexte
+# (« la machine contacte login.microsoftonline.com »). Seuls les domaines dont TOUS les sous-domaines
+# appartiennent à l'éditeur sont listés ; ceux qui portent le nom d'un client restent masqués
+# (acme.sharepoint.com, acme.onmicrosoft.com, x.blob.core.windows.net, acme.okta.com, acme.github.io…).
+DOMAINES_PUBLICS = {
+    # Microsoft
+    "microsoft.com", "windows.com", "windowsupdate.com", "msftconnecttest.com", "msftncsi.com", "live.com",
+    "office.com", "office365.com", "microsoftonline.com", "microsoftonline-p.com", "bing.com", "msn.com",
+    "skype.com", "azure.com", "msauth.net", "msftauth.net", "aka.ms",
+    # Google, Apple, Amazon, Mozilla
+    "google.com", "googleapis.com", "gstatic.com", "youtube.com", "gmail.com", "android.com", "chromium.org",
+    "apple.com", "icloud.com", "mzstatic.com", "amazon.com", "mozilla.org", "mozilla.net", "firefox.com",
+    # Développement et systèmes
+    "github.com", "githubusercontent.com", "gitlab.com", "ubuntu.com", "canonical.com", "debian.org",
+    "redhat.com", "centos.org", "fedoraproject.org", "kernel.org", "python.org", "pypi.org", "npmjs.org",
+    "npmjs.com", "docker.com", "docker.io", "oracle.com", "java.com", "vmware.com", "adobe.com",
+    # Sécurité, certificats, réseau
+    "cloudflare.com", "akamai.com", "digicert.com", "letsencrypt.org", "sectigo.com", "globalsign.com",
+    "verisign.com", "entrust.net", "usertrust.com", "cisco.com", "fortinet.com", "paloaltonetworks.com",
+    "sophos.com", "kaspersky.com", "eset.com", "trendmicro.com", "crowdstrike.com", "virustotal.com",
+    "abuse.ch", "shodan.io", "mitre.org", "nist.gov", "cisa.gov", "ssi.gouv.fr", "cert.fr",
+    # Normes et références
+    "w3.org", "xmlsoap.org", "openxmlformats.org", "schema.org", "ietf.org", "iana.org", "wikipedia.org",
+    # Réseaux sociaux
+    "linkedin.com", "facebook.com", "twitter.com", "x.com", "instagram.com", "whatsapp.com",
+}
+# Lisibles seulement tels quels : leurs sous-domaines portent souvent le nom d'un client
+DOMAINES_PUBLICS_EXACTS = {"example.com", "example.org", "example.net", "okta.com", "slack.com", "zoom.us",
+                           "salesforce.com", "atlassian.com", "atlassian.net", "s3.amazonaws.com",
+                           "sentinelone.net", "servicenow.com", "zendesk.com"}
+
+
+def domaine_public(valeur):
+    """Vrai pour un domaine public connu (ou l'un de ses sous-domaines, si tous appartiennent à l'éditeur)."""
+    v = valeur.lower().rstrip(".")
+    if v in DOMAINES_PUBLICS_EXACTS:
+        return True
+    return any(v == d or v.endswith("." + d) for d in DOMAINES_PUBLICS)
+
+
 def _luhn(chiffres):
     total = 0
     for i, c in enumerate(reversed(chiffres)):
@@ -609,6 +649,7 @@ class Anonymiseur:
         self._apercu_index = {}
         self._compteurs = Counter()  # type -> nombre de jetons déjà créés (validés + aperçu)
         self.etiquettes = {}  # clé d'un terme permanent -> jeton personnalisé (sans crochets)
+        self.domaines_publics = False  # laisser lisibles les domaines publics connus (choix de la conversation)
         self.a_annoncer = {}  # ancien jeton déjà envoyé -> nouveau jeton, à signaler à l'IA à la copie
         self._renommages = {}
 
@@ -722,6 +763,9 @@ class Anonymiseur:
                     continue
                 d, f = _plage(m)
                 if f > d and _accepte(type_, m, texte[d:f]):
+                    if (self.domaines_publics and type_ == "FQDN" and "tld" in m.re.groupindex
+                            and domaine_public(texte[d:f])):
+                        continue
                     sorte = type_ip(texte[d:f]) if type_ == "IP" else type_
                     if (types is None or sorte in types) and prendre(d, f):
                         trouves.append((d, f, sorte, texte[d:f]))

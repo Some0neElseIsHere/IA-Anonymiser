@@ -131,11 +131,13 @@ class Conversation:
         self.epingle = False
         self.envois = []  # textes exacts copiés pour l'IA (déjà anonymisés), pour le rapport de preuve
         self.etiquettes = {}  # jeton personnalisé des termes de la conversation : {terme: "CLIENT"}
+        self.domaines_publics = False  # domaines publics connus laissés lisibles (microsoft.com…)
 
     def etat(self):
         return {"nom": self.nom, "termes": self.termes, "source": self.source, "reponse": self.reponse,
                 "moteur": self.moteur.etat(), "id": self.id, "activite": self.activite,
-                "epingle": self.epingle, "cree": self.cree, "envois": self.envois, "etiquettes": self.etiquettes}
+                "epingle": self.epingle, "cree": self.cree, "envois": self.envois, "etiquettes": self.etiquettes,
+                "domaines_publics": self.domaines_publics}
 
     @classmethod
     def depuis_etat(cls, d, langue):
@@ -153,6 +155,7 @@ class Conversation:
         etiquettes = d.get("etiquettes", {})
         c.etiquettes = {t: str(j) for t, j in etiquettes.items() if t in c.termes and str(j).strip()} \
             if isinstance(etiquettes, dict) else {}
+        c.domaines_publics = bool(d.get("domaines_publics", False))
         return c
 
 
@@ -1031,6 +1034,7 @@ class Application:
         self.attentes.pop(self.actualiser, None)
         self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in
                                   {**self.options.etiquettes, **self.conv.etiquettes}.items() if j}
+        self.moteur.domaines_publics = self.conv.domaines_publics
         res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.options.types,
                                      stockage.expressions(self.options.motifs))
         self.resultat = res
@@ -1222,7 +1226,9 @@ class Application:
         self.sauver_zones()
         self.numero += 1
         # La plus récente en haut de la liste
-        self.conversations.insert(0, Conversation(self.t("nom_conversation", n=self.numero), self.t.langue))
+        nouvelle = Conversation(self.t("nom_conversation", n=self.numero), self.t.langue)
+        nouvelle.domaines_publics = self.options.domaines_publics  # réglage par défaut des Options
+        self.conversations.insert(0, nouvelle)
         self.courante = 0
         self.charger_zones()
         self.onglets.select(0)
@@ -1258,10 +1264,19 @@ class Application:
                              command=self.basculer_epingle)
             menu.add_command(label=t("renommer"), command=self.renommer_conversation)
             menu.add_command(label=t("rp_exporter"), command=self.exporter_rapport)
+            self.var_domaines = tk.BooleanVar(value=self.conv.domaines_publics)
+            menu.add_checkbutton(label=t("domaines_publics_conv"), variable=self.var_domaines,
+                                 command=self.basculer_domaines_publics)
             menu.add_command(label=t("fermer"), command=self.fermer_conversation)
             menu.add_separator()
         menu.add_command(label=t("nouvelle_conversation").lstrip("+ "), command=self.nouvelle_conversation)
         menu.tk_popup(evenement.x_root, evenement.y_root)
+
+    def basculer_domaines_publics(self):
+        """Pour cette conversation : laisser lisibles, ou masquer, les domaines publics connus."""
+        self.conv.domaines_publics = not self.conv.domaines_publics
+        self.actualiser()
+        self.sauvegarder()
 
     def renommer_conversation(self):
         nom = simpledialog.askstring(self.t("renommer_titre"), self.t("renommer_question"),
@@ -1699,6 +1714,19 @@ class Application:
             self.info_bulle(lien, t("voir_expression"))
             ttk.Label(case, text=t("opt_exemple", e=EXEMPLES[type_]), style="Aide.TLabel").pack(
                 anchor="w", padx=(int(28 * e), 0))
+        # Domaines publics connus : réglage par défaut des nouvelles conversations
+        ttk.Separator(o).pack(fill="x", pady=(12, 10))
+        ligne = ttk.Frame(o)
+        ligne.pack(anchor="w")
+        var_domaines = tk.BooleanVar(value=self.options.domaines_publics)
+        ttk.Checkbutton(ligne, text=t("opt_domaines_publics"), variable=var_domaines).pack(side="left")
+        icone = self.icone_info()
+        aide = (ttk.Label(ligne, image=icone, cursor="question_arrow") if icone
+                else ttk.Label(ligne, text="ⓘ", style="LienDiscret.TLabel"))
+        aide.pack(side="left", padx=(8, 0))
+        self.info_bulle(aide, t("opt_domaines_publics_bulle"), largeur=int(460 * e))
+        ttk.Label(o, text=t("opt_domaines_publics_aide"), style="Aide.TLabel", wraplength=largeur_texte,
+                  justify="left").pack(anchor="w", padx=(int(28 * e), 0))
 
         # Masquage personnalisé : termes exacts (jeton parlant facultatif) et expressions régulières (titre)
         o = ttk.Frame(onglets, padding=18)
@@ -1889,6 +1917,7 @@ class Application:
         def enregistrer():
             ancienne_langue = self.t.langue
             self.options.types = {k for k, v in cases.items() if v.get()}
+            self.options.domaines_publics = var_domaines.get()
             termes = [x for x in elements if not x["regex"]]
             self.options.permanents = stockage.trier([x["texte"] for x in termes])
             self.options.etiquettes = {x["texte"]: x["nom"] for x in termes if x["nom"]}

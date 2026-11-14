@@ -489,5 +489,27 @@ class Cef(unittest.TestCase):
             self.assertEqual(anon(texte), texte, texte)
 
 
+class DomainesPublics(unittest.TestCase):
+    TEXTE = ("contacte login.microsoftonline.com, ctldl.windowsupdate.com, acme.sharepoint.com, "
+             "acme.onmicrosoft.com, x.blob.core.windows.net, acme.okta.com, okta.com, srv01.acme.local, j.doe@gmail.com")
+
+    def test_masques_par_defaut(self):
+        self.assertNotIn("microsoftonline", anon(self.TEXTE))
+
+    def test_lisibles_si_demande(self):
+        a = Anonymiseur("fr")
+        a.domaines_publics = True
+        self.assertEqual(a.anonymiser(self.TEXTE, [], TYPES_AUTO, []).texte,
+                         "contacte login.microsoftonline.com, ctldl.windowsupdate.com, [FQDN_1], [FQDN_2], "
+                         "[FQDN_3], [FQDN_4], okta.com, [FQDN_5], [EMAIL_1]")
+
+    def test_pas_de_confusion_de_suffixe(self):
+        from moteur import domaine_public
+        self.assertTrue(domaine_public("download.microsoft.com"))
+        self.assertFalse(domaine_public("evilmicrosoft.com"))
+        self.assertFalse(domaine_public("microsoft.com.attaquant.ru"))
+        self.assertFalse(domaine_public("acme.github.io"))
+
+
 if __name__ == "__main__":
     unittest.main()
