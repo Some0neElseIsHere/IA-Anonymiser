@@ -144,8 +144,9 @@ MOTIFS = [
         r" ?\d{3} ?\d{3}(?: ?\d{2})?(?![\d\w.])")),
     ("CARTE", re.compile(r"(?<![\w-])(?:\d{4}[ -]?){3}\d{4}(?![\w-])")),
     ("TEL", re.compile(
-        r"(?<![\w+.:/-])(?:(?:\+|00)33 ?(?:\(0\) ?)?|0)[1-9](?P<sep>[ .-]?)\d{2}(?:(?P=sep)\d{2}){3}(?![\w.:-])"  # France
-        r"|(?<![\w+])\+[1-9]\d{0,2}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?![\w.])"   # international
+        r"(?<![\w+:/-])(?<!\d\.)(?:(?:\+|00)33 ?(?:\(0\) ?)?|0)[1-9](?P<sep>[ .-]?)\d{2}(?:(?P=sep)\d{2}){3}"
+        r"(?![\w:-]|\.\d)"  # France : un point final de phrase est permis, pas « 15.42.50 »
+        r"|(?<![\w+])\+[1-9]\d{0,2}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?!\w|\.\d)"   # international
     )),
     # Compte d'ordinateur (WORKSTATION5$, svc_ADFS$) : le nom de la machine est masqué, le « $ » reste
     ("FQDN", re.compile(r"(?<![\w$\\%-])(?P<v>(?=[\w-]*[A-Za-z])[A-Za-z0-9][\w-]{1,19})\$(?![\w$])")),

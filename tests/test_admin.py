@@ -386,6 +386,13 @@ class JournauxReels2(unittest.TestCase):
                       "PCI\\VEN_8086&DEV_1237", "USB\\VID_80EE&PID_0021"):
             self.assertEqual(anon(texte), texte, texte)
 
+    def test_telephone_en_fin_de_phrase(self):
+        # Régression v1.11.1 à v1.12.4, vue sur les captures d'écran : le point final bloquait la détection
+        self.assertEqual(anon("Ses coordonnées : 06 12 34 56 78."), "Ses coordonnées : [TEL_1].")
+        self.assertEqual(anon("Appelez le +33 6 98 76 54 32."), "Appelez le [TEL_1].")
+        self.assertEqual(anon("Tél. 01 47 64 68 55, ou 0612345678."), "Tél. [TEL_1], ou [TEL_2].")
+        self.assertEqual(anon("2005-06-03-15.42.50.675872"), "2005-06-03-15.42.50.675872")
+
     def test_numeros_qui_restent_masques(self):
         self.assertEqual(anon("06 12 34 56 78 / 06.12.34.56.78 / 0612345678"), "[TEL_1] / [TEL_1] / [TEL_1]")
         self.assertEqual(anon("carte 4970 1012 3456 7890"), "carte [CARTE_1]")
