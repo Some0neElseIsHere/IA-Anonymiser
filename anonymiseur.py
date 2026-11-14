@@ -20,6 +20,8 @@ import webbrowser
 from tkinter import font as tkfont
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
+import fichiers
+import glisser
 import rapport
 import stockage
 from moteur import (EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, etiquette_reservee, expressions,
@@ -499,6 +501,8 @@ class Application:
         else:
             self.charger_zones()
         root.protocol("WM_DELETE_WINDOW", self.quitter)
+        # Fichiers déposés depuis l'Explorateur : chargés dans le texte original
+        root.after(200, lambda: glisser.activer(root, self.deposer))
         root.after(SAUVEGARDE_MS, self.sauvegarde_periodique)
         root.after(THEME_MS, self.suivre_theme_windows)
         if self.options.premier_lancement:
@@ -641,6 +645,8 @@ class Application:
         self.source.indiquer(t("ind_source"), self.police)
         self.source.bouton(t("effacer"), lambda: self.vider(self.source))
         self.source.bouton(t("coller"), lambda: self.coller(self.source))
+        ouvrir = self.source.bouton(t("ouvrir"), self.ouvrir_fichier)
+        self.info_bulle(ouvrir, t("ouvrir_bulle"))
         self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(6, 0, 0, 0))
         self.bouton_copier_ia = self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
         p1.add(self.source, weight=1)
@@ -688,6 +694,8 @@ class Application:
             zone.texte.bind("<Button-3>", lambda e, z=zone, s=spans: self.menu_contextuel(e, z, s() or []))
         self.source.texte.bind("<Control-m>", lambda e: (self.masquer_selection(), "break")[1])
         self.construire_recherche()
+        for sequence in ("<Control-o>", "<Control-O>"):
+            root.bind(sequence, lambda e: (self.ouvrir_fichier(), "break")[1])
         for sequence in ("<Control-f>", "<Control-F>"):
             root.bind(sequence, lambda e: (self.ouvrir_recherche(), "break")[1])
             for zone in (self.source, self.sortie, self.reponse, self.restauree):
@@ -1541,6 +1549,56 @@ class Application:
         zone.ecrire(texte)
         zone.texte.edit_modified(True)
         self.activite()
+
+    # --- ouverture d'un fichier (bouton, Ctrl+O, glisser-déposer) -----------
+    def ouvrir_fichier(self):
+        t = self.t
+        chemin = filedialog.askopenfilename(
+            parent=self.root, title=t("ouvrir_titre"),
+            filetypes=[(t("fichiers_texte"), "*.log *.txt *.csv *.json *.xml *.out *.conf *.cfg *.ini *.md"),
+                       (t("tous_fichiers"), "*.*")])
+        if chemin:
+            self.charger_fichiers([chemin])
+
+    def deposer(self, chemins):
+        self.root.deiconify()
+        self.root.lift()
+        self.charger_fichiers(chemins)
+
+    def charger_fichiers(self, chemins):
+        """Charge un ou plusieurs fichiers dans le texte original (plusieurs : un en-tête par fichier)."""
+        t = self.t
+        taille = sum(os.path.getsize(c) for c in chemins if os.path.isfile(c))
+        if taille > fichiers.GROS_FICHIER and not messagebox.askyesno(
+                t("ouvrir_titre"), t("fichier_gros", t=taille // (1024 * 1024), s=max(5, taille // 2_000_000)),
+                parent=self.root):
+            return
+        morceaux = []
+        for chemin in chemins:
+            if not os.path.isfile(chemin):
+                continue
+            try:
+                texte, _ = fichiers.lire(chemin)
+            except fichiers.FichierIllisible:
+                messagebox.showwarning(t("ouvrir_titre"), t("fichier_binaire", f=os.path.basename(chemin)),
+                                       parent=self.root)
+                continue
+            except OSError as e:
+                messagebox.showwarning(t("ouvrir_titre"), t("fichier_illisible", f=os.path.basename(chemin), e=e),
+                                       parent=self.root)
+                continue
+            morceaux.append((chemin, texte))
+        if not morceaux:
+            return
+        if self.source.lire().strip() and not messagebox.askyesno(t("ouvrir_titre"), t("remplacer_texte"),
+                                                                  parent=self.root):
+            return
+        self.onglets.select(0)
+        self.source.ecrire(fichiers.assembler(morceaux))
+        self.source.texte.edit_modified(True)
+        self.source.texte.see("1.0")
+        self.activite()
+        self.actualiser()
 
     def ecrire_presse_papiers(self, texte):
         self.root.clipboard_clear()

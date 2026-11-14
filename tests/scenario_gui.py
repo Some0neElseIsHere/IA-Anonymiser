@@ -34,6 +34,8 @@ messagebox.showwarning = lambda *a, **k: APPELS.append(("showwarning", a[:2]))
 messagebox.showerror = lambda *a, **k: APPELS.append(("showerror", a[:2]))
 simpledialog.askstring = lambda *a, **k: REPONSES["askstring"]
 filedialog.asksaveasfilename = lambda *a, **k: os.path.join(SORTIE, "rapport-scenario.html")
+FICHIER_A_OUVRIR = os.path.join(SORTIE, "export-powershell.log")
+filedialog.askopenfilename = lambda *a, **k: FICHIER_A_OUVRIR
 import webbrowser  # noqa: E402
 webbrowser.open = lambda *a, **k: None
 
@@ -505,6 +507,40 @@ def lancer():
         verifier(source.yview()[1] >= 1.0, "la gauche n'est pas allée en bas")
         photo("3b-defilement")
 
+    def ouvrir_fichiers():
+        import codecs
+        import glisser
+        app.nouvelle_conversation()
+        # Export PowerShell (« > fichier ») : UTF-16 avec BOM, fins de ligne Windows
+        contenu = "Échec : ACME\\jdupont depuis 10.1.2.3\r\nServeur dc01.acme.local\r\n"
+        with open(FICHIER_A_OUVRIR, "wb") as f:
+            f.write(codecs.BOM_UTF16_LE + contenu.encode("utf-16-le"))
+        app.source.texte.event_generate("<Control-o>")
+        racine.update()
+        verifier(app.source.lire().rstrip("\n") == contenu.replace("\r\n", "\n").rstrip("\n"),
+                 f"fichier UTF-16 mal lu : {app.source.lire()!r}")
+        verifier("[COMPTE_1]" in app.sortie.lire() and "10.1.2.3" not in app.sortie.lire(), "fichier non anonymisé")
+        # Glisser-déposer de deux fichiers : vrai message WM_DROPFILES, comme depuis l'Explorateur
+        a, b = os.path.join(SORTIE, "a.log"), os.path.join(SORTIE, "b.txt")
+        open(a, "w", encoding="utf-8").write("srv-a 10.0.0.1\n")
+        open(b, "w", encoding="cp1252").write("poste é 10.0.0.2\n")
+        verifier(getattr(racine, "_glisser", None), "glisser-déposer non activé")
+        glisser.simuler_depot(racine, [a, b])
+        for _ in range(20):
+            racine.update()
+            if "==> b.txt <==" in app.source.lire():
+                break
+            time.sleep(0.05)
+        verifier(app.source.lire() == "==> a.log <==\nsrv-a 10.0.0.1\n\n==> b.txt <==\nposte é 10.0.0.2\n",
+                 f"dépôt : {app.source.lire()!r}")
+        # Fichier binaire : refusé avec une explication
+        evtx = os.path.join(SORTIE, "Security.evtx")
+        open(evtx, "wb").write(b"ElfFile\x00" * 10)
+        avant = len(APPELS)
+        app.charger_fichiers([evtx])
+        verifier(len(APPELS) > avant and APPELS[-1][0] == "showwarning", "fichier .evtx accepté")
+        photo("3d-fichiers")
+
     def colonne_reduite():
         racine.update()
         largeur = app.colonne.winfo_width()
@@ -583,7 +619,7 @@ def lancer():
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
-            gros_log, defilement_jumele, colonne_reduite, quitter_phase1],
+            gros_log, defilement_jumele, ouvrir_fichiers, colonne_reduite, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, fin],
     }[PHASE]
 

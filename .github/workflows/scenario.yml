@@ -5,6 +5,16 @@ name: Scénario de bout en bout
 
 on:
   workflow_dispatch:
+  # À chaque modification du code : une régression dans la vraie application est vue tout de suite
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+
+concurrency:
+  group: scenario-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
