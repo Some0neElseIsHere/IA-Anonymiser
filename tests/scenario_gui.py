@@ -298,6 +298,24 @@ def lancer():
         verifier(duree < 5, f"gros log trop lent : {duree:.2f} s")
         verifier("10.0." not in app.sortie.lire(), "IP en clair dans le gros log")
 
+    def defilement_jumele():
+        app.onglets.select(0)
+        racine.update()
+        source, sortie = app.source.texte, app.sortie.texte
+        ligne = lambda t: int(t.index("@0,0").split(".")[0])
+        app.source.prendre_main()
+        source.yview("1500.0")
+        racine.update()
+        verifier(ligne(sortie) == ligne(source) == 1500, f"droite pas alignée : {ligne(source)} / {ligne(sortie)}")
+        app.sortie.prendre_main()
+        sortie.yview_scroll(40, "units")
+        racine.update()
+        verifier(ligne(source) == ligne(sortie) > 1500, f"gauche pas alignée : {ligne(source)} / {ligne(sortie)}")
+        sortie.yview_moveto(1.0)
+        racine.update()
+        verifier(source.yview()[1] >= 1.0, "la gauche n'est pas allée en bas")
+        photo("3b-defilement")
+
     def quitter_phase1():
         app.arbre_conv.selection_set(contexte["premiere"].id)
         app.changer_conversation()
@@ -341,7 +359,7 @@ def lancer():
             copier_pour_ia, reponse_ia, verifier_restauration, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
-            gros_log, quitter_phase1],
+            gros_log, defilement_jumele, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, fin],
     }[PHASE]
 

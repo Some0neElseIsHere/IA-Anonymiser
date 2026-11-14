@@ -148,15 +148,46 @@ class Zone(ttk.Frame):
         cadre.pack(fill="both", expand=True)
         self.texte = tk.Text(cadre, wrap="word", font=app.police, undo=not lecture_seule, relief="flat",
                              borderwidth=0, padx=14, pady=10, highlightthickness=1, spacing1=3, spacing3=3)
-        barre = ttk.Scrollbar(cadre, command=self.texte.yview)
-        self.texte.configure(yscrollcommand=barre.set)
+        self.barre = barre = ttk.Scrollbar(cadre, command=self.texte.yview)
+        self.texte.configure(yscrollcommand=self._defile)
         barre.pack(side="right", fill="y", padx=(4, 0))
         self.texte.pack(side="left", fill="both", expand=True)
+        # Défilement jumelé : la zone que l'utilisateur manipule entraîne l'autre
+        self.jumelle, self.paire = None, {"meneur": self}
+        for widget in (self.texte, barre):
+            widget.bind("<Enter>", self.prendre_main, add="+")
+        for evenement in ("<FocusIn>", "<Key>", "<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.texte.bind(evenement, self.prendre_main, add="+")
         self.lecture_seule = lecture_seule
         if lecture_seule:
             self.texte.configure(state="disabled")
         self.indication = None
         app.textes_tk.append(self)
+
+    @staticmethod
+    def jumeler(a, b):
+        """Les deux zones défilent ensemble, ligne à ligne."""
+        a.jumelle, b.jumelle = b, a
+        b.paire = a.paire
+
+    def prendre_main(self, _=None):
+        self.paire["meneur"] = self
+
+    def _defile(self, debut, fin):
+        self.barre.set(debut, fin)
+        if self.jumelle and self.paire["meneur"] is self:
+            self.jumelle.suivre(self)
+
+    def suivre(self, autre):
+        """Aligne cette zone sur l'autre : même première ligne visible (les jetons sont plus courts que
+        les valeurs, donc une même ligne n'occupe pas la même hauteur des deux côtés)."""
+        debut, fin = autre.texte.yview()
+        if fin >= 1.0 and debut > 0:
+            self.texte.yview_moveto(1.0)
+            return
+        ligne = int(autre.texte.index("@0,0").split(".")[0])
+        if int(self.texte.index("@0,0").split(".")[0]) != ligne:
+            self.texte.yview(f"{ligne}.0")
 
     def indiquer(self, texte, police):
         """Consignes affichées en gris tant que la zone est vide ; elles disparaissent dès qu'on colle."""
@@ -210,6 +241,8 @@ class Zone(ttk.Frame):
         if tag:
             self.surligner(spans, tag, contenu)
         self.texte.yview_moveto(position)
+        if self.jumelle and self.paire["meneur"] is self.jumelle:
+            self.suivre(self.jumelle)
         if self.lecture_seule:
             self.texte.configure(state="disabled")
         else:
@@ -452,6 +485,7 @@ class Application:
         self.bouton_copier_ia = self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
         p1.add(self.source, weight=1)
         p1.add(self.sortie, weight=1)
+        Zone.jumeler(self.source, self.sortie)
 
         o2 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o2, text=t("onglet_restaurer"))
@@ -465,6 +499,7 @@ class Application:
         self.bouton_copier = self.restauree.bouton(t("copier"), self.copier_restauree, accent=True)
         p2.add(self.reponse, weight=1)
         p2.add(self.restauree, weight=1)
+        Zone.jumeler(self.reponse, self.restauree)
 
         o3 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o3, text=t("onglet_elements", n=0))
@@ -710,6 +745,7 @@ class Application:
         if spans:
             premier = self.source.texte.tag_nextrange("actif", "1.0")
             if premier:
+                self.source.prendre_main()
                 self.source.texte.see(premier[0])
 
     def maj_termes(self):
