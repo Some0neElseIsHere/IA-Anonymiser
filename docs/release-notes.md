@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.9** : **termes permanents et motifs personnalisés réunis** dans un seul onglet des Options, **Masquage personnalisé** :
+  - une seule liste avec trois colonnes : le terme ou motif, son type (« Texte exact » ou « Expression régulière ») et son jeton ou titre ;
+  - une case **Expression régulière** à cocher lors de la saisie. Non cochée, le texte est cherché tel quel (majuscules et accents ignorés) et le second champ est un **jeton** parlant facultatif (`[ENTREPRISE]`). Cochée, le texte est un motif (`PC-\d{4}`) et le second champ est un **titre** facultatif (« Postes ») ;
+  - l'icône ⓘ à côté de la case rappelle la syntaxe des expressions régulières ;
+  - cliquez sur une ligne pour la modifier, y compris pour changer son type ;
+  - vos termes et motifs existants sont repris tels quels, rien à refaire. Les onglets des Options sont désormais : Général, Détection, Masquage personnalisé, Consigne pour l'IA.
+
 - **v1.10.8** : bouton **«** (réduire la colonne des conversations) agrandi, à la même taille que **»** dans la colonne réduite.
 
 - **v1.10.7** : interface plus compacte :
