@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.11.3** : **tri dans « 3. Éléments masqués »**. Un clic sur un en-tête de colonne (Jeton, Type, Valeur d'origine, Ici) trie la liste par ordre croissant ▲, un deuxième par ordre décroissant ▼, un troisième revient à l'ordre d'apparition dans le texte. Le tri alphabétique ignore les majuscules et les accents (« élodie » avant « Etienne »). Les nombres sont rangés dans l'ordre naturel : `[IP_2]` avant `[IP_10]`, et la colonne « Ici » se trie du plus fréquent au plus rare. Le tri choisi est conservé d'un lancement à l'autre.
+
 - **v1.11.2** : **fenêtre des expressions (Options → Détection → ⓘ) mise à jour**. Les expressions affichées sont toujours celles que l'outil applique réellement, mais leurs explications dataient d'avant les tests sur les journaux réels :
   - **un titre pour chaque expression**, par exemple « Kerberos : utilisateur/ROYAUME (Zeek, klist) » ou « Événement Windows : compte (Account Name…) », avec le nombre d'expressions du type. « Compte » en compte 24, « Nom de machine ou de domaine » 10 ;
   - **explications réécrites** pour tous les types : clés de contrôle des cartes, IBAN et n° de sécurité sociale, règles des téléphones, adresses IP laissées lisibles, exclusions des comptes et des noms de domaine, écritures d'une même adresse MAC ;
