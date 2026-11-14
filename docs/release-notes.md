@@ -10,6 +10,14 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.12.3** : **troisième batterie de tests, après les changements récents**. Tout a été repassé : 129 tests unitaires, 3 000 journaux Windows et Linux générés, les 37 journaux réels des séries précédentes, le journal de rançongiciel, et le scénario dans la vraie application sous Windows. S'y ajoutent **126 nouveaux journaux** tirés des échantillons de Microsoft Sentinel : CEF de pare-feu et de WAF (Fortinet, Palo Alto, Cisco Firepower, Barracuda, SonicWall, Forcepoint, Zscaler…), Syslog (Cisco ISE, Meraki, Stealthwatch, McAfee ePO, Symantec, Juniper, Veeam, VMware ESXi, OpenVPN…), EDR (CrowdStrike, SentinelOne, Carbon Black, Trend Micro), Exchange, Netwrix, Oracle, vCenter. Corrections :
+  - **champs CEF** : `suser=`, `duser=` (comptes), `shost=`, `dhost=`, `dvchost=`, `sntdom=`, `dntdom=` (machines et domaines) sont masqués ;
+  - **JSON des EDR et SIEM** : toute clé qui se termine par « user », « username » ou « accountname » (`SrcUserName`, `DstUserName`, `targetUser`…) ou par « hostname », « devicename », « endpointname »… (`SrcHostName`, `DstDvcHostname`, `endpoint_name`, `EndpointName`, `VbrHostName`) est reconnue ;
+  - **champ vide** : dans `duser= src=10.1.2.3`, la clé suivante n'est plus prise pour la valeur ;
+  - **faux secrets écartés** : `{fsn=-1}` et une ponctuation seule.
+
+  Aucune régression : restauration exacte partout, aucune fuite sur les journaux dont on connaît les valeurs, et le gros export de 7 Mo se traite toujours en 3 s.
+
 - **v1.12.2** : **jeton personnalisé pour les termes d'une conversation**. Dans « 3. Éléments masqués », la liste à droite s'appelle désormais **Masquage personnalisé de cette conversation**, pendant d'Options → Masquage personnalisé qui vaut pour toutes les conversations :
   - deux colonnes, **Terme** et **Jeton**, et un champ **Jeton** à côté de la saisie : « Sophie Bernard » peut devenir `[VICTIME]` au lieu de `[NOM_2]` ;
   - **cliquez sur un terme** pour le modifier, lui ou son jeton, puis **Mettre à jour** (Échap annule). Si le terme a déjà été envoyé à l'IA, la copie suivante la prévient du changement, comme pour les termes permanents ;

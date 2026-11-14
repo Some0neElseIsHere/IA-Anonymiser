@@ -481,7 +481,11 @@ def lancer():
         racine.update()
         verifier(ligne(source) == ligne(sortie) > 1500, f"gauche pas alignée : {ligne(source)} / {ligne(sortie)}")
         sortie.yview_moveto(1.0)
-        racine.update()
+        for _ in range(10):  # le défilement de l'autre zone suit au rafraîchissement suivant
+            racine.update()
+            if source.yview()[1] >= 1.0:
+                break
+            time.sleep(0.05)
         verifier(source.yview()[1] >= 1.0, "la gauche n'est pas allée en bas")
         photo("3b-defilement")
 
