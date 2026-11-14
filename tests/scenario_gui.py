@@ -210,6 +210,8 @@ def lancer():
         app.ajouter_terme()
         racine.update()
         iid = f"t{app.conv.termes.index('Terme temporaire')}"
+        app.onglets.select(2)  # la croix n'a de position que si l'onglet est affiché
+        racine.update()
         app.termes.arbre.see(iid)
         racine.update()
         x, y, w, h = app.termes.arbre.bbox(iid, "suppr")
@@ -218,6 +220,7 @@ def lancer():
         verifier(app.termes.champ.get() == "", "la croix a chargé la ligne dans les champs")
         verifier(not trouver_bouton(app.root, ("Toujours masquer", "Supprimer")), "boutons encore présents")
         photo("0b-jeton-conversation")
+        app.onglets.select(0)
 
     def coller_log():
         coller(app.source, LOG)
