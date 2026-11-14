@@ -247,6 +247,11 @@ def lancer():
         jetons = valeurs("jeton")
         ip = [j for j in jetons if j.startswith("[IP_")]
         verifier(ip == sorted(ip, key=lambda j: int(j[4:-1])), f"ordre naturel des jetons : {ip}")
+        app.trier_elements("nb")
+        racine.update()
+        nb = [int(x) if x.isdigit() else 0 for x in valeurs("nb")]
+        verifier(nb == sorted(nb, reverse=True), f"« Ici » : plus fréquents d'abord : {nb}")
+        verifier(arbre.heading("nb", "text").endswith("▼"), "flèche ▼ attendue sur « Ici »")
         app.trier_elements("type")  # laissé trié par type : la relance doit s'en souvenir
         racine.update()
         app.onglets.select(0)

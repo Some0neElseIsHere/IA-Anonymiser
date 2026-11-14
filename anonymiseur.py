@@ -1043,10 +1043,11 @@ class Application:
     def trier_elements(self, colonne):
         """Clic sur un en-tête : croissant, puis décroissant, puis retour à l'ordre d'apparition."""
         tri = self.options.tri_elements
+        premier = colonne == "nb"  # « Ici » : les plus fréquents d'abord ; texte : de A à Z d'abord
         if not tri or tri[0] != colonne:
-            self.options.tri_elements = [colonne, False]
-        elif not tri[1]:
-            self.options.tri_elements = [colonne, True]
+            self.options.tri_elements = [colonne, premier]
+        elif tri[1] == premier:
+            self.options.tri_elements = [colonne, not premier]
         else:
             self.options.tri_elements = None
         self.sauver_options()
