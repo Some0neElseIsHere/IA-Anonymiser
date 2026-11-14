@@ -10,6 +10,10 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.5** :
+  - **ligne survolée en surbrillance des deux côtés** : dans « Anonymiser mon texte » et « Restaurer la réponse de l'IA », la ligne sous la souris s'éclaire à gauche et la ligne correspondante s'éclaire à droite. Les surlignages jaunes et verts restent visibles par-dessus ;
+  - **conversations dans la colonne réduite** : la barre d'icônes liste désormais toutes les conversations, en initiales (« IA » pour « Incident AD », « C3 » pour « Conversation 3 »), les épinglées d'abord, séparées des autres par un trait. Un clic change de conversation, le survol affiche le nom complet, et le clic droit ouvre le menu habituel (épingler, renommer, exporter, fermer).
+
 - **v1.10.4** : correspondance au survol, colonne repliable, et détection complétée grâce à un long log d'incident :
   - **survol** : passez la souris sur un élément surligné pour voir son équivalent. Sur une valeur en jaune (texte original, réponse restaurée), la bulle montre le jeton, par exemple `[IP_3]` ; sur un jeton en vert, elle montre la vraie valeur. Le type est indiqué dessous, et un jeton inconnu en rouge est expliqué ;
   - **colonne repliable** : le bouton **«** à côté du titre réduit la colonne des conversations à une fine barre d'icônes (déplier, nouvelle conversation, Options, À propos), pour laisser plus de place au texte. **»** la déplie à sa largeur précédente. Le choix est conservé d'un lancement à l'autre ;

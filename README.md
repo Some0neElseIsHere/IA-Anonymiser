@@ -22,7 +22,7 @@ Au premier lancement, un écran d'accueil présente le principe. Ensuite, tant q
 2. Cliquez sur **Copier pour l'IA** et collez le texte dans votre conversation.
 3. **Onglet « Restaurer la réponse de l'IA »** : collez la réponse de l'IA à gauche. À droite, les jetons comme `[NOM_1]` sont remplacés par les vraies valeurs. Cliquez sur **Copier**.
 
-Dans les deux onglets, **passez la souris sur un élément surligné** : une bulle affiche le jeton correspondant (côté texte original ou réponse restaurée) ou la vraie valeur (côté jetons), avec son type. Les deux zones **défilent ensemble**, ligne à ligne.
+Dans les deux onglets, **passez la souris sur un élément surligné** : une bulle affiche le jeton correspondant (côté texte original ou réponse restaurée) ou la vraie valeur (côté jetons), avec son type. La ligne survolée s'éclaire **des deux côtés**, pour retrouver d'un coup d'œil sa version anonymisée ou restaurée. Les deux zones **défilent ensemble**, ligne à ligne.
 
 ![Onglet Restaurer](docs/clair-restaurer.png)
 
@@ -32,7 +32,7 @@ La colonne de gauche liste vos conversations, classées comme dans Claude : d'ab
 
 **Avant de coller une réponse de l'IA, sélectionnez la bonne conversation.** Un jeton inconnu de cette conversation apparaît en rouge.
 
-Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour l'épingler, la renommer ou la fermer. Le bouton **«** à côté du titre réduit la colonne à une barre d'icônes (déplier, nouvelle conversation, Options, À propos) pour laisser plus de place au texte ; **»** la déplie. Ce choix est conservé.
+Les conversations sont conservées d'un lancement à l'autre : vous pouvez restaurer une réponse de l'IA le lendemain. Faites un clic droit sur une conversation pour l'épingler, la renommer ou la fermer. Le bouton **«** à côté du titre réduit la colonne à une barre d'icônes : déplier, nouvelle conversation, vos conversations en initiales (« IA » pour « Incident AD », nom complet au survol, clic droit pour le menu), Options et À propos pour laisser plus de place au texte ; **»** la déplie. Ce choix est conservé.
 
 ### Ce qui est masqué
 
