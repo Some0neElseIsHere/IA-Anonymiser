@@ -681,8 +681,8 @@ class Application:
         o3 = ttk.Frame(self.onglets, padding=8)
         self.onglets.add(o3, text=t("onglet_conversation"))
         # Deux colonnes fixes, sans poignée : la détection à gauche, le masquage personnalisé à droite
-        o3.columnconfigure(0, weight=3, uniform="o3")
-        o3.columnconfigure(1, weight=2, uniform="o3")
+        o3.columnconfigure(0, weight=5, uniform="o3")
+        o3.columnconfigure(1, weight=3, uniform="o3")
         o3.rowconfigure(0, weight=1)
         self.construire_options_conversation(o3).grid(row=0, column=0, sticky="nsew", padx=(0, int(12 * self.echelle)))
         self.construire_termes(o3).grid(row=0, column=1, sticky="nsew")
