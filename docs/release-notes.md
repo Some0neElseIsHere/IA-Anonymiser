@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.3** : **un seul ascenseur pour les deux zones**. Dans « Anonymiser mon texte » et « Restaurer la réponse de l'IA », faire défiler une zone (molette, ascenseur ou clavier) fait défiler l'autre. Les deux restent alignées sur la même ligne, même si les jetons sont plus courts que les valeurs d'origine : chaque ligne du texte original reste en face de sa version anonymisée.
+
 - **v1.10.2** : détection plus fiable, corrigée grâce à une campagne de tests massifs (10 000 documents générés : logs Windows, Linux, pare-feu, AD, SQL, tickets, mails, en français et en anglais) :
   - **noms avec ou sans accents** : un terme saisi « Marc Lefèvre » masque aussi « Marc Lefevre » et « MARC LEFEVRE », sous le même jeton ;
   - **numéros sur plusieurs lignes** : un numéro de sécurité sociale, de téléphone ou un IBAN ne peut plus « déborder » sur la ligne suivante et avaler un morceau de texte ;
