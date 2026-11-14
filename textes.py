@@ -88,7 +88,7 @@ TEXTES = {
         "ajouter": "Ajouter",
         "supprimer": "Supprimer",
         "toujours_masquer": "Toujours masquer",
-        "aide_clic_droit": "Clic droit sur un mot → Masquer (Ctrl+M). Cliquez sur un terme pour modifier son jeton.",
+        "aide_clic_droit": "Clic droit sur un mot → Masquer (Ctrl+M). Cliquez sur un terme pour modifier son jeton, sur ✕ pour le supprimer ; clic droit → Toujours masquer.",
         # types
         "type_EMAIL": "E-mail",
         "type_TEL": "Téléphone",
@@ -326,7 +326,7 @@ TEXTES = {
         "ajouter": "Add",
         "supprimer": "Remove",
         "toujours_masquer": "Always mask",
-        "aide_clic_droit": "Right-click a word → Mask (Ctrl+M). Click a term to change its token.",
+        "aide_clic_droit": "Right-click a word → Mask (Ctrl+M). Click a term to change its token, ✕ to delete it; right-click → Always mask.",
         "type_EMAIL": "Email",
         "type_TEL": "Phone",
         "type_IBAN": "IBAN",

@@ -205,6 +205,18 @@ def lancer():
         verifier("Marc Lefèvre" not in app.conv.etiquettes, "jeton déjà pris accepté")
         app.options.etiquettes = {}
         app.termes.vider()
+        # Croix de la 3e colonne : supprime la ligne (sans la charger dans les champs)
+        app.termes.champ.insert(0, "Terme temporaire")
+        app.ajouter_terme()
+        racine.update()
+        iid = f"t{app.conv.termes.index('Terme temporaire')}"
+        app.termes.arbre.see(iid)
+        racine.update()
+        x, y, w, h = app.termes.arbre.bbox(iid, "suppr")
+        retour = app.termes.clic(type("E", (), {"x": x + w // 2, "y": y + h // 2})())
+        verifier(retour == "break" and "Terme temporaire" not in app.conv.termes, f"croix : {app.conv.termes}")
+        verifier(app.termes.champ.get() == "", "la croix a chargé la ligne dans les champs")
+        verifier(not trouver_bouton(app.root, ("Toujours masquer", "Supprimer")), "boutons encore présents")
         photo("0b-jeton-conversation")
 
     def coller_log():

@@ -405,13 +405,18 @@ class ListeTermes(ttk.Frame):
             champ.bind("<Escape>", lambda e: self.vider())
         zone = ttk.Frame(self)
         zone.pack(fill="both", expand=True)
-        self.arbre = ttk.Treeview(zone, columns=("terme", "jeton"), show="headings", selectmode="extended",
+        self.arbre = ttk.Treeview(zone, columns=("terme", "jeton", "suppr"), show="headings", selectmode="extended",
                                   height=hauteur)
         e = app.echelle
         self.arbre.heading("terme", text=t("opt_terme"), anchor="w")
         self.arbre.heading("jeton", text=t("col_jeton"), anchor="w")
-        self.arbre.column("terme", width=int(150 * e), stretch=True)
-        self.arbre.column("jeton", width=int(120 * e), stretch=False)
+        self.arbre.heading("suppr", text="")
+        self.arbre.column("terme", width=int(140 * e), stretch=True)
+        self.arbre.column("jeton", width=int(110 * e), stretch=False)
+        self.arbre.column("suppr", width=int(30 * e), minwidth=int(30 * e), stretch=False, anchor="center")
+        self.supprimer = supprimer
+        # Clic sur la croix : supprime la ligne, sans la charger dans les champs
+        self.arbre.bind("<Button-1>", self.clic, add="+")
         barre = ttk.Scrollbar(zone, command=self.arbre.yview)
         self.arbre.configure(yscrollcommand=barre.set)
         barre.pack(side="right", fill="y", padx=(4, 0))
@@ -426,11 +431,18 @@ class ListeTermes(ttk.Frame):
         for i, terme in enumerate(self.termes):
             jeton = self.etiquettes.get(terme)
             self.arbre.insert("", "end", iid=f"t{i}",
-                              values=(terme, f"[{jeton}]" if jeton else self.app.t("opt_jeton_auto")))
+                              values=(terme, f"[{jeton}]" if jeton else self.app.t("opt_jeton_auto"), "✕"))
         self.bouton.configure(text=self.app.t("ajouter"))
 
     def selection(self):
         return [self.termes[int(i[1:])] for i in self.arbre.selection()]
+
+    def clic(self, e):
+        ligne = self.arbre.identify_row(e.y)
+        if ligne and self.arbre.identify_column(e.x) == "#3":
+            self.supprimer([self.termes[int(ligne[1:])]])
+            return "break"
+        return None
 
     def choisir(self):
         """Une seule ligne sélectionnée : elle passe dans les champs, pour modifier le terme ou son jeton."""
@@ -955,10 +967,7 @@ class Application:
 
         self.termes = ListeTermes(self, cadre, self.ajouter_terme, self.supprimer_termes, hauteur=4)
         self.termes.pack(fill="both", expand=True)
-        pied = ttk.Frame(cadre)
-        pied.pack(fill="x", pady=(8, 0))
-        ttk.Button(pied, text=t("toujours_masquer"), command=self.rendre_permanents).pack(side="left")
-        ttk.Button(pied, text=t("supprimer"), command=self.supprimer_termes).pack(side="left", padx=(8, 0))
+        self.termes.arbre.bind("<Button-3>", self.menu_terme)
         self.aide_adaptee(cadre, t("aide_clic_droit")).pack(fill="x", pady=(6, 0))
         return cadre
 
@@ -1408,8 +1417,20 @@ class Application:
         self.moteur.reinclure("NOM", terme)
         self.actualiser()
 
-    def supprimer_termes(self):
-        retires = set(self.termes.selection())
+    def menu_terme(self, evenement):
+        """Clic droit sur un terme de la conversation : Toujours masquer, Supprimer."""
+        ligne = self.termes.arbre.identify_row(evenement.y)
+        if not ligne:
+            return
+        if ligne not in self.termes.arbre.selection():
+            self.termes.arbre.selection_set(ligne)
+        self.menu.delete(0, "end")
+        self.menu.add_command(label=self.t("toujours_masquer"), command=self.rendre_permanents)
+        self.menu.add_command(label=self.t("supprimer"), command=self.supprimer_termes)
+        self.menu.tk_popup(evenement.x_root, evenement.y_root)
+
+    def supprimer_termes(self, termes=None):
+        retires = set(self.termes.selection() if termes is None else termes)
         if not retires:
             self.message(self.t("msg_selection_termes"))
             return
