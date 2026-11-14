@@ -747,7 +747,7 @@ class Application:
         if self.icone_petite:
             ttk.Label(marque, image=self.icone_petite).pack(side="left", padx=(0, 8))
         ttk.Label(marque, text="IA-Anonymiser", style="Marque.TLabel").pack(side="left")
-        reduire = ttk.Button(marque, text="«", width=3, style="Toolbutton", command=self.basculer_colonne)
+        reduire = ttk.Button(marque, text="«", width=3, style="Mini.Toolbutton", command=self.basculer_colonne)
         reduire.pack(side="right")
         self.info_bulle(reduire, t("reduire_colonne"))
 

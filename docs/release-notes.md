@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.8** : bouton **«** (réduire la colonne des conversations) agrandi, à la même taille que **»** dans la colonne réduite.
+
 - **v1.10.7** : interface plus compacte :
   - **colonne des conversations à largeur fixe** : le séparateur qu'on pouvait faire glisser à la souris (curseur ↔) entre la colonne et les onglets est retiré. La colonne est soit dépliée, soit réduite avec les boutons **«** / **»** ;
   - **marges et espacements resserrés** dans toute la fenêtre principale (bords de la fenêtre, onglets, zones de texte, colonne, boutons) : plus de place pour le texte, surtout sur un écran de portable.
