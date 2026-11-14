@@ -10,6 +10,11 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.13.0** :
+  - **ouvrir un fichier de log** : bouton **Ouvrir…** dans le texte original, raccourci **Ctrl+O**, ou **glisser-déposer** d'un ou plusieurs fichiers depuis l'Explorateur sur la fenêtre. Plusieurs fichiers sont mis bout à bout, chacun précédé de `==> nom <==`. L'encodage est reconnu tout seul : UTF-8 avec ou sans BOM, UTF-16 (fichiers créés par `>` dans PowerShell), Windows-1252. Un fichier binaire (`.evtx`, archive, document Office) est refusé avec la commande `wevtutil` pour l'exporter en texte. Au-delà de 20 Mo, une confirmation est demandée ;
+  - **domaines publics connus lisibles, au choix pour chaque conversation** : `microsoft.com`, `windowsupdate.com`, `login.microsoftonline.com`, `google.com`, `github.com`, autorités de certification, éditeurs de sécurité, organismes de normes… peuvent rester en clair pour que l'IA garde le contexte. Réglage par défaut des nouvelles conversations dans Options → Détection, et pour une conversation précise par clic droit sur son nom → **Domaines publics lisibles**. Seuls les domaines dont tous les sous-domaines appartiennent à l'éditeur sont concernés : `acme.sharepoint.com`, `acme.onmicrosoft.com`, `x.blob.core.windows.net`, `acme.okta.com`, vos domaines internes et les adresses e-mail restent toujours masqués. Désactivé par défaut ;
+  - **contrôle automatique** : le scénario qui pilote la vraie application sous Windows se lance désormais à chaque modification du code, et plus seulement à la main.
+
 - **v1.12.5** : corrections trouvées en remettant à jour les captures d'écran du README :
   - **téléphone en fin de phrase de nouveau masqué** : depuis la v1.11.1, un numéro suivi d'un point (« … au 06 12 34 56 78. ») restait en clair, le point final étant pris pour une date (`15.42.50`). Un point ne bloque plus que s'il est suivi d'un chiffre ; les fausses détections dans les dates restent écartées ;
   - **chaînes de connexion** : le serveur de `Server=sql01;…` et de `Data Source=tcp:sqlprod02,1433;…` est masqué (`localhost` reste lisible) ;
