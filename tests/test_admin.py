@@ -301,10 +301,10 @@ class JournauxV1104(unittest.TestCase):
 
     def test_net_use(self):
         self.assertEqual(anon('net use \\\\fs01\\C$ /user:ACME\\svc Wint3r!Maint2026"'),
-                         'net use \\\\fs01\\C$ /user:[COMPTE_1] [SECRET_1]"')
+                         'net use \\\\[FQDN_1]\\C$ /user:[COMPTE_1] [SECRET_1]"')
         self.assertEqual(anon("net use Z: \\\\nas\\data S3cret! /user:backup"),
-                         "net use Z: \\\\nas\\data [SECRET_1] /user:[COMPTE_1]")
-        self.assertEqual(anon("net use \\\\nas\\data * /user:jdoe"), "net use \\\\nas\\data * /user:[COMPTE_1]")
+                         "net use Z: \\\\[FQDN_1]\\data [SECRET_1] /user:[COMPTE_1]")
+        self.assertEqual(anon("net use \\\\nas\\data * /user:jdoe"), "net use \\\\[FQDN_1]\\data * /user:[COMPTE_1]")
 
     def test_comptes_des_journaux(self):
         self.assertEqual(anon("Login failed for user 'app_paie'."), "Login failed for user '[COMPTE_1]'.")
@@ -316,6 +316,63 @@ class JournauxV1104(unittest.TestCase):
         self.assertEqual(anon("session opened for user mdurand by"), "session opened for user [COMPTE_1] by")
         self.assertEqual(anon("sudo:   pmartin : TTY=pts/0"), "sudo:   [COMPTE_1] : TTY=pts/0")
         self.assertEqual(anon("a ticket for user experience"), "a ticket for user experience")
+
+
+class JournauxReels(unittest.TestCase):
+    """Défauts trouvés sur de vrais journaux (loghub, OTRF Security-Datasets), v1.11.0."""
+
+    def test_empreintes_et_guid_ne_sont_pas_des_numeros(self):
+        for texte in ("MD5=BE57D3232C688595C3276DB79B66BD35", "{39e4a257-f132-5f8b-1000-000000000700}",
+                      "{00000000-0000-0000-0000-000000000000}", "BIOS-e820: 0000000000100000",
+                      "value=\"140705280950272\"", "ntpd: time reset +0.182379 s"):
+            self.assertEqual(anon(texte), texte, texte)
+
+    def test_numeros_valides_toujours_masques(self):
+        self.assertEqual(anon("carte 4111111111111111"), "carte [CARTE_1]")
+        self.assertEqual(anon("FR7630006000011234567890189"), "[IBAN_1]")
+
+    def test_versions_ne_sont_pas_des_ip(self):
+        for texte in ("wcp.dll version 0.0.0.6", "Version=4.0.0.0", "amd64~~6.1.1.0", "0:0:0:0:0:0:0:1"):
+            self.assertEqual(anon(texte), texte, texte)
+
+    def test_mots_courants_pas_comptes(self):
+        for texte in ("Virtual Account:\t\tNo", "User: NT AUTHORITY\\SYSTEM", "(uid=0)", "Elevated Token:\t\tNo",
+                      "Target Account:\n\tSecurity ID:\tS-1-0-0", "pam_unix(passwd:chauthtok): ok",
+                      "Service Account:   LocalSystem"):
+            self.assertEqual(anon(texte), texte, texte)
+
+    def test_compte_propage_a_l_identique(self):
+        self.assertEqual(anon("session closed for user root\nROOT LOGIN ON tty2, PCI Root Bridge"),
+                         "session closed for user [COMPTE_1]\nROOT LOGIN ON tty2, PCI Root Bridge")
+
+    def test_espaces_de_noms_et_fichiers(self):
+        for texte in ("System.Security", "Microsoft.PowerShell.Security", "com.apple.xpc.activity",
+                      "REG.EXE-E7E8BD26.pf", "Weather.app", "subject.OU"):
+            self.assertEqual(anon(texte), texte, texte)
+
+    def test_evenement_windows(self):
+        texte = ("New Logon:\n\tAccount Name:\t\tpgustavo\n\tAccount Domain:\t\tTHESHIRE\n"
+                 "\tWorkstation Name:\tWORKSTATION6\n\tAccount Name:\t\tMORDORDC$\n\tAccount Name:\t\t-")
+        self.assertEqual(anon(texte), "New Logon:\n\tAccount Name:\t\t[COMPTE_1]\n\tAccount Domain:\t\t[FQDN_1]\n"
+                                      "\tWorkstation Name:\t[FQDN_2]\n\tAccount Name:\t\t[FQDN_3]$\n\tAccount Name:\t\t-")
+
+    def test_noms_de_machine(self):
+        self.assertEqual(anon("Nov 12 08:01:02 srv-web01 sshd[123]: ok"), "Nov 12 08:01:02 [FQDN_1] sshd[123]: ok")
+        self.assertEqual(anon("   Host Name . . . . . . . . . . . . : PC-0815"),
+                         "   Host Name . . . . . . . . . . . . : [FQDN_1]")
+        self.assertEqual(anon("copie vers \\\\fs01\\Direction"), "copie vers \\\\[FQDN_1]\\Direction")
+        self.assertEqual(anon("Nov 12 08:01:02 localhost kernel: x"), "Nov 12 08:01:02 localhost kernel: x")
+
+    def test_domaine_en_minuscules(self):
+        self.assertEqual(anon("User: ACME\\jdoe\nacme\\jdoe\nAcme SAS, com.acme.payroll"),
+                         "User: [COMPTE_1]\n[FQDN_1]\\[COMPTE_2]\nAcme SAS, com.acme.payroll")
+
+    def test_comptes_linux_et_web(self):
+        self.assertEqual(anon("New session 4 of user jdupont."), "New session 4 of user [COMPTE_1].")
+        self.assertEqual(anon("password changed for jdupont"), "password changed for [COMPTE_1]")
+        self.assertEqual(anon('10.1.2.3 - jdupont [12/Nov/2026:08:00:00 +0100] "GET / HTTP/1.1" 200'),
+                         '[IP_1] - [COMPTE_1] [12/Nov/2026:08:00:00 +0100] "GET / HTTP/1.1" 200')
+        self.assertEqual(anon("User name                    jdupont"), "User name                    [COMPTE_1]")
 
 
 if __name__ == "__main__":

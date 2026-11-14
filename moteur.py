@@ -3,6 +3,7 @@
 Les correspondances jeton -> valeur restent en mémoire uniquement.
 """
 import bisect
+import ipaddress
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -31,7 +32,7 @@ EXEMPLES = {
     "SECU": "1 85 05 78 006 084 36",
     "IP": "192.168.1.10",
     "MAC": "00:1A:2B:3C:4D:5E",
-    "FQDN": "srv-paie01.acme.local, intranet.acme.fr",
+    "FQDN": "srv-paie01.acme.local, intranet.acme.fr, WORKSTATION5 (événement, syslog, ipconfig, \\\\srv)",
     "SECRET": "password=…, AKIA…, ghp_…, eyJ… (JWT), BEGIN PRIVATE KEY",
     "COMPTE": r"ACME\mlefevre, C:\Users\mlefevre, /home/mlefevre",
     "DN": "CN=Marc Lefevre,OU=Compta,DC=acme,DC=local",
@@ -63,6 +64,8 @@ _CLES_SECRETES = (
     r"|private[_-]?key|account[_-]?key|shared[_-]?access[_-]?key|community"
 )
 _VALEUR = r"""(?P<q>["'])?(?P<v>(?(q)[^"'\n]+|[^\s;,"'<>&]+))(?(q)(?P=q))"""
+# Valeur d'un compte : sans parenthèses ni crochets, « (uid=0) » ne donne pas « 0) »
+_VALEUR_COMPTE = r"""(?P<q>["'])?(?P<v>(?(q)[^"'\n]+|[^\s;,"'<>&()\[\]{}]+))(?(q)(?P=q))"""
 
 # Une partie de DN : DC=… et C=… ne contiennent jamais d'espace (sinon DC=local avalerait la suite de la phrase)
 _RDN = r"(?:(?:CN|OU|O|L|ST|UID)=[^,=\n+\"<>;()]+|(?:DC|C)=[\w-]+)"
@@ -74,7 +77,7 @@ MOTIFS = [
     ("SECRET", re.compile(r"\b(?:bearer|basic)\s+(?P<v>[A-Za-z0-9\-._~+/]{12,}=*)", re.IGNORECASE)),
     ("SECRET", re.compile(r"<(?P<k>password|pwd|secret|token|apikey|api_key)>(?P<v>[^<]+)</(?P=k)>",
                           re.IGNORECASE)),
-    ("SECRET", re.compile(r"(?<![\w.-])(?:[\w.-]*[_.-])?(?:" + _CLES_SECRETES + r")[\"']?\s*[:=]\s*" + _VALEUR,
+    ("SECRET", re.compile(r"(?<![\w.(-])(?:[\w.-]*[_.-])?(?:" + _CLES_SECRETES + r")[\"']?[ \t]*[:=][ \t]*" + _VALEUR,
                           re.IGNORECASE)),
     ("SECRET", re.compile(
         r"(?<![\w-])(?:"
@@ -97,16 +100,44 @@ MOTIFS = [
         r"(?<![\w=])" + _RDN + r"(?:\s*,\s*" + _RDN + r")+",
         re.IGNORECASE)),
     ("SID", re.compile(r"\bS-1-5-21-\d+-\d+-\d+(?:-\d+)?\b")),
-    ("EMAIL", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
-    ("IBAN", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b")),
+    # Début de mot obligatoire : sinon une longue chaîne sans « @ » (base64 PowerShell) est relue à chaque caractère
+    ("EMAIL", re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
+    ("IBAN", re.compile(r"(?<![\w-])[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?(?![\w-])")),
     ("SECU", re.compile(
         r"(?<![\d\w.])[12] ?\d{2} ?(?:0[1-9]|1[0-2]|[2-9]\d) ?(?:\d{2}|2[AB])"
         r" ?\d{3} ?\d{3}(?: ?\d{2})?(?![\d\w.])")),
-    ("CARTE", re.compile(r"(?<!\d)(?:\d{4}[ -]?){3}\d{4}(?!\d)")),
+    ("CARTE", re.compile(r"(?<![\w-])(?:\d{4}[ -]?){3}\d{4}(?![\w-])")),
     ("TEL", re.compile(
         r"(?<![\w+])(?:(?:\+|00)33 ?(?:\(0\) ?)?|0)[1-9](?:[ .-]?\d{2}){4}(?!\w)"  # France
-        r"|(?<![\w+])\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?!\w)"           # international
+        r"|(?<![\w+])\+[1-9]\d{0,2}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?![\w.])"   # international
     )),
+    # Compte d'ordinateur (WORKSTATION5$, svc_ADFS$) : le nom de la machine est masqué, le « $ » reste
+    ("FQDN", re.compile(r"(?<![\w$\\%-])(?P<v>(?=[\w-]*[A-Za-z])[A-Za-z0-9][\w-]{1,19})\$(?![\w$])")),
+    # En-tête syslog : « Nov 12 08:01:02 srv-web01 sshd[123]: » (et horodatage ISO de rsyslog)
+    ("FQDN", re.compile(
+        r"(?m)^(?:[A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d|\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:[.,]\d+)?(?:Z|[+-]\d\d:?\d\d)?)"
+        r" (?P<v>[A-Za-z0-9][\w.-]*) (?=[\w./()-]+(?:\[\d+\])?:)")),
+    # ipconfig /all, systeminfo, hostnamectl, auditd : nom de la machine
+    ("FQDN", re.compile(
+        r"(?im)^[ \t]*(?:Host Name|Nom de l'h[ôo]te|Static hostname|Transient hostname|Primary Dns Suffix|"
+        r"Suffixe DNS principal|Domain|Domaine|Logon Server|Serveur d'ouverture de session)"
+        r"[ \t.]*:[ \t]*\\{0,2}(?P<v>[A-Za-z0-9][\w.-]*)[ \t]*$")),
+    # Transcript PowerShell : « Machine: PC-0815 (Microsoft Windows NT …) »
+    ("FQDN", re.compile(r"(?im)^Machine:[ \t]*(?P<v>[A-Za-z0-9][\w.-]*)(?=[ \t]*(?:\(|$))")),
+    # Serveur d'un chemin réseau : \\fs01\partage
+    ("FQDN", re.compile(r"(?<![\w\\])\\\\(?P<v>[A-Za-z0-9][\w-]{0,62})(?=\\)")),
+    ("FQDN", re.compile(r"(?<![\w.-])(?:hostname|host|computer|computername|workstation)=\"?(?P<v>[A-Za-z0-9][\w.-]*)",
+                        re.IGNORECASE)),
+    # Événements Windows tels qu'affichés (Observateur d'événements, SIEM) : un champ par ligne
+    ("FQDN", re.compile(
+        r"(?im)^[ \t]*(?:Account Domain|Domain Name|Domaine du compte|Nom de domaine|Workstation Name|"
+        r"Source Workstation|Nom de la station de travail|Station de travail source|Client Name|"
+        r"(?:Caller )?Computer(?: Name)?|Supplied Realm Name|Target Domain|Target Server Name|Nom du serveur cible)"
+        r"[ \t]*:[ \t]*(?P<v>[A-Za-z0-9][\w.-]*)[ \t]*$")),
+    ("COMPTE", re.compile(
+        r"(?im)^[ \t]*(?:Account Name|Nom du compte|Logon Account|Compte d'ouverture de session|User Name|"
+        r"Nom d'utilisateur|SAM Account Name|New Account Name|Old Account Name|Target User Name|"
+        r"Account For Which Logon Failed|Client User Name)[ \t]*:[ \t]*(?P<v>[^\s\\-][^\t\r\n]*?)[ \t]*$")),
     # Comptes : DOMAINE\utilisateur (domaine NetBIOS en majuscules), et l'utilisateur dans un chemin de profil
     ("COMPTE", re.compile(r"(?<![\w\\/.-])(?P<d>[A-Z][A-Z0-9-]{1,14})\\[A-Za-z0-9][\w.$-]{1,63}(?![\w\\])")),
     ("COMPTE", re.compile(
@@ -114,16 +145,25 @@ MOTIFS = [
         re.IGNORECASE)),
     ("COMPTE", re.compile(r"(?<![\w./-])/(?:home|Users)/(?P<v>[A-Za-z0-9._-]+)")),
     ("COMPTE", re.compile(
-        r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|account(?:[_-]?name)?|samaccountname)"
-        r"[\"']?\s*[:=]\s*" + _VALEUR, re.IGNORECASE)),
+        r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|acct|account(?:[_-]?name)?|samaccountname)"
+        r"[\"']?[ \t]*[:=][ \t]*" + _VALEUR_COMPTE, re.IGNORECASE)),
     # Comptes dans les journaux : SQL Server, sshd, PAM, sudo, net use /user:x
     ("COMPTE", re.compile(r"\bfor (?:invalid |illegal )?user '(?P<v>[^'\s\\]+)'", re.IGNORECASE)),
     ("COMPTE", re.compile(r"\bfor (?:invalid |illegal )?user (?P<v>[\w.$-]+)(?= from\b)")),
     ("COMPTE", re.compile(r"\b(?:Accepted|Failed) [\w/-]+ for (?P<v>[\w.$-]+) from\b")),
     ("COMPTE", re.compile(r"\bsession (?:opened|closed) for user (?P<v>[\w.$-]+)")),
     ("COMPTE", re.compile(r"\bsudo(?:\[\d+\])?:\s+(?P<v>[\w.$-]+) : ")),
+    ("COMPTE", re.compile(r"\b(?:[Ss]ession \d+|[Ss]lice) of user (?P<v>[\w.$-]+?)\.?(?=\s|$)")),
+    ("COMPTE", re.compile(r"\bpassword (?:changed|expired) for (?P<v>[\w.$-]+)")),
+    ("COMPTE", re.compile(r"\bby (?P<v>[\w.$-]+)\(uid=\d+\)")),
+    ("COMPTE", re.compile(r"\b(?:new user: name|delete user|removed user|changed user)[ =']+(?P<v>[\w.$-]+)")),
+    # Journal d'accès Apache / nginx : « 10.1.2.3 - jdupont [12/Nov/2026:… »
+    ("COMPTE", re.compile(r"(?m)^\S+ \S+ (?P<v>[^\s\[-][^\s\[]*) \[\d{2}/\w{3}/\d{4}:")),
+    # net user : la commande et sa sortie
+    ("COMPTE", re.compile(r"(?i)\bnet\s+user\s+(?P<v>(?!/)[^\s/\"]+)")),
+    ("COMPTE", re.compile(r"(?im)^(?:User name|Nom d'utilisateur)[ \t]{2,}(?P<v>\S+)[ \t]*$")),
     ("COMPTE", re.compile(r"\bnet\s+use\b[^\n]*?/u(?:ser)?:(?P<v>[^\s\\\"]+)(?=[\s\"]|$)", re.IGNORECASE)),
-    ("IP", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
+    ("IP", re.compile(r"(?<![\w.~])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
     ("IP", re.compile(
         r"(?<![\w:.])(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}"           # IPv6 complète
         r"|(?:[0-9a-f]{1,4}:){1,6}(?::[0-9a-f]{1,4}){1,6}"              # abrégée : 2a01:e0a::17
@@ -138,27 +178,116 @@ MOTIFS = [
 DOMAINES_SYSTEME = {"BUILTIN", "NT", "AUTHORITY", "SERVICE", "APPPOOL", "WORKGROUP", "HKLM", "HKCU", "HKCR",
                     "HKU", "HKCC", "SYSTEM", "LOCAL"}
 PROFILS_GENERIQUES = {"public", "default", "default user", "all users", "shared", "guest"}
+# Valeurs qui ne sont pas des comptes : champs vides, booléens, comptes intégrés de Windows
+COMPTES_NEUTRES = {"-", "?", "(unknown)", "unset", "no", "yes", "true", "false", "none", "null", "n/a", "na", "unknown", "nt", "system",
+                   "local service", "network service", "localsystem", "anonymous logon", "nt authority",
+                   "service local", "service réseau", "système", "ouverture de session anonyme", "%%1843"}
+MACHINES_NEUTRES = {"?", "(NONE)", "LOCALHOST.LOCALDOMAIN", "UBUNTU", "DEBIAN", "KALI", "WORKGROUP", "BUILTIN", "NT AUTHORITY", "NT", "LOCALHOST", "MSHOME", "ADMIN", "IPC", "PRINT",
+                    "WINDOW MANAGER", "FONT DRIVER HOST", "NT SERVICE", "-"}
+# Longueur des IBAN par pays (un IBAN de la mauvaise longueur n'en est pas un : empreinte MD5, identifiant…)
+LONGUEURS_IBAN = dict(
+    (c, int(n)) for c, n in (x.split(":") for x in (
+        "AD:24 AE:23 AL:28 AT:20 AZ:28 BA:20 BE:16 BG:22 BH:22 BR:29 BY:28 CH:21 CR:22 CY:28 CZ:24 DE:22 DK:18 "
+        "DO:28 EE:20 EG:29 ES:24 FI:18 FO:18 FR:27 GB:22 GE:22 GI:23 GL:18 GR:27 GT:28 HR:21 HU:28 IE:22 IL:23 "
+        "IQ:23 IS:26 IT:27 JO:30 KW:30 KZ:20 LB:28 LC:32 LI:21 LT:20 LU:20 LV:21 MC:27 MD:24 ME:22 MK:19 MR:27 "
+        "MT:31 MU:30 NL:18 NO:15 PK:24 PL:28 PS:29 PT:25 QA:29 RO:24 RS:22 SA:24 SC:31 SE:24 SI:19 SK:24 SM:27 "
+        "ST:25 SV:28 TL:23 TN:24 TR:26 UA:29 VA:22 VG:24 XK:20").split()))
+# Codes pays utilisés comme extensions de domaine (sans cette liste, « subject.OU » passait pour un domaine)
+CODES_PAYS = set(
+    "ac ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bm bn bo br bs bt bw by bz "
+    "ca cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg er es et eu fi fj fk "
+    "fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu id ie il im in io iq "
+    "ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mg mh "
+    "mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk "
+    "pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sk sl sm sn so sr ss st sv sx sy sz tc "
+    "td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug uk us uy uz va vc ve vg vi vn vu wf ws ye yt za zm zw".split())
+# Premier niveau d'un identifiant à l'envers (com.apple.xpc, org.mozilla…) : ce n'est pas un nom de machine
+DEBUTS_INVERSES = {"com", "org", "net", "edu", "gov", "io", "fr", "de", "uk", "eu", "ch", "be", "nl", "jp"}
+
+
+def _luhn(chiffres):
+    total = 0
+    for i, c in enumerate(reversed(chiffres)):
+        n = int(c) * (2 if i % 2 else 1)
+        total += n - 9 if n > 9 else n
+    return total % 10 == 0
+
+
+def _iban_valide(compact):
+    reorganise = compact[4:] + compact[:4]
+    try:
+        return int("".join(str(int(c, 36)) for c in reorganise)) % 97 == 1
+    except ValueError:
+        return False
+
+
+def _nir_valide(compact):
+    corps = compact[:13].upper().replace("2A", "19").replace("2B", "18")
+    return corps.isdigit() and 97 - int(corps) % 97 == int(compact[13:])
 # Bouclage et adresses non attribuées : rien à cacher, et l'IA comprend mieux « 127.0.0.1 » qu'un jeton
 IP_NEUTRES = {"0.0.0.0", "::", "::1", "255.255.255.255"}
+# Types propagés à l'identique (majuscules comprises) : un mot de passe, ou un compte comme « root » ou
+# « Security » qui ne doit pas masquer « ROOT LOGIN » ou « PCI Root Bridge »
+EXACTS = ("SECRET", "COMPTE")
 
 
 def _accepte(type_, m, valeur):
-    if type_ == "SECRET" and re.match(r"(?:[/~]|[A-Za-z]:\\)", valeur):
-        return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
+    if type_ == "SECRET":
+        if re.match(r"(?:[/~]|[A-Za-z]:\\)", valeur):
+            return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
+        if valeur.lower() in COMPTES_NEUTRES or re.match(r"(?:com|org|net)\.[a-z]+\.", valeur):
+            return False  # « Elevated Token: No », identifiant macOS (com.apple.xpc…)
     if type_ == "IP":
-        if valeur in IP_NEUTRES or valeur.startswith("127."):
+        try:
+            adresse = ipaddress.ip_address(valeur.split("%")[0])
+        except ValueError:
             return False
-        if ":" in valeur:  # IPv6 : au moins un chiffre et une forme crédible (pas « dead:beef: »)
-            groupes = [g for g in valeur.split("%")[0].split(":") if g]
-            return any(c.isdigit() for c in valeur) and len(groupes) <= 8 and (len(groupes) >= 2 or "::" in valeur)
+        if adresse.is_loopback or adresse.is_unspecified or str(adresse) in IP_NEUTRES:
+            return False
+        if adresse.version == 4 and valeur.startswith("0."):
+            return False
+        avant = m.string[max(0, m.start() - 12):m.start()]
+        if re.search(r"(?:version|ver\.?|\bv)[ =:]*$", avant, re.IGNORECASE):
+            return False  # « wcp.dll version 0.0.0.6 », « Version=4.0.0.0 »
+        if ":" in valeur:  # IPv6 : au moins un chiffre (pas « dead:beef: »)
+            return any(c.isdigit() for c in valeur)
+        return True
     if type_ == "FQDN":
-        tld = m.group("tld").lower()
-        return tld not in EXTENSIONS_FICHIERS and (len(tld) == 2 or tld in EXTENSIONS_DOMAINE)
+        if "tld" not in m.re.groupindex:  # nom de machine ou de domaine NetBIOS (champ d'événement, NOM$)
+            return valeur.upper() not in MACHINES_NEUTRES and not re.fullmatch(r"(?:DWM|UMFD)-\d+", valeur)
+        tld = m.group("tld")
+        etiquettes = valeur.split(".")
+        if tld.lower() in EXTENSIONS_FICHIERS or (len(tld) == 2 and tld.lower() not in CODES_PAYS):
+            return False
+        if len(tld) > 2 and tld.lower() not in EXTENSIONS_DOMAINE:
+            return False
+        if re.fullmatch(r"[A-Z][a-z]+[A-Za-z]*", tld) and tld != tld.capitalize().upper():
+            return False  # espace de noms .NET : System.Security, Microsoft.PowerShell.Security
+        if len(etiquettes) >= 3 and etiquettes[0].lower() in DEBUTS_INVERSES:
+            return False  # identifiant à l'envers : com.apple.private.ac
+        if re.search(r"(?i)\.(?:exe|dll|sys)-[0-9a-f]{8}\.pf$", valeur):
+            return False  # fichier Prefetch : REG.EXE-E7E8BD26.pf
+        if len(etiquettes) == 2 and tld.lower() == "app" and etiquettes[0][:1].isupper():
+            return False  # application macOS : Weather.app
+        return True
     if type_ == "COMPTE":
         domaine = m.groupdict().get("d")
         if domaine and (domaine in DOMAINES_SYSTEME or domaine.startswith("HKEY")):
             return False
-        return valeur.strip().lower() not in PROFILS_GENERIQUES
+        propre = valeur.strip().lower()
+        if propre in PROFILS_GENERIQUES or propre in COMPTES_NEUTRES or propre.isdigit():
+            return False
+        return not re.fullmatch(r"(?:dwm|umfd)-\d+", propre)
+    if type_ in ("CARTE", "IBAN", "SECU"):
+        compact = re.sub(r"[ -]", "", valeur)
+        saisi = compact != valeur  # écrit avec ses espaces, comme dans un mail ou un ticket
+        if type_ == "CARTE":
+            return saisi or (compact[0] in "23456" and _luhn(compact))
+        if type_ == "IBAN":
+            if LONGUEURS_IBAN.get(compact[:2]) != len(compact):
+                return False
+            return saisi or _iban_valide(compact)
+        return (saisi and len(compact) in (13, 15)) or (len(compact) == 15 and _nir_valide(compact))
     return True
 
 
@@ -434,6 +563,15 @@ class Anonymiseur:
         # Une valeur déjà masquée dans la conversation est masquée partout où elle réapparaît,
         # même sans le contexte qui l'a fait détecter (« user slefevre » après « C:\\Users\\slefevre »).
         connues = [(v, t) for t, v in self.valide.values()] + [(v, t) for _, _, t, v in trouves]
+        # DOMAINE\utilisateur : le domaine et l'utilisateur seuls sont aussi masqués ailleurs
+        # (« vallorie\jdoe » dans la sortie de whoami, « Account Name: jdoe »)
+        for valeur, type_ in list(connues):
+            if type_ == "COMPTE" and valeur.count("\\") == 1:
+                domaine, utilisateur = valeur.split("\\")
+                if domaine.upper() not in DOMAINES_SYSTEME and re.fullmatch(r"[A-Za-z][\w-]{1,14}", domaine):
+                    connues.append((domaine, "FQDN\\"))  # seulement devant « \ » : pas « Acme SAS »
+                if utilisateur.lower() not in COMPTES_NEUTRES:
+                    connues.append((utilisateur, "COMPTE"))
         for d, f, type_, valeur in self._occurrences_connues(texte, connues, types):
             if prendre(d, f):
                 trouves.append((d, f, type_, valeur))
@@ -478,9 +616,9 @@ class Anonymiseur:
         """
         par_valeur = {}
         for valeur, type_ in connues:
-            if len(valeur) >= 3 and "\n" not in valeur and (types is None or type_ in types or
+            if len(valeur) >= 3 and "\n" not in valeur and (types is None or type_.rstrip("\\") in types or
                                                             type_ in ("NOM", "PERSO")):
-                par_valeur.setdefault(valeur if type_ == "SECRET" else valeur.lower(), (type_, valeur))
+                par_valeur.setdefault(valeur if type_ in EXACTS else valeur.lower(), (type_, valeur))
         minuscules = texte.lower()
         if len(minuscules) != len(texte):  # caractère dont la minuscule change la longueur : cas rare
             minuscules = None
@@ -491,7 +629,7 @@ class Anonymiseur:
         sortie = []
         for cle in sorted(par_valeur, key=len, reverse=True):  # les plus longues d'abord
             type_, valeur = par_valeur[cle]
-            exact = type_ == "SECRET"
+            exact = type_ in EXACTS
             if exact or minuscules is not None:
                 cible = texte if exact else minuscules
                 positions = []
@@ -502,12 +640,15 @@ class Anonymiseur:
             else:
                 positions = [m.start() for m in re.finditer(re.escape(valeur), texte, re.IGNORECASE)]
             n = len(valeur)
+            devant_barre = type_.endswith("\\")  # domaine NetBIOS déduit d'un DOMAINE\utilisateur
             for pos in positions:
+                if devant_barre and (pos + n >= len(texte) or texte[pos + n] != "\\"):
+                    continue
                 if mot(valeur[0]) and pos > 0 and mot(texte[pos - 1]):
                     continue
                 if mot(valeur[-1]) and pos + n < len(texte) and mot(texte[pos + n]):
                     continue
-                sortie.append((pos, pos + n, type_, texte[pos:pos + n]))
+                sortie.append((pos, pos + n, type_.rstrip("\\"), texte[pos:pos + n]))
         return sortie
 
     def _jetons_trouves(self, texte):
