@@ -10,6 +10,11 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.12.5** : corrections trouvées en remettant à jour les captures d'écran du README :
+  - **téléphone en fin de phrase de nouveau masqué** : depuis la v1.11.1, un numéro suivi d'un point (« … au 06 12 34 56 78. ») restait en clair, le point final étant pris pour une date (`15.42.50`). Un point ne bloque plus que s'il est suivi d'un chiffre ; les fausses détections dans les dates restent écartées ;
+  - **chaînes de connexion** : le serveur de `Server=sql01;…` et de `Data Source=tcp:sqlprod02,1433;…` est masqué (`localhost` reste lisible) ;
+  - **captures d'écran du README** refaites sur la version actuelle, avec l'onglet Masquage personnalisé des Options.
+
 - **v1.12.4** : dans « 3. Éléments masqués », le **masquage personnalisé de la conversation** est plus compact. Les boutons « Toujours masquer » et « Supprimer » sous la liste sont retirés. À la place :
   - une **3e colonne avec une croix ✕** sur chaque ligne : un clic supprime le terme, sans le charger dans les champs de saisie ;
   - **Toujours masquer** et **Supprimer** restent disponibles par un **clic droit** sur un terme (ou plusieurs, sélectionnés avec Ctrl ou Maj). La touche Suppr fonctionne toujours.
