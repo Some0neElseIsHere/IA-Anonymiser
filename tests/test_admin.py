@@ -450,5 +450,28 @@ class IpLocalesEtPubliques(unittest.TestCase):
                          "185.220.101.47 attaque 10.0.0.1 ; 185.220.101.47")
 
 
+class Cef(unittest.TestCase):
+    """Troisième série : échantillons Microsoft Sentinel (CEF, Syslog, EDR, SIEM), v1.12.3."""
+
+    def test_cef(self):
+        self.assertEqual(
+            anon("act=blocked suser=DESKTOP-UCETTHQ\\\\gtn-user shost=SRV-SBPAM-002 dvchost=AFW1-FL1 "
+                 "dntdom=paloaltonetwork duser= src=10.1.2.3"),
+            "act=blocked suser=[COMPTE_1] shost=[FQDN_1] dvchost=[FQDN_2] dntdom=[FQDN_3] duser= src=[IP_privée_1]")
+        self.assertEqual(anon("externalId=1;suser=abc;request=x"), "externalId=1;suser=[COMPTE_1];request=x")
+
+    def test_json_edr_siem(self):
+        self.assertEqual(
+            anon('"SrcUserName": "admin", "DstUserName": "NT AUTHORITY\\\\SYSTEM", "SrcHostName": "C-DFIR-WIN7", '
+                 '"endpoint_name": "DESKTOP_--007", "DeviceName": "localhost", "userAgent": "Mozilla/5.0"'),
+            '"SrcUserName": "[COMPTE_1]", "DstUserName": "NT AUTHORITY\\\\SYSTEM", "SrcHostName": "[FQDN_1]", '
+            '"endpoint_name": "[FQDN_2]", "DeviceName": "localhost", "userAgent": "Mozilla/5.0"')
+        self.assertEqual(anon("|targetUser=admin|targetHostname=ws-12|"), "|targetUser=[COMPTE_1]|targetHostname=[FQDN_1]|")
+
+    def test_pas_de_faux_secrets(self):
+        for texte in ("token={fsn=-1}", 'secret="\\"'):
+            self.assertEqual(anon(texte), texte, texte)
+
+
 if __name__ == "__main__":
     unittest.main()

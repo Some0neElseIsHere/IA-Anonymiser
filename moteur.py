@@ -162,9 +162,13 @@ MOTIFS = [
     ("FQDN", re.compile(r"(?im)^Machine:[ \t]*(?P<v>[A-Za-z0-9][\w.-]*)(?=[ \t]*(?:\(|$))")),
     # Serveur d'un chemin réseau : \\fs01\partage
     ("FQDN", re.compile(r"(?<![\w\\])\\\\(?P<v>[A-Za-z0-9][\w-]{0,62})(?=\\)")),
+    # Clé = machine : hostname=, host=, CEF (shost, dhost, dvchost, sntdom, dntdom), JSON des EDR et SIEM
+    # (SrcHostName, DstDvcHostname, endpoint_name, EndpointName, DeviceName, VbrHostName…)
     ("FQDN", re.compile(
-        r"(?<![\w.-])\"?(?:host[_-]?name|host|computer(?:[_-]?name)?|workstation|machine[_-]?name|device[_-]?name|"
-        r"client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name)\"?[ \t]*[:=][ \t]*\"?(?P<v>[A-Za-z0-9][\w.-]*)",
+        r"(?<![\w.-])\"?(?:[a-z_]*?(?:host[_-]?name|dvc[_-]?host[_-]?name|computer[_-]?name|device[_-]?name|"
+        r"endpoint[_-]?name|machine[_-]?name|workstation[_-]?name)|host|computer|workstation|[sd]host|dvchost|"
+        r"[sd]ntdom|client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name)"
+        r"\\?\"?[ \t]*[:=][ \t]*(?![^\s\"';,|&]*=)\\?\"?(?P<v>[A-Za-z0-9][\w.-]*)",
         re.IGNORECASE)),
     # Entra ID (Azure AD) : nom de l'appareil dans deviceDetail
     ("FQDN", re.compile(r'"deviceDetail"\s*:\s*\{[^{}]*?"displayName"\s*:\s*"(?P<v>[^"]+)"')),
@@ -192,6 +196,10 @@ MOTIFS = [
         r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|acct|account(?:[_-]?(?:name|id))?|samaccountname"
         r"|principal[_-]?id|recipient[_-]?account[_-]?id|owner[_-]?id)"
         r"[\"']?[ \t]*[:=][ \t]*" + _VALEUR_COMPTE, re.IGNORECASE)),
+    # Clés préfixées : CEF (suser, duser), JSON des EDR / SIEM (SrcUserName, DstUserName, targetUser…)
+    ("COMPTE", re.compile(
+        r"(?<![\w.-])\"?[a-z_]*?(?:user(?:[_-]?name)?|account[_-]?name)\\?\"?[ \t]*[:=][ \t]*"
+        r"(?![^\s\"';,|&]*=)(?P<q>\\?[\"'])?(?P<v>[^\s;,\"'<>&()\[\]{}|=]+)", re.IGNORECASE)),
     # AWS : numéro de compte et utilisateur ou rôle dans un ARN (arn:aws:iam::123456789012:user/pedro)
     ("COMPTE", re.compile(r"\barn:aws[\w-]*:[\w-]*:[\w-]*:(?P<v>\d{12}):")),
     ("COMPTE", re.compile(r"\barn:aws[\w-]*:(?:iam|sts)::\d{12}:(?:user|role|group|assumed-role)/"
@@ -252,7 +260,8 @@ DESCRIPTIONS = [
     ("ipconfig /all, systeminfo, hostnamectl : Host Name, Domain…", "ipconfig /all, systeminfo, hostnamectl: Host Name, Domain…"),
     ("Transcript PowerShell : Machine:", "PowerShell transcript: Machine:"),
     ("Serveur d'un chemin réseau (\\\\fs01\\partage)", "Server in a network path (\\\\fs01\\share)"),
-    ("Clé = machine : hostname=, srcname=, deviceName…", "Key = machine: hostname=, srcname=, deviceName…"),
+    ("Clé = machine : hostname=, CEF (shost, dhost, dvchost, dntdom), JSON (SrcHostName, EndpointName…)",
+     "Key = machine: hostname=, CEF (shost, dhost, dvchost, dntdom), JSON (SrcHostName, EndpointName…)"),
     ("Entra ID : appareil dans deviceDetail", "Entra ID: device in deviceDetail"),
     ("DNS Windows : (5)srv01(4)acme(5)local(0)", "Windows DNS: (5)srv01(4)acme(5)local(0)"),
     ("DHCP Windows : adresse MAC sans séparateurs", "Windows DHCP: MAC address without separators"),
@@ -263,6 +272,8 @@ DESCRIPTIONS = [
     ("Profil Windows : C:\\Users\\…", "Windows profile: C:\\Users\\…"),
     ("Profil Linux / macOS : /home/…, /Users/…", "Linux / macOS profile: /home/…, /Users/…"),
     ("Clé = compte : user=, login=, uid=, acct=, accountId…", "Key = account: user=, login=, uid=, acct=, accountId…"),
+    ("Clés préfixées : CEF (suser, duser), JSON (SrcUserName, targetUser…)",
+     "Prefixed keys: CEF (suser, duser), JSON (SrcUserName, targetUser…)"),
     ("AWS : numéro de compte dans un ARN", "AWS: account number in an ARN"),
     ("AWS : utilisateur ou rôle dans un ARN", "AWS: user or role in an ARN"),
     ("Kerberos : utilisateur/ROYAUME (Zeek, klist)", "Kerberos: user/REALM (Zeek, klist)"),
@@ -378,8 +389,8 @@ def _accepte(type_, m, valeur):
             return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
         if valeur.lower() in COMPTES_NEUTRES or re.match(r"(?:com|org|net)\.[a-z]+\.", valeur):
             return False  # « Elevated Token: No », identifiant macOS (com.apple.xpc…)
-        if re.match(r"[A-Z]\w*\{", valeur):
-            return False  # objet Java affiché : token=Token{a64f992}
+        if re.match(r"[A-Z]\w*\{|[{\[]", valeur) or not re.search(r"[A-Za-z0-9]", valeur):
+            return False  # objet affiché (token=Token{a64f992}, {fsn=-1}), ou rien qu'une ponctuation
     if type_ == "IP":
         try:
             adresse = ipaddress.ip_address(valeur.split("%")[0])
