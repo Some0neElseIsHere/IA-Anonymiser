@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.12.0** : **adresses IP locales et publiques distinguées**. L'IA voit d'un coup d'œil ce qui est interne et ce qui vient d'Internet :
+  - **IP locale (privée)**, jeton `[IP_1]` : 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 (CGNAT), 169.254.0.0/16 (lien local), multicast, plages de documentation, et en IPv6 fc00::/7, fe80::/10, ff00::/8 ;
+  - **IP publique**, jeton `[IP_PUB_1]` : toutes les autres, IPv4 et IPv6 ;
+  - **deux cases dans Options → Détection**, côte à côte. Décochez « Adresse IP publique » pour laisser lisibles les IP publiques (l'adresse d'un attaquant à faire analyser, par exemple) tout en masquant votre réseau interne ;
+  - **rien à refaire** : si les adresses IP étaient masquées, les IP publiques le sont aussi ; si elles étaient laissées en clair, les IP publiques le restent. Dans une conversation en cours, une IP publique déjà envoyée garde son jeton `[IP_n]`, pour que l'IA ne s'y perde pas ;
+  - en anglais, mêmes jetons (`[IP_1]`, `[IP_PUB_1]`).
+
 - **v1.11.4** : dans « 3. Éléments masqués », le premier clic sur la colonne « Ici » trie bien du plus fréquent au plus rare, comme annoncé en v1.11.3 (il triait du plus rare au plus fréquent). Le deuxième clic inverse, le troisième revient à l'ordre d'apparition.
 
 - **v1.11.3** : **tri dans « 3. Éléments masqués »**. Un clic sur un en-tête de colonne (Jeton, Type, Valeur d'origine, Ici) trie la liste par ordre croissant ▲, un deuxième par ordre décroissant ▼, un troisième revient à l'ordre d'apparition dans le texte. Le tri alphabétique ignore les majuscules et les accents (« élodie » avant « Etienne »). Les nombres sont rangés dans l'ordre naturel : `[IP_2]` avant `[IP_10]`, et la colonne « Ici » se trie du plus fréquent au plus rare. Le tri choisi est conservé d'un lancement à l'autre.
