@@ -1,0 +1,35 @@
+OK     accueil
+OK     langue_fr
+OK     reglages
+OK     masquage_personnalise
+OK     renommer
+OK     termes_conversation
+OK     jeton_terme_conversation
+OK     coller_log
+OK     verifier_anonymisation
+OK     recherche
+OK     tri_elements
+OK     copier_pour_ia
+OK     reponse_ia
+OK     verifier_restauration
+OK     survol
+OK     ne_pas_masquer
+OK     jeton_personnalise
+OK     verifier_annonce
+OK     verifier_annonce_unique
+OK     rapport
+OK     conversations
+OK     epingler
+OK     restaurer_ancienne_reponse
+OK     verifier_ancienne_reponse
+OK     anglais_et_sombre
+OK     anglais_jetons
+OK     verifier_anglais
+OK     fermer_conversation
+OK     gros_log
+OK     defilement_jumele
+OK     colonne_reduite
+OK     quitter_phase1
+
+gros log (3 000 lignes) : 1.38 s
+fenêtres simulées : [('askyesno', ('IA-Anonymiser', "Rapport enregistré :\nresultats-e2e\\rapport-scenario.html\n\nL'ouvrir maintenant ?"))]
