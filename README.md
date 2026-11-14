@@ -24,6 +24,8 @@ Au premier lancement, un écran d'accueil présente le principe. Ensuite, tant q
 
 Dans les deux onglets, **passez la souris sur un élément surligné** : une bulle affiche le jeton correspondant (côté texte original ou réponse restaurée) ou la vraie valeur (côté jetons), avec son type. La ligne survolée s'éclaire **des deux côtés**, pour retrouver d'un coup d'œil sa version anonymisée ou restaurée. Les deux zones **défilent ensemble**, ligne à ligne.
 
+Pour **rechercher** dans le texte original : **Ctrl+F** ou la loupe à côté de « Coller ». Toutes les occurrences sont surlignées en bleu, la courante en orange ; **Entrée** passe à la suivante, **Maj+Entrée** à la précédente, **Échap** ferme la recherche. La zone de droite suit, pour voir la version anonymisée.
+
 ![Onglet Restaurer](docs/clair-restaurer.png)
 
 ### Une conversation par discussion avec l'IA

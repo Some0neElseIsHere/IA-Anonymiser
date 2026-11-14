@@ -10,6 +10,10 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.10.6** :
+  - **recherche dans le texte original** : **Ctrl+F**, ou la loupe à côté de « Coller », ouvre une barre de recherche au-dessus du texte. Toutes les occurrences sont surlignées en bleu et la courante en orange, avec un compteur (« 3 / 12 »). **Entrée** ou **↓** passe à la suivante, **Maj+Entrée** ou **↑** à la précédente, **Échap** ferme. La recherche ignore les majuscules, se met à jour quand le texte change, et la zone de droite suit pour montrer la version anonymisée. Un mot sélectionné avant Ctrl+F est recherché directement ;
+  - **colonne réduite** : initiales des conversations bien centrées, boutons **»** et **+** agrandis.
+
 - **v1.10.5** :
   - **ligne survolée en surbrillance des deux côtés** : dans « Anonymiser mon texte » et « Restaurer la réponse de l'IA », la ligne sous la souris s'éclaire à gauche et la ligne correspondante s'éclaire à droite. Les surlignages jaunes et verts restent visibles par-dessus ;
   - **conversations dans la colonne réduite** : la barre d'icônes liste désormais toutes les conversations, en initiales (« IA » pour « Incident AD », « C3 » pour « Conversation 3 »), les épinglées d'abord, séparées des autres par un trait. Un clic change de conversation, le survol affiche le nom complet, et le clic droit ouvre le menu habituel (épingler, renommer, exporter, fermer).
