@@ -263,9 +263,162 @@ def passwd(u, t):
         lignes.append(f"{x['login']}:x:{u.r.randint(1000, 2000)}:100:{x['prenom']} {x['nom']},,,:/home/{x['login']}:/bin/bash")
     return "\n".join(lignes) + "\n"
 
+def fortigate(u, t, n=4):
+    r, lignes = u.r, []
+    for _ in range(n):
+        x, poste = r.choice(u.personnes), r.choice(u.postes)
+        u.note(x["login"], poste, u.ip[poste], u.attaquant)
+        d = next(t)
+        lignes.append(f'date={d:%Y-%m-%d} time={d:%H:%M:%S} devname="FGT-SIEGE" devid="FG100FTK21000123" '
+                      f'logid="0000000013" type="traffic" subtype="forward" level="notice" vd="root" '
+                      f'srcip={u.ip[poste]} srcport={r.randint(40000, 65000)} srcintf="port1" srcname="{poste}" '
+                      f'dstip={u.attaquant} dstport=443 dstintf="wan1" action="{r.choice(["accept", "deny"])}" '
+                      f'user="{x["login"]}" group="VPN-Users" service="HTTPS" sentbyte={r.randint(100, 99999)}')
+    return "\n".join(lignes) + "\n"
+
+
+def cisco_asa(u, t, n=4):
+    r, lignes = u.r, []
+    for _ in range(n):
+        x = r.choice(u.personnes)
+        srv = r.choice(u.serveurs)
+        u.note(x["login"], u.attaquant, u.ip[srv])
+        d = next(t)
+        if r.random() < 0.5:
+            lignes.append(f"{d:%b %d %Y %H:%M:%S}: %ASA-6-113004: AAA user authentication Successful : "
+                          f"server =  {u.ip[srv]} : user = {x['login']}")
+        else:
+            lignes.append(f"{d:%b %d %Y %H:%M:%S}: %ASA-4-722051: Group <GP-VPN> User <{x['login']}> "
+                          f"IP <{u.attaquant}> IPv4 Address <10.8.0.{r.randint(2, 250)}> assigned to session")
+    return "\n".join(lignes) + "\n"
+
+
+def iis(u, t, n=5):
+    r = u.r
+    lignes = ["#Software: Microsoft Internet Information Services 10.0", "#Version: 1.0",
+              "#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) sc-status"]
+    srv = r.choice(u.serveurs)
+    for _ in range(n):
+        x, poste = r.choice(u.personnes), r.choice(u.postes)
+        u.note(x["login"], u.ip[poste], u.ip[srv])
+        nom = r.choice([f"{u.netbios}\\{x['login']}", f"{x['login']}@{u.domaine}"])
+        d = next(t)
+        lignes.append(f"{d:%Y-%m-%d %H:%M:%S} {u.ip[srv]} GET /owa/ - 443 {nom} {u.ip[poste]} "
+                      f"Mozilla/5.0+(Windows+NT+10.0) {r.choice([200, 302, 401])}")
+    return "\n".join(lignes) + "\n"
+
+
+def exchange_suivi(u, t, n=4):
+    r = u.r
+    lignes = ["date-time,client-ip,client-hostname,server-ip,server-hostname,event-id,recipient-address,"
+              "message-subject,sender-address"]
+    srv = r.choice(u.serveurs)
+    for _ in range(n):
+        x, y = r.sample(u.personnes, 2)
+        u.note(x["email"], y["email"], f"{srv}.{u.domaine}", u.ip[srv])
+        lignes.append(f"{next(t):%Y-%m-%dT%H:%M:%S}.000Z,{u.ip[srv]},{srv}.{u.domaine},{u.ip[srv]},"
+                      f"{srv}.{u.domaine},DELIVER,{y['email']},Facture novembre,{x['email']}")
+    return "\n".join(lignes) + "\n"
+
+
+def postfix(u, t, n=4):
+    r, lignes = u.r, []
+    for _ in range(n):
+        x = r.choice(u.personnes)
+        srv = r.choice(u.serveurs)
+        u.note(x["email"], u.attaquant, srv)
+        d = next(t)
+        tete = f"{d:%b} {d.day:>2} {d:%H:%M:%S} {srv} postfix/smtpd[{r.randint(1000, 9999)}]"
+        lignes.append(f"{tete}: 4F1A2{r.randint(10, 99)}: client=unknown[{u.attaquant}], sasl_method=LOGIN, "
+                      f"sasl_username={x['email']}")
+        lignes.append(f"{tete}: warning: unknown[{u.attaquant}]: SASL LOGIN authentication failed: "
+                      f"UGFzc3dvcmQ6")
+    return "\n".join(lignes) + "\n"
+
+
+def squid(u, t, n=4):
+    r, lignes = u.r, []
+    for _ in range(n):
+        x, poste = r.choice(u.personnes), r.choice(u.postes)
+        u.note(x["login"], u.ip[poste])
+        lignes.append(f"{r.randint(1_700_000_000, 1_800_000_000)}.{r.randint(100, 999)}    {r.randint(10, 999)} "
+                      f"{u.ip[poste]} TCP_MISS/200 {r.randint(500, 90000)} GET http://www.example.com/ "
+                      f"{x['login']} HIER_DIRECT/93.184.216.34 text/html")
+    return "\n".join(lignes) + "\n"
+
+
+def entra(u, t, n=2):
+    r, lignes = u.r, []
+    for _ in range(n):
+        x, poste = r.choice(u.personnes), r.choice(u.postes)
+        u.note(f"{x['login']}@{u.domaine}", u.attaquant, poste)
+        lignes.append('{"createdDateTime":"%s","userDisplayName":"%s %s","userPrincipalName":"%s@%s",'
+                      '"userId":"%s","appDisplayName":"Office 365 Exchange Online","ipAddress":"%s",'
+                      '"status":{"errorCode":50126,"failureReason":"Invalid username or password."},'
+                      '"deviceDetail":{"deviceId":"","displayName":"%s","operatingSystem":"Windows10",'
+                      '"browser":"Edge 120.0.0"},"location":{"city":"Lyon","countryOrRegion":"FR"}}'
+                      % (f"{next(t):%Y-%m-%dT%H:%M:%SZ}", x["prenom"], x["nom"], x["login"], u.domaine,
+                         uuid.UUID(int=r.getrandbits(128)), u.attaquant, poste))
+    return "\n".join(lignes) + "\n"
+
+
+def dns_windows(u, t, n=4):
+    r, lignes = u.r, []
+    for _ in range(n):
+        poste, srv = r.choice(u.postes), r.choice(u.serveurs)
+        u.note(u.ip[poste], f"{srv}.{u.domaine}")
+        etiquettes = "".join(f"({len(p)}){p}" for p in f"{srv}.{u.domaine}".split(".")) + "(0)"
+        d = next(t)
+        lignes.append(f"{d:%d/%m/%Y %H:%M:%S} 0A3C PACKET  000001D2B3C4{r.randint(1000, 9999)} UDP Rcv "
+                      f"{u.ip[poste]}  1a2b   Q [0001   D   NOERROR] A      {etiquettes}")
+    return "\n".join(lignes) + "\n"
+
+
+def dhcp_windows(u, t, n=4):
+    r = u.r
+    lignes = ["ID,Date,Time,Description,IP Address,Host Name,MAC Address,User Name, TransactionID"]
+    for _ in range(n):
+        poste = r.choice(u.postes)
+        mac = u.mac[poste].replace(":", "")
+        u.note(u.ip[poste], f"{poste}.{u.domaine}", mac)
+        d = next(t)
+        lignes.append(f"10,{d:%m/%d/%y},{d:%H:%M:%S},Assign,{u.ip[poste]},{poste}.{u.domaine},{mac},,"
+                      f"{r.randint(100000, 999999)},0,,,,0x4D53465420352E30,MSFT 5.0,,,,0")
+    return "\n".join(lignes) + "\n"
+
+
+def evenement_fr(u, t, n=3):
+    r, blocs = u.r, []
+    for _ in range(n):
+        x, poste = r.choice(u.personnes), r.choice(u.postes)
+        u.note(x["login"], u.netbios, poste, u.ip[poste])
+        blocs.append(f"{next(t):%d/%m/%Y %H:%M:%S}  Sécurité  4625\nÉchec d'ouverture de session d'un compte.\n\n"
+                     f"Sujet :\n\tID de sécurité :\t\tS-1-0-0\n\tNom du compte :\t\t-\n\n"
+                     f"Compte pour lequel l'ouverture de session a échoué :\n\tID de sécurité :\t\tS-1-0-0\n"
+                     f"\tNom du compte :\t\t{x['login']}\n\tDomaine du compte :\t\t{u.netbios}\n\n"
+                     f"Informations sur le réseau :\n\tNom de la station de travail :\t{poste}\n"
+                     f"\tAdresse du réseau source :\t{u.ip[poste]}\n\tPort source :\t\t0\n")
+    return "\n".join(blocs)
+
+
+def conteneurs(u, t, n=3):
+    r, lignes = u.r, []
+    for _ in range(n):
+        x, poste = r.choice(u.personnes), r.choice(u.postes)
+        u.note(x["email"], u.ip[poste])
+        lignes.append('{"kind":"Event","apiVersion":"audit.k8s.io/v1","level":"Metadata","verb":"delete",'
+                      '"user":{"username":"%s","groups":["system:authenticated"]},"sourceIPs":["%s"],'
+                      '"objectRef":{"resource":"secrets","namespace":"paie"}}' % (x["email"], u.ip[poste]))
+        lignes.append('{"log":"%s INFO login ok user=%s ip=%s\\n","stream":"stdout","time":"%s"}'
+                      % (f"{next(t):%Y-%m-%dT%H:%M:%S}", x["login"], u.ip[poste], f"{next(t):%Y-%m-%dT%H:%M:%SZ}"))
+        u.note(x["login"])
+    return "\n".join(lignes) + "\n"
+
 
 FORMATS = [security, security, sysmon, ipconfig, get_aduser, net_user, transcript, auth_log, auth_log, journal,
-           auditd, acces_web, passwd]
+           auditd, acces_web, passwd, fortigate, cisco_asa, iis, exchange_suivi, postfix, squid, entra, dns_windows,
+           dhcp_windows, evenement_fr, conteneurs]
+
 
 
 def document(u, n_blocs=4):

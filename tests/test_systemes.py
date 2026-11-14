@@ -46,9 +46,12 @@ class Systemes(unittest.TestCase):
         self.assertEqual(abimes[:20], [])
 
     def test_restauration(self):
-        # Noms de machine et de domaine : même jeton quelle que soit la casse (WEB04 / web04)
+        # Même jeton pour les écritures d'une même valeur : casse des noms de machine (WEB04 / web04),
+        # séparateurs des adresses MAC (06-6E-30-D6-3A-BE / 066E30D63ABE)
+        def forme(x):
+            return re.sub(r"\b([0-9a-f]{2})[:-](?=[0-9a-f]{2}\b)", r"\1", x.casefold())
         for _, texte, sortie, a in self.cas:
-            self.assertEqual(a.restaurer(sortie).texte.casefold(), texte.casefold())
+            self.assertEqual(forme(a.restaurer(sortie).texte), forme(texte))
 
     def test_rapide(self):
         self.assertLess(self.duree, 30)

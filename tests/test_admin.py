@@ -375,5 +375,50 @@ class JournauxReels(unittest.TestCase):
         self.assertEqual(anon("User name                    jdupont"), "User name                    [COMPTE_1]")
 
 
+class JournauxReels2(unittest.TestCase):
+    """Deuxième série : supercalculateurs, AWS, Zeek, pare-feu, proxy, Entra ID, DNS et DHCP Windows (v1.11.1)."""
+
+    def test_pas_de_faux_telephones_ni_numeros(self):
+        for texte in ("#open\t2023-08-16-01-28-55", "trace-2020-09-04-03-30-17.etl", "2005-06-03-15.42.50.675872",
+                      "081110 010354 5184 INFO", "Fan speeds ( 3552 3534 3375 4245 3515 )",
+                      "softheader=003b005b 00030000 00000001", "value=\"1 5 0 139 61 48 160 241 107\"",
+                      "onExtend:1514038530000 14 0 4", "token=Token{a64f992 ActivityRecord}",
+                      "PCI\\VEN_8086&DEV_1237", "USB\\VID_80EE&PID_0021"):
+            self.assertEqual(anon(texte), texte, texte)
+
+    def test_numeros_qui_restent_masques(self):
+        self.assertEqual(anon("06 12 34 56 78 / 06.12.34.56.78 / 0612345678"), "[TEL_1] / [TEL_1] / [TEL_1]")
+        self.assertEqual(anon("carte 4970 1012 3456 7890"), "carte [CARTE_1]")
+        self.assertEqual(anon("2 66 08 27 142 815 13"), "[SECU_1]")
+
+    def test_aws(self):
+        self.assertEqual(anon('"arn":"arn:aws:iam::123456789123:user/pedro","accountId":"123456789123"'),
+                         '"arn":"arn:aws:iam::[COMPTE_1]:user/[COMPTE_2]","accountId":"[COMPTE_1]"')
+
+    def test_kerberos(self):
+        self.assertEqual(anon("stevie.marie/PANDALAB.COM\tkrbtgt/PANDALAB.COM"),
+                         "[COMPTE_1]/[FQDN_1]\tkrbtgt/[FQDN_1]")
+        self.assertEqual(anon("HIER_DIRECT/93.184.216.34"), "HIER_DIRECT/[IP_1]")
+
+    def test_pare_feu_et_proxy(self):
+        self.assertEqual(anon('srcip=10.1.2.3 srcname="PC-0815" user="jdupont"'),
+                         'srcip=[IP_1] srcname="[FQDN_1]" user="[COMPTE_1]"')
+        self.assertEqual(anon("AAA user authentication Successful : server =  10.1.1.5 : user = jdupont"),
+                         "AAA user authentication Successful : server =  [IP_1] : user = [COMPTE_1]")
+        self.assertEqual(anon("Group <GP-VPN> User <jdupont> IP <185.1.2.3>"),
+                         "Group <GP-VPN> User <[COMPTE_1]> IP <[IP_1]>")
+        self.assertEqual(anon("1711169010.546    458 10.1.2.3 TCP_MISS/200 69715 GET http://x.example.com/ jdupont "
+                              "HIER_DIRECT/93.184.216.34 text/html"),
+                         "1711169010.546    458 [IP_1] TCP_MISS/200 69715 GET http://[FQDN_1]/ [COMPTE_1] "
+                         "HIER_DIRECT/[IP_2] text/html")
+
+    def test_entra_dns_dhcp(self):
+        self.assertEqual(anon('"deviceDetail":{"deviceId":"","displayName":"PC-0815","operatingSystem":"Windows10"}'),
+                         '"deviceDetail":{"deviceId":"","displayName":"[FQDN_1]","operatingSystem":"Windows10"}')
+        self.assertEqual(anon("A      (5)rds01(8)vallorie(5)local(0)"), "A      [FQDN_1]")
+        self.assertEqual(anon("10,11/10/26,11:38:44,Assign,10.1.2.3,pc-1.acme.local,7C2886E5CF51,,685860"),
+                         "10,11/10/26,11:38:44,Assign,[IP_1],[FQDN_1],[MAC_1],,685860")
+
+
 if __name__ == "__main__":
     unittest.main()

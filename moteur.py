@@ -108,7 +108,7 @@ MOTIFS = [
         r" ?\d{3} ?\d{3}(?: ?\d{2})?(?![\d\w.])")),
     ("CARTE", re.compile(r"(?<![\w-])(?:\d{4}[ -]?){3}\d{4}(?![\w-])")),
     ("TEL", re.compile(
-        r"(?<![\w+])(?:(?:\+|00)33 ?(?:\(0\) ?)?|0)[1-9](?:[ .-]?\d{2}){4}(?!\w)"  # France
+        r"(?<![\w+.:/-])(?:(?:\+|00)33 ?(?:\(0\) ?)?|0)[1-9](?P<sep>[ .-]?)\d{2}(?:(?P=sep)\d{2}){3}(?![\w.:-])"  # France
         r"|(?<![\w+])\+[1-9]\d{0,2}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?![\w.])"   # international
     )),
     # Compte d'ordinateur (WORKSTATION5$, svc_ADFS$) : le nom de la machine est masqué, le « $ » reste
@@ -126,8 +126,16 @@ MOTIFS = [
     ("FQDN", re.compile(r"(?im)^Machine:[ \t]*(?P<v>[A-Za-z0-9][\w.-]*)(?=[ \t]*(?:\(|$))")),
     # Serveur d'un chemin réseau : \\fs01\partage
     ("FQDN", re.compile(r"(?<![\w\\])\\\\(?P<v>[A-Za-z0-9][\w-]{0,62})(?=\\)")),
-    ("FQDN", re.compile(r"(?<![\w.-])(?:hostname|host|computer|computername|workstation)=\"?(?P<v>[A-Za-z0-9][\w.-]*)",
-                        re.IGNORECASE)),
+    ("FQDN", re.compile(
+        r"(?<![\w.-])\"?(?:host[_-]?name|host|computer(?:[_-]?name)?|workstation|machine[_-]?name|device[_-]?name|"
+        r"client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name)\"?[ \t]*[:=][ \t]*\"?(?P<v>[A-Za-z0-9][\w.-]*)",
+        re.IGNORECASE)),
+    # Entra ID (Azure AD) : nom de l'appareil dans deviceDetail
+    ("FQDN", re.compile(r'"deviceDetail"\s*:\s*\{[^{}]*?"displayName"\s*:\s*"(?P<v>[^"]+)"')),
+    # DNS Windows (journal de débogage) : (5)rds01(8)vallorie(5)local(0)
+    ("FQDN", re.compile(r"(?:\(\d{1,2}\)[\w-]+){2,}\(0\)")),
+    # DHCP Windows : adresse MAC sans séparateurs dans le journal CSV
+    ("MAC", re.compile(r"(?m)^\d{2},\d\d/\d\d/\d\d,\d\d:\d\d:\d\d,[^,\n]*,[^,\n]*,[^,\n]*,(?P<v>[0-9A-Fa-f]{12}),")),
     # Événements Windows tels qu'affichés (Observateur d'événements, SIEM) : un champ par ligne
     ("FQDN", re.compile(
         r"(?im)^[ \t]*(?:Account Domain|Domain Name|Domaine du compte|Nom de domaine|Workstation Name|"
@@ -145,14 +153,24 @@ MOTIFS = [
         re.IGNORECASE)),
     ("COMPTE", re.compile(r"(?<![\w./-])/(?:home|Users)/(?P<v>[A-Za-z0-9._-]+)")),
     ("COMPTE", re.compile(
-        r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|acct|account(?:[_-]?name)?|samaccountname)"
+        r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|acct|account(?:[_-]?(?:name|id))?|samaccountname"
+        r"|principal[_-]?id|recipient[_-]?account[_-]?id|owner[_-]?id)"
         r"[\"']?[ \t]*[:=][ \t]*" + _VALEUR_COMPTE, re.IGNORECASE)),
+    # AWS : numéro de compte et utilisateur ou rôle dans un ARN (arn:aws:iam::123456789012:user/pedro)
+    ("COMPTE", re.compile(r"\barn:aws[\w-]*:[\w-]*:[\w-]*:(?P<v>\d{12}):")),
+    ("COMPTE", re.compile(r"\barn:aws[\w-]*:(?:iam|sts)::\d{12}:(?:user|role|group|assumed-role)/"
+                          r"(?:[\w+=,.@-]+/)*(?P<v>[\w+=,.@-]+)")),
+    # Kerberos (Zeek, klist) : « stevie.marie/PANDALAB.COM » ; les classes de service (krbtgt/, ldap/) restent
+    ("COMPTE", re.compile(r"(?<![\w./\\$-])(?P<v>[\w.-]+)/(?=(?:[A-Z0-9-]+\.)+[A-Z]{2,}(?![\w.]))")),
     # Comptes dans les journaux : SQL Server, sshd, PAM, sudo, net use /user:x
     ("COMPTE", re.compile(r"\bfor (?:invalid |illegal )?user '(?P<v>[^'\s\\]+)'", re.IGNORECASE)),
     ("COMPTE", re.compile(r"\bfor (?:invalid |illegal )?user (?P<v>[\w.$-]+)(?= from\b)")),
     ("COMPTE", re.compile(r"\b(?:Accepted|Failed) [\w/-]+ for (?P<v>[\w.$-]+) from\b")),
     ("COMPTE", re.compile(r"\bsession (?:opened|closed) for user (?P<v>[\w.$-]+)")),
     ("COMPTE", re.compile(r"\bsudo(?:\[\d+\])?:\s+(?P<v>[\w.$-]+) : ")),
+    # Cisco ASA (« User <jdupont> »), Squid (colonne utilisateur avant HIER_…)
+    ("COMPTE", re.compile(r"\b[Uu]ser <(?P<v>[^<>\s]+)>")),
+    ("COMPTE", re.compile(r"(?m)^\d{9,10}\.\d{3}\s+\d+ \S+ [A-Z_]+/\d{3} \d+ [A-Z]+ \S+ (?P<v>[^\s-]\S*) [A-Z_]+/")),
     ("COMPTE", re.compile(r"\b(?:[Ss]ession \d+|[Ss]lice) of user (?P<v>[\w.$-]+?)\.?(?=\s|$)")),
     ("COMPTE", re.compile(r"\bpassword (?:changed|expired) for (?P<v>[\w.$-]+)")),
     ("COMPTE", re.compile(r"\bby (?P<v>[\w.$-]+)\(uid=\d+\)")),
@@ -176,10 +194,14 @@ MOTIFS = [
 ]
 
 DOMAINES_SYSTEME = {"BUILTIN", "NT", "AUTHORITY", "SERVICE", "APPPOOL", "WORKGROUP", "HKLM", "HKCU", "HKCR",
-                    "HKU", "HKCC", "SYSTEM", "LOCAL"}
+                    "HKU", "HKCC", "SYSTEM", "LOCAL",
+                    # Identifiants de périphériques Windows : PCI\VEN_8086, USB\VID_80EE, SCSI\DISK…
+                    "PCI", "HDAUDIO", "HID", "ACPI", "USB", "USBSTOR", "SCSI", "SWD", "ROOT", "STORAGE", "DISPLAY",
+                    "BTHENUM", "BTH", "IDE", "PCIIDE", "UMB", "SW", "MONITOR", "HTREE", "NDIS", "BTHLE", "BTHLEDEVICE",
+                    "INTELAUDIO", "TS_USB_HUB_ENUMERATOR", "VMBUS", "WPDBUSENUM", "MMDEVAPI", "UEFI"}
 PROFILS_GENERIQUES = {"public", "default", "default user", "all users", "shared", "guest"}
 # Valeurs qui ne sont pas des comptes : champs vides, booléens, comptes intégrés de Windows
-COMPTES_NEUTRES = {"-", "?", "(unknown)", "unset", "no", "yes", "true", "false", "none", "null", "n/a", "na", "unknown", "nt", "system",
+COMPTES_NEUTRES = {"-", "?", "(unknown)", "unset", "self", "anonymous_principal", "no", "yes", "true", "false", "none", "null", "n/a", "na", "unknown", "nt", "system",
                    "local service", "network service", "localsystem", "anonymous logon", "nt authority",
                    "service local", "service réseau", "système", "ouverture de session anonyme", "%%1843"}
 MACHINES_NEUTRES = {"?", "(NONE)", "LOCALHOST.LOCALDOMAIN", "UBUNTU", "DEBIAN", "KALI", "WORKGROUP", "BUILTIN", "NT AUTHORITY", "NT", "LOCALHOST", "MSHOME", "ADMIN", "IPC", "PRINT",
@@ -202,6 +224,14 @@ CODES_PAYS = set(
     "pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sk sl sm sn so sr ss st sv sx sy sz tc "
     "td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug uk us uy uz va vc ve vg vi vn vu wf ws ye yt za zm zw".split())
 # Premier niveau d'un identifiant à l'envers (com.apple.xpc, org.mozilla…) : ce n'est pas un nom de machine
+SERVICES_SPN = {"krbtgt", "ldap", "cifs", "host", "http", "https", "mssqlsvc", "rpcss", "dns", "gc", "wsman",
+                "termsrv", "restrictedkrbhost", "kadmin", "nfs", "smtp", "imap", "pop", "ftp", "exchangemdb",
+                "exchangerfr", "exchangeab", "dhcp", "time", "msomhsvc", "msoledbsql", "postgres", "mysql"}
+# Mots qui, juste avant un numéro, confirment qu'il s'agit bien d'une carte ou d'un n° de sécurité sociale
+_CONTEXTE = {
+    "CARTE": re.compile(r"(?i)(?:carte|card|\bcb\b|visa|mastercard|master card|amex|\bpan\b|cr[ée]dit)"),
+    "SECU": re.compile(r"(?i)(?:s[ée]cu|s[ée]curit[ée] sociale|\bnir\b|insee|\bssn\b|social security|n° ss|num_ss)"),
+}
 DEBUTS_INVERSES = {"com", "org", "net", "edu", "gov", "io", "fr", "de", "uk", "eu", "ch", "be", "nl", "jp"}
 
 
@@ -237,6 +267,8 @@ def _accepte(type_, m, valeur):
             return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
         if valeur.lower() in COMPTES_NEUTRES or re.match(r"(?:com|org|net)\.[a-z]+\.", valeur):
             return False  # « Elevated Token: No », identifiant macOS (com.apple.xpc…)
+        if re.match(r"[A-Z]\w*\{", valeur):
+            return False  # objet Java affiché : token=Token{a64f992}
     if type_ == "IP":
         try:
             adresse = ipaddress.ip_address(valeur.split("%")[0])
@@ -247,7 +279,7 @@ def _accepte(type_, m, valeur):
         if adresse.version == 4 and valeur.startswith("0."):
             return False
         avant = m.string[max(0, m.start() - 12):m.start()]
-        if re.search(r"(?:version|ver\.?|\bv)[ =:]*$", avant, re.IGNORECASE):
+        if re.search(r"\b(?:version|ver\.?|v)[ =:]*$", avant, re.IGNORECASE):
             return False  # « wcp.dll version 0.0.0.6 », « Version=4.0.0.0 »
         if ":" in valeur:  # IPv6 : au moins un chiffre (pas « dead:beef: »)
             return any(c.isdigit() for c in valeur)
@@ -275,19 +307,31 @@ def _accepte(type_, m, valeur):
         if domaine and (domaine in DOMAINES_SYSTEME or domaine.startswith("HKEY")):
             return False
         propre = valeur.strip().lower()
-        if propre in PROFILS_GENERIQUES or propre in COMPTES_NEUTRES or propre.isdigit():
-            return False
+        if propre in PROFILS_GENERIQUES or propre in COMPTES_NEUTRES or (propre.isdigit() and len(propre) < 6):
+            return False  # uid=0, uid=1000 ; un n° de compte AWS (12 chiffres) reste masqué
+        if propre in SERVICES_SPN and m.string[m.end("v"):m.end("v") + 1] == "/":
+            return False  # krbtgt/DOMAINE.LOCAL, ldap/DC01… : classe de service, pas un utilisateur
         return not re.fullmatch(r"(?:dwm|umfd)-\d+", propre)
     if type_ in ("CARTE", "IBAN", "SECU"):
         compact = re.sub(r"[ -]", "", valeur)
         saisi = compact != valeur  # écrit avec ses espaces, comme dans un mail ou un ticket
+        avant = m.string[max(0, m.start() - 60):m.start()]
         if type_ == "CARTE":
-            return saisi or (compact[0] in "23456" and _luhn(compact))
+            if compact[0] not in "23456":
+                return False
+            groupes_reguliers = re.fullmatch(r"\d{4}([ -])\d{4}\1\d{4}\1\d{4}", valeur)
+            # Luhn valide, ou écrit comme une carte (4 x 4) avec « carte », « CB », « Visa »… juste avant
+            return _luhn(compact) or bool(saisi and groupes_reguliers and _CONTEXTE["CARTE"].search(avant))
         if type_ == "IBAN":
             if LONGUEURS_IBAN.get(compact[:2]) != len(compact):
                 return False
             return saisi or _iban_valide(compact)
-        return (saisi and len(compact) in (13, 15)) or (len(compact) == 15 and _nir_valide(compact))
+        if len(compact) == 15 and _nir_valide(compact):
+            return True
+        if re.fullmatch(r"[12] \d{2} (?:0[1-9]|1[0-2]|[2-9]\d) (?:\d{2}|2[AB]) \d{3} \d{3}(?: \d{2})?", valeur):
+            return True  # présentation officielle du NIR (1 85 05 78 006 084 36) : sans ambiguïté
+        # Sinon, clé fausse ou absente : seulement si « sécu », « NIR »… précède (des nombres quelconques passeraient)
+        return saisi and len(compact) in (13, 15) and bool(_CONTEXTE["SECU"].search(avant))
     return True
 
 
