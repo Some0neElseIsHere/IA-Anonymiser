@@ -519,7 +519,9 @@ def lancer():
         racine.update()
         verifier(app.source.lire().rstrip("\n") == contenu.replace("\r\n", "\n").rstrip("\n"),
                  f"fichier UTF-16 mal lu : {app.source.lire()!r}")
-        verifier("[COMPTE_1]" in app.sortie.lire() and "10.1.2.3" not in app.sortie.lire(), "fichier non anonymisé")
+        sortie = app.sortie.lire()  # l'interface est en anglais à ce stade : [ACCOUNT_1]
+        verifier("jdupont" not in sortie and "10.1.2.3" not in sortie and "dc01" not in sortie,
+                 f"fichier non anonymisé : {sortie!r}")
         # Glisser-déposer de deux fichiers : vrai message WM_DROPFILES, comme depuis l'Explorateur
         a, b = os.path.join(SORTIE, "a.log"), os.path.join(SORTIE, "b.txt")
         open(a, "w", encoding="utf-8").write("srv-a 10.0.0.1\n")
