@@ -135,6 +135,7 @@ class Options:
         self.langue = "auto"         # auto, fr, en
         self.theme = "auto"          # auto, clair, sombre
         self.conserver = True        # conversations gardées entre deux lancements
+        self.colonne_reduite = False  # colonne des conversations réduite à une barre d'icônes
         # Première installation : aucun réglage enregistré (sert à afficher l'écran d'accueil une seule fois)
         self.premier_lancement = not os.path.exists(self.chemin)
         self.charger()
@@ -171,6 +172,7 @@ class Options:
         self.langue = d.get("langue") if d.get("langue") in ("auto", "fr", "en") else "auto"
         self.theme = d.get("theme") if d.get("theme") in ("auto", "clair", "sombre") else "auto"
         self.conserver = bool(d.get("conserver", True))
+        self.colonne_reduite = bool(d.get("colonne_reduite", False))
 
     def sauver(self):
         with open(self.chemin, "w", encoding="utf-8") as f:
@@ -178,7 +180,8 @@ class Options:
                        "etiquettes": self.etiquettes,
                        "motifs": self.motifs,
                        "consigne": self.consigne, "consigne_texte": self.consigne_texte,
-                       "langue": self.langue, "theme": self.theme, "conserver": self.conserver},
+                       "langue": self.langue, "theme": self.theme, "conserver": self.conserver,
+                       "colonne_reduite": self.colonne_reduite},
                       f, ensure_ascii=False, indent=2)
 
 

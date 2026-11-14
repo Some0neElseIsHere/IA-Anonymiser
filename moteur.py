@@ -86,6 +86,10 @@ MOTIFS = [
         r"|AIza[0-9A-Za-z_-]{35}"                         # Google
         r"|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"  # JWT
         r")(?![\w-])")),
+    # net use \\srv\partage MOTDEPASSE /user:x  ou  net use \\srv\partage /user:x MOTDEPASSE (« * » = demandé)
+    ("SECRET", re.compile(r"\bnet\s+use\b[^\n]*?/u(?:ser)?:\S+\s+(?P<v>[^\s/\"*][^\s\"]*)", re.IGNORECASE)),
+    ("SECRET", re.compile(r"\bnet\s+use\s+(?:[A-Z]:\s+)?\\\\\S+\s+(?P<v>[^\s/\"*][^\s\"]*)\s+/u(?:ser)?:",
+                          re.IGNORECASE)),
     # Compte dans une URL : https://deploy:motdepasse@serveur (le mot de passe est pris juste au-dessus)
     ("COMPTE", re.compile(r"\b[a-z][a-z0-9+.-]*://(?P<v>[^\s:/@]+)(?::[^\s@/]*)?@", re.IGNORECASE)),
     # DN : masqué partie par partie (voir _decomposer_dn), pour que l'IA reconnaisse la personne
@@ -112,7 +116,19 @@ MOTIFS = [
     ("COMPTE", re.compile(
         r"(?<![\w.-])(?:user[ _-]?id|uid|user(?:[_-]?name)?|login|account(?:[_-]?name)?|samaccountname)"
         r"[\"']?\s*[:=]\s*" + _VALEUR, re.IGNORECASE)),
+    # Comptes dans les journaux : SQL Server, sshd, PAM, sudo, net use /user:x
+    ("COMPTE", re.compile(r"\bfor (?:invalid |illegal )?user '(?P<v>[^'\s\\]+)'", re.IGNORECASE)),
+    ("COMPTE", re.compile(r"\bfor (?:invalid |illegal )?user (?P<v>[\w.$-]+)(?= from\b)")),
+    ("COMPTE", re.compile(r"\b(?:Accepted|Failed) [\w/-]+ for (?P<v>[\w.$-]+) from\b")),
+    ("COMPTE", re.compile(r"\bsession (?:opened|closed) for user (?P<v>[\w.$-]+)")),
+    ("COMPTE", re.compile(r"\bsudo(?:\[\d+\])?:\s+(?P<v>[\w.$-]+) : ")),
+    ("COMPTE", re.compile(r"\bnet\s+use\b[^\n]*?/u(?:ser)?:(?P<v>[^\s\\\"]+)(?=[\s\"]|$)", re.IGNORECASE)),
     ("IP", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
+    ("IP", re.compile(
+        r"(?<![\w:.])(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}"           # IPv6 complète
+        r"|(?:[0-9a-f]{1,4}:){1,6}(?::[0-9a-f]{1,4}){1,6}"              # abrégée : 2a01:e0a::17
+        r"|(?:[0-9a-f]{1,4}:){1,7}:|::(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})"
+        r"(?:%[\w.]+)?(?![\w:])", re.IGNORECASE)),
     ("MAC", re.compile(r"(?<![\w:-])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![\w:-])")),
     ("FQDN", re.compile(
         r"(?<![\w.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?P<tld>[a-z]{2,63})(?![\w-]|\.\w)",
@@ -122,11 +138,19 @@ MOTIFS = [
 DOMAINES_SYSTEME = {"BUILTIN", "NT", "AUTHORITY", "SERVICE", "APPPOOL", "WORKGROUP", "HKLM", "HKCU", "HKCR",
                     "HKU", "HKCC", "SYSTEM", "LOCAL"}
 PROFILS_GENERIQUES = {"public", "default", "default user", "all users", "shared", "guest"}
+# Bouclage et adresses non attribuées : rien à cacher, et l'IA comprend mieux « 127.0.0.1 » qu'un jeton
+IP_NEUTRES = {"0.0.0.0", "::", "::1", "255.255.255.255"}
 
 
 def _accepte(type_, m, valeur):
     if type_ == "SECRET" and re.match(r"(?:[/~]|[A-Za-z]:\\)", valeur):
         return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
+    if type_ == "IP":
+        if valeur in IP_NEUTRES or valeur.startswith("127."):
+            return False
+        if ":" in valeur:  # IPv6 : au moins un chiffre et une forme crédible (pas « dead:beef: »)
+            groupes = [g for g in valeur.split("%")[0].split(":") if g]
+            return any(c.isdigit() for c in valeur) and len(groupes) <= 8 and (len(groupes) >= 2 or "::" in valeur)
     if type_ == "FQDN":
         tld = m.group("tld").lower()
         return tld not in EXTENSIONS_FICHIERS and (len(tld) == 2 or tld in EXTENSIONS_DOMAINE)

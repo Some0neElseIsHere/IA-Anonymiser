@@ -284,5 +284,39 @@ class LogComplet(unittest.TestCase):
         self.assertEqual(a.restaurer(r.texte).texte, log)
 
 
+class JournauxV1104(unittest.TestCase):
+    """Trous trouvés avec le log d'incident « rançongiciel » (v1.10.4)."""
+
+    def test_ipv6(self):
+        self.assertEqual(anon("depuis 2a01:e0a:1f3:9a40::17 port 50122"), "depuis [IP_1] port 50122")
+        self.assertEqual(anon("fe80::1c2b:3cff:fe4d:5e6f%eth0"), "[IP_1]")
+        self.assertEqual(anon("2001:0db8:85a3:0000:0000:8a2e:0370:7334"), "[IP_1]")
+
+    def test_pas_ipv6(self):
+        for texte in ("à 08:39:38", "std::vector", "MAC 00:1A:2B:3C:4D:5E", "dead:beef:", "a::b"):
+            self.assertNotIn("[IP_", anon(texte), texte)
+
+    def test_bouclage_en_clair(self):
+        self.assertEqual(anon("ping 127.0.0.1, ::1 et 0.0.0.0"), "ping 127.0.0.1, ::1 et 0.0.0.0")
+
+    def test_net_use(self):
+        self.assertEqual(anon('net use \\\\fs01\\C$ /user:ACME\\svc Wint3r!Maint2026"'),
+                         'net use \\\\fs01\\C$ /user:[COMPTE_1] [SECRET_1]"')
+        self.assertEqual(anon("net use Z: \\\\nas\\data S3cret! /user:backup"),
+                         "net use Z: \\\\nas\\data [SECRET_1] /user:[COMPTE_1]")
+        self.assertEqual(anon("net use \\\\nas\\data * /user:jdoe"), "net use \\\\nas\\data * /user:[COMPTE_1]")
+
+    def test_comptes_des_journaux(self):
+        self.assertEqual(anon("Login failed for user 'app_paie'."), "Login failed for user '[COMPTE_1]'.")
+        self.assertEqual(anon("Login failed for user 'NT AUTHORITY\\ANONYMOUS LOGON'"),
+                         "Login failed for user 'NT AUTHORITY\\ANONYMOUS LOGON'")
+        self.assertEqual(anon("Accepted publickey for jdupont from"), "Accepted publickey for [COMPTE_1] from")
+        self.assertEqual(anon("Failed password for invalid user oracle from"),
+                         "Failed password for invalid user [COMPTE_1] from")
+        self.assertEqual(anon("session opened for user mdurand by"), "session opened for user [COMPTE_1] by")
+        self.assertEqual(anon("sudo:   pmartin : TTY=pts/0"), "sudo:   [COMPTE_1] : TTY=pts/0")
+        self.assertEqual(anon("a ticket for user experience"), "a ticket for user experience")
+
+
 if __name__ == "__main__":
     unittest.main()

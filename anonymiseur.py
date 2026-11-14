@@ -158,6 +158,11 @@ class Zone(ttk.Frame):
             widget.bind("<Enter>", self.prendre_main, add="+")
         for evenement in ("<FocusIn>", "<Key>", "<MouseWheel>", "<Button-4>", "<Button-5>"):
             self.texte.bind(evenement, self.prendre_main, add="+")
+        # Survol d'un élément surligné : bulle avec la valeur ou le jeton correspondant
+        self.app, self.survol, self._plages, self._lignes, self._bulle = app, None, {}, [0], None
+        self.texte.bind("<Motion>", self._survoler, add="+")
+        self.texte.bind("<Leave>", lambda _: self._cacher_bulle(), add="+")
+        self.texte.bind("<MouseWheel>", lambda _: self._cacher_bulle(), add="+")
         self.lecture_seule = lecture_seule
         if lecture_seule:
             self.texte.configure(state="disabled")
@@ -249,6 +254,50 @@ class Zone(ttk.Frame):
             self.texte.edit_reset()
         self.maj_indication()
 
+    def _element_sous(self, x, y):
+        """(étiquette, élément) sous le pointeur, ou None. L'élément est le jeton (ou le texte s'il est inconnu)."""
+        index = self.texte.index(f"@{x},{y}")
+        boite = self.texte.bbox(index)
+        if not boite or not boite[0] <= x <= boite[0] + boite[2]:
+            return None  # pointeur après la fin de la ligne
+        noms = self.texte.tag_names(index)
+        ligne, colonne = map(int, index.split("."))
+        if ligne > len(self._lignes):
+            return None
+        n = self._lignes[ligne - 1] + colonne
+        for tag in ("inconnu", "masque", "jeton"):
+            plages = self._plages.get(tag)
+            if tag in noms and plages:
+                i = bisect.bisect_right(plages, (n, float("inf"))) - 1
+                if i >= 0 and plages[i][0] <= n < plages[i][1]:
+                    return tag, plages[i][2]
+        return None
+
+    def _survoler(self, e):
+        element = self._element_sous(e.x, e.y) if self.survol else None
+        texte = self.survol(*element) if element else None
+        if not texte:
+            self._cacher_bulle()
+            return
+        x, y = e.x_root + 14, e.y_root + 18
+        if self._bulle and self._bulle[1] == texte:
+            self._bulle[0].geometry(f"+{x}+{y}")
+            return
+        self._cacher_bulle()
+        fen = tk.Toplevel(self.texte)
+        fen.wm_overrideredirect(True)
+        fen.wm_attributes("-topmost", True)
+        p = self.app.palette
+        tk.Label(fen, text=texte, justify="left", background=p["fond"], foreground=p["texte"], relief="solid",
+                 borderwidth=1, padx=8, pady=4, font=(self.app.famille, 10)).pack()
+        fen.geometry(f"+{x}+{y}")
+        self._bulle = (fen, texte)
+
+    def _cacher_bulle(self):
+        if self._bulle:
+            self._bulle[0].destroy()
+            self._bulle = None
+
     def surligner(self, spans, tag, contenu=None):
         """Colore des plages (début, fin) exprimées en caractères depuis le début du texte.
 
@@ -256,6 +305,7 @@ class Zone(ttk.Frame):
         depuis le début à chaque plage, ce qui fige l'application sur un gros fichier de logs.
         """
         self.texte.tag_remove(tag, "1.0", "end")
+        self._plages[tag] = sorted(spans)
         if not spans:
             return
         contenu = self.lire() if contenu is None else contenu
@@ -264,6 +314,7 @@ class Zone(ttk.Frame):
         while position != -1:
             lignes.append(position + 1)
             position = contenu.find("\n", position + 1)
+        self._lignes = lignes
 
         def index(n):
             ligne = bisect.bisect_right(lignes, n) - 1
@@ -486,6 +537,8 @@ class Application:
         p1.add(self.source, weight=1)
         p1.add(self.sortie, weight=1)
         Zone.jumeler(self.source, self.sortie)
+        self.source.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=True)
+        self.sortie.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=False)
 
         o2 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o2, text=t("onglet_restaurer"))
@@ -500,6 +553,8 @@ class Application:
         p2.add(self.reponse, weight=1)
         p2.add(self.restauree, weight=1)
         Zone.jumeler(self.reponse, self.restauree)
+        self.reponse.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=False)
+        self.restauree.survol = lambda tag, j: self.bulle_element(tag, j, montrer_jeton=True)
 
         o3 = ttk.Frame(self.onglets, padding=12)
         self.onglets.add(o3, text=t("onglet_elements", n=0))
@@ -547,13 +602,18 @@ class Application:
         pan.bind("<Configure>", au_redimensionnement, add="+")
 
     def construire_conversations(self, parent):
+        """Colonne des conversations, avec sa version réduite (barre d'icônes) ; on bascule de l'une à l'autre."""
         t = self.t
-        cadre = ttk.Frame(parent, padding=(0, 0, 14, 0))
+        conteneur = ttk.Frame(parent)
+        cadre = self.colonne_pleine = ttk.Frame(conteneur, padding=(0, 0, 14, 0))
         marque = ttk.Frame(cadre)
         marque.pack(fill="x", pady=(0, 14))
         if self.icone_petite:
             ttk.Label(marque, image=self.icone_petite).pack(side="left", padx=(0, 8))
         ttk.Label(marque, text="IA-Anonymiser", style="Marque.TLabel").pack(side="left")
+        reduire = ttk.Button(marque, text="«", width=3, style="Toolbutton", command=self.basculer_colonne)
+        reduire.pack(side="right")
+        self.info_bulle(reduire, t("reduire_colonne"))
 
         bas = ttk.Frame(cadre)
         bas.pack(side="bottom", fill="x", pady=(10, 0))
@@ -573,7 +633,47 @@ class Application:
         self.arbre_conv.bind("<F2>", lambda e: self.renommer_conversation())
         self.arbre_conv.bind("<Delete>", lambda e: self.fermer_conversation())
         self.arbre_conv.bind("<Button-3>", self.menu_conversation)
-        return cadre
+
+        # Version réduite : logo, déplier, nouvelle conversation ; Options et À propos en bas
+        mini = self.colonne_mini = ttk.Frame(conteneur, padding=(0, 0, 10, 0))
+        if self.icone_petite:
+            ttk.Label(mini, image=self.icone_petite).pack(pady=(0, 14))
+        boutons = [("»", self.basculer_colonne, t("deplier_colonne"), "Toolbutton", (0, 8)),
+                   ("+", self.nouvelle_conversation, t("nouvelle_conversation").lstrip("+ "), "Accent.TButton", (0, 0))]
+        for texte, commande, bulle, style, marge in boutons:
+            b = ttk.Button(mini, text=texte, width=3, style=style, command=commande)
+            b.pack(pady=marge)
+            self.info_bulle(b, bulle)
+        for texte, commande, bulle in (("ⓘ", self.ouvrir_a_propos, t("a_propos")),
+                                       ("⚙", self.ouvrir_options, t("options"))):
+            b = ttk.Button(mini, text=texte, width=3, command=commande)
+            b.pack(side="bottom", pady=(8, 0))
+            self.info_bulle(b, bulle)
+
+        (mini if self.options.colonne_reduite else cadre).pack(fill="both", expand=True)
+        if self.options.colonne_reduite:
+            self.proportion(parent, lambda l, h: self.colonne_mini.winfo_reqwidth())
+        return conteneur
+
+    def basculer_colonne(self):
+        """Réduit la colonne des conversations à une barre d'icônes, ou la déplie."""
+        reduite = not self.options.colonne_reduite
+        self.options.colonne_reduite = reduite
+        try:
+            if reduite:
+                self._largeur_colonne = self.lateral.sashpos(0)
+        except tk.TclError:
+            pass
+        (self.colonne_pleine if reduite else self.colonne_mini).pack_forget()
+        (self.colonne_mini if reduite else self.colonne_pleine).pack(fill="both", expand=True)
+        self.root.update_idletasks()
+        largeur = (self.colonne_mini.winfo_reqwidth() if reduite
+                   else getattr(self, "_largeur_colonne", None) or self.colonne_pleine.winfo_reqwidth())
+        try:
+            self.lateral.sashpos(0, largeur)
+        except tk.TclError:
+            pass
+        self.sauver_options()
 
     def construire_elements(self, parent):
         t = self.t
@@ -696,6 +796,16 @@ class Application:
         if res.inconnus:
             texte += self.t("msg_inconnus", n=len(res.inconnus))
         self.message(texte)
+
+    def bulle_element(self, tag, jeton, montrer_jeton):
+        """Texte de la bulle au survol : côté valeurs on montre le jeton, côté jetons la vraie valeur."""
+        if tag == "inconnu":
+            return self.t("bulle_inconnu")
+        info = self.moteur.info(jeton)
+        if not info:
+            return None
+        type_, valeur = info
+        return f"{jeton if montrer_jeton else valeur}\n{self.libelle(type_, valeur)}"
 
     def libelle(self, type_, valeur):
         if type_ == "NOM" and valeur.casefold() in {p.casefold() for p in self.options.permanents}:

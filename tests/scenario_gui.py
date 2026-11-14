@@ -188,6 +188,30 @@ def lancer():
         app.onglets.select(1)
         photo("2-restaure")
 
+    def survol():
+        app.onglets.select(0)
+        racine.update()
+        def bulle_sur(zone, valeur):
+            zone.texte.see("1.0")
+            racine.update()
+            debut = zone.texte.search(valeur, "1.0", "end")
+            verifier(debut, f"{valeur} introuvable dans la zone")
+            x, y, w, h = zone.texte.bbox(f"{debut}+2c")
+            element = zone._element_sous(x + 1, y + h // 2)
+            verifier(element, f"rien sous le pointeur pour {valeur}")
+            zone._survoler(type("E", (), {"x": x + 1, "y": y + h // 2, "x_root": 50, "y_root": 50})())
+            verifier(zone._bulle, "bulle non affichée")
+            texte = zone._bulle[1]
+            zone._cacher_bulle()
+            return texte
+        ip = jeton_de("10.20.40.17")
+        verifier(bulle_sur(app.source, "10.20.40.17").startswith(ip), "survol côté original : jeton attendu")
+        verifier(bulle_sur(app.sortie, ip).startswith("10.20.40.17"), "survol côté IA : valeur attendue")
+        app.onglets.select(1)
+        racine.update()
+        verifier(bulle_sur(app.restauree, "10.20.40.17").startswith(ip), "survol réponse restaurée")
+        verifier(bulle_sur(app.reponse, "[IP_99]") == app.t("bulle_inconnu"), "survol jeton inconnu")
+
     def ne_pas_masquer():
         jeton_ip = next(j for j in app.moteur.jetons() if j.startswith("[IP_"))
         valeur = app.moteur.info(jeton_ip)[1]
@@ -316,6 +340,19 @@ def lancer():
         verifier(source.yview()[1] >= 1.0, "la gauche n'est pas allée en bas")
         photo("3b-defilement")
 
+    def colonne_reduite():
+        largeur = app.lateral.sashpos(0)
+        app.basculer_colonne()
+        racine.update()
+        verifier(app.colonne_mini.winfo_ismapped() and not app.colonne_pleine.winfo_ismapped(), "colonne non réduite")
+        verifier(app.lateral.sashpos(0) < largeur / 2, f"largeur réduite : {app.lateral.sashpos(0)} / {largeur}")
+        photo("3c-colonne-reduite")
+        app.basculer_colonne()
+        racine.update()
+        verifier(abs(app.lateral.sashpos(0) - largeur) <= 2, "largeur non retrouvée en dépliant")
+        app.basculer_colonne()  # laissée réduite : la relance doit s'en souvenir
+        racine.update()
+
     def quitter_phase1():
         app.arbre_conv.selection_set(contexte["premiere"].id)
         app.changer_conversation()
@@ -340,6 +377,12 @@ def lancer():
         verifier(app.options.langue == "en" and app.theme_applique == "sombre", "langue ou thème perdus")
         verifier(len(app.options.motifs) == 2 and app.options.motifs[0]["titre"] == "Postes", "motifs perdus")
         verifier(len(app.conv.envois) == 3, f"envois perdus : {len(app.conv.envois)}")
+        racine.update()
+        verifier(app.options.colonne_reduite and app.colonne_mini.winfo_ismapped(), "colonne réduite non conservée")
+        verifier(app.lateral.sashpos(0) < 120 * app.echelle, f"colonne réduite trop large : {app.lateral.sashpos(0)}")
+        app.basculer_colonne()
+        racine.update()
+        verifier(app.colonne_pleine.winfo_ismapped(), "colonne non dépliée à la relance")
 
     def relance_restauration():
         coller(app.reponse, contexte["reponse"])
@@ -356,10 +399,10 @@ def lancer():
 
     etapes = {
         1: [accueil, langue_fr, reglages, renommer, termes_conversation, coller_log, verifier_anonymisation,
-            copier_pour_ia, reponse_ia, verifier_restauration, ne_pas_masquer, jeton_personnalise, verifier_annonce,
+            copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
-            gros_log, defilement_jumele, quitter_phase1],
+            gros_log, defilement_jumele, colonne_reduite, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, fin],
     }[PHASE]
 

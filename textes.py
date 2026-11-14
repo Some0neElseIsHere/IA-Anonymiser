@@ -4,6 +4,9 @@ TEXTES = {
     "fr": {
         "options": "Options",
         "a_propos": "À propos",
+        "reduire_colonne": "Réduire la colonne",
+        "deplier_colonne": "Afficher les conversations",
+        "bulle_inconnu": "Jeton inconnu dans cette conversation : laissé tel quel",
         "conversations": "Conversations",
         "nouvelle_conversation": "+ Nouvelle conversation",
         "renommer": "Renommer",
@@ -216,6 +219,9 @@ TEXTES = {
     "en": {
         "options": "Settings",
         "a_propos": "About",
+        "reduire_colonne": "Collapse sidebar",
+        "deplier_colonne": "Show conversations",
+        "bulle_inconnu": "Unknown token in this conversation: left as is",
         "conversations": "Conversations",
         "nouvelle_conversation": "+ New conversation",
         "renommer": "Rename",
