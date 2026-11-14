@@ -411,9 +411,10 @@ class ListeTermes(ttk.Frame):
         self.arbre.heading("terme", text=t("opt_terme"), anchor="w")
         self.arbre.heading("jeton", text=t("col_jeton"), anchor="w")
         self.arbre.heading("suppr", text="")
-        self.arbre.column("terme", width=int(140 * e), stretch=True)
-        self.arbre.column("jeton", width=int(110 * e), stretch=False)
-        self.arbre.column("suppr", width=int(30 * e), minwidth=int(30 * e), stretch=False, anchor="center")
+        # Largeurs de départ modestes : les deux premières colonnes s'élargissent, la croix reste visible
+        self.arbre.column("terme", width=int(100 * e), minwidth=int(60 * e), stretch=True)
+        self.arbre.column("jeton", width=int(80 * e), minwidth=int(50 * e), stretch=True)
+        self.arbre.column("suppr", width=int(28 * e), minwidth=int(28 * e), stretch=False, anchor="center")
         self.supprimer = supprimer
         # Clic sur la croix : supprime la ligne, sans la charger dans les champs
         self.arbre.bind("<Button-1>", self.clic, add="+")

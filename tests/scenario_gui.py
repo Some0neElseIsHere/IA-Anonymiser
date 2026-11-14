@@ -215,6 +215,7 @@ def lancer():
         app.termes.arbre.see(iid)
         racine.update()
         x, y, w, h = app.termes.arbre.bbox(iid, "suppr")
+        verifier(x + w <= app.termes.arbre.winfo_width(), f"croix hors de la liste : {x + w} > {app.termes.arbre.winfo_width()}")
         retour = app.termes.clic(type("E", (), {"x": x + w // 2, "y": y + h // 2})())
         verifier(retour == "break" and "Terme temporaire" not in app.conv.termes, f"croix : {app.conv.termes}")
         verifier(app.termes.champ.get() == "", "la croix a chargé la ligne dans les champs")
