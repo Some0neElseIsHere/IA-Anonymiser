@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.16.1** : **titres d'onglets entiers** : à la taille minimale de la fenêtre, les quatre titres étaient coupés (« 3. Options de la conversatio »). L'onglet 2 s'appelle maintenant « 2. Restaurer », et dans l'onglet 3 les types de détection s'affichent sous leur nom court (« Secret », « Compte »), le nom complet restant dans l'info-bulle. Captures du README mises à jour, dont l'onglet 3.
+
 - **v1.16.0** : **journaux de connexion Entra ID (Azure AD)**, testés sur 43 fichiers réels ou d'exemple (exports du portail, Sentinel / Log Analytics, API Graph, journal d'audit unifié Microsoft 365, attaques par pulvérisation de mots de passe) : 1 100 valeurs sensibles, aucune en clair.
   - **nom affiché des utilisateurs masqué** (« Jane Doe ») : `userDisplayName`, `Identity` (Sentinel), `initiatedBy.user` (journal d'audit), y compris dans du JSON rangé dans une chaîne ou dans une cellule CSV. Le nom est ensuite masqué partout où il réapparaît dans le texte ;
   - **exports CSV et tableaux** (portail Entra ID, Log Analytics, Sentinel, résultats KQL copiés) : les colonnes User, Username, UserDisplayName, Sign-in identifier, Device name… sont masquées, avec ou sans guillemets, séparées par des virgules, points-virgules ou tabulations ;
@@ -27,7 +29,7 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
   - **Rétablir les réglages par défaut** remet la conversation sur Options → Détection ; une ligne indique si la conversation a des réglages propres ;
   - le **masquage personnalisé de la conversation** (termes et jetons parlants) passe dans cet onglet ; **« 4. Éléments masqués »** occupe désormais toute la largeur ;
   - le **rapport** indique les types détectés dans la conversation, et non plus les réglages généraux ;
-  - onglets renommés plus courts (« 1. Anonymiser », « 2. Restaurer la réponse ») pour que les quatre titres tiennent en entier, même fenêtre réduite.
+  - onglets renommés plus courts (« 1. Anonymiser », « 2. Restaurer la réponse »).
 
 - **v1.14.0** : **rapport amélioré** (Exporter le rapport…) :
   - **synthèse en tête** : nombre d'éléments masqués, d'envois, de valeurs parties en clair par erreur et laissées en clair volontairement (en rouge s'il y a une fuite), puis le nombre d'éléments par type ;
