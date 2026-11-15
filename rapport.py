@@ -10,7 +10,7 @@ import html
 import os
 import re
 
-from moteur import JETON_RE, TYPES_AUTO, Anonymiseur, _cle, jeton_canonique
+from moteur import JETON_RE, TYPES_AUTO, Anonymiseur, _cle, domaine_public, jeton_canonique
 
 STYLE = """
 body { font-family: "Segoe UI", system-ui, sans-serif; color: #1b1b1b; max-width: 1000px; margin: 32px auto;
@@ -141,6 +141,18 @@ def envois_en_clair(valeur, type_, envois):
             if Anonymiseur._occurrences_connues(envoi["texte"], [(valeur, type_)], None)]
 
 
+def non_detecte(type_, valeur, envoi, types_defaut, publics_defaut):
+    """Vrai si, au moment de cet envoi, ce type n'était pas détecté dans la conversation (case décochée)
+    ou si c'était un domaine public laissé lisible : la valeur est partie en clair par choix, pas par erreur.
+    Les envois d'avant la v1.15.1 n'ont pas ces réglages : on prend ceux de la conversation."""
+    types = envoi.get("types")
+    types = set(types) if isinstance(types, list) else types_defaut
+    publics = envoi.get("publics", publics_defaut)
+    if type_ in TYPES_AUTO and type_ not in types:
+        return True
+    return bool(publics) and type_ == "FQDN" and domaine_public(valeur)
+
+
 def jetons_dans(texte, jetons):
     """(début, fin, jeton) des jetons d'un texte : forme habituelle [TYPE_n] (même réécrite par l'IA)
     et jetons personnalisés ([ENTREPRISE]), cherchés tels quels."""
@@ -218,7 +230,14 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     envois = conversation.envois
     jetons = list(moteur.valide)  # seuls les jetons réellement envoyés (validés) sont rapportés
     titre = e(t("rp_titre", c=conversation.nom))
-    en_clair = {j: envois_en_clair(moteur.valide[j][1], moteur.valide[j][0], envois) for j in jetons}
+    tous_en_clair = {j: envois_en_clair(moteur.valide[j][1], moteur.valide[j][0], envois) for j in jetons}
+    types_conv = getattr(conversation, "types", None)
+    types_conv = set(options.types if types_conv is None else types_conv)
+    publics = getattr(conversation, "domaines_publics", False)
+    # Valeur en clair parce que son type était décoché dans la conversation : choix, pas erreur
+    choisis = {j: [n for n in tous_en_clair[j]
+                   if non_detecte(*moteur.valide[j], envois[n - 1], types_conv, publics)] for j in jetons}
+    en_clair = {j: [n for n in tous_en_clair[j] if n not in choisis[j]] for j in jetons}
     fuites = [j for j in jetons if en_clair[j] and j not in moteur.exclus]
     from textes import CONSIGNES
     consignes = [getattr(options, "consigne_texte", None)] + [c for c in CONSIGNES.values()]
@@ -226,9 +245,6 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     presences = presence(jetons, envois, consignes)
     remplaces = renommages(moteur, {j: p[0] for j, p in presences.items()})
     etiquettes_conv = getattr(conversation, "etiquettes", {}) or {}
-    publics = getattr(conversation, "domaines_publics", False)
-    types_conv = getattr(conversation, "types", None)
-    types_conv = options.types if types_conv is None else types_conv
 
     # Synthèse : chiffres clés, éléments par type
     par_type = {}
@@ -240,7 +256,7 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
     nb_elements = sum(par_type.values())
     cartes = [(nb_elements, t("rp_s_elements"), False), (len(envois), t("rp_s_envois"), False),
               (len(fuites), t("rp_s_fuites"), bool(fuites)),
-              (sum(1 for j in jetons if j in moteur.exclus), t("rp_s_clair"), False)]
+              (sum(1 for j in jetons if j in moteur.exclus or (choisis[j] and not en_clair[j])), t("rp_s_clair"), False)]
 
     lignes = [
         "<!DOCTYPE html>",
@@ -295,6 +311,8 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
                 statut += " " + t("rp_envois_numeros", n=numeros)
         elif numeros:
             statut, classe = t("rp_statut_fuite", n=numeros), ' class="fuite"'
+        elif choisis[j]:
+            statut, classe = t("rp_statut_non_detecte", n=", ".join(str(n) for n in choisis[j])), ' class="clair"'
         else:
             statut, classe = t("rp_statut_masque"), ""
         if j in remplaces:

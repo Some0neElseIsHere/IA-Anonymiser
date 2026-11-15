@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.15.1** : **rapport : une case décochée n'est plus une fuite**. Si vous décochez un type (IBAN, numéro de sécurité sociale…) dans l'onglet 3, les valeurs de ce type envoyées ensuite sont indiquées « laissé en clair : type décoché dans la conversation » et comptées parmi les éléments laissés en clair volontairement, et non plus « envoyés en clair par erreur ». De même pour les domaines publics laissés lisibles. Chaque envoi garde désormais les réglages du moment ; pour les envois plus anciens, ce sont les réglages actuels de la conversation qui comptent.
+
 - **v1.15.0** : **nouvel onglet « 3. Options de la conversation »** :
   - **détection propre à chaque conversation** : cochez ou décochez les types (noms, e-mails, IP publiques, IP privées…) pour la conversation en cours seulement ; le texte pour l'IA est recalculé aussitôt. Options → Détection devient le réglage par défaut des nouvelles conversations ; les conversations existantes gardent les réglages actuels ;
   - **domaines publics lisibles** : la case est maintenant dans cet onglet, à la place du clic droit sur le nom de la conversation ;

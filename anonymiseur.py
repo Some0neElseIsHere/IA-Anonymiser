@@ -152,8 +152,14 @@ class Conversation:
         c.activite = float(d.get("activite", c.activite))
         c.epingle = bool(d.get("epingle", False))
         c.cree = float(d["cree"]) if d.get("cree") else None  # inconnue avant la version 1.6
-        c.envois = [{"date": float(x["date"]), "texte": str(x["texte"])}
-                    for x in d.get("envois", []) if isinstance(x, dict) and "texte" in x]
+        c.envois = []
+        for x in d.get("envois", []):
+            if isinstance(x, dict) and "texte" in x:
+                envoi = {"date": float(x["date"]), "texte": str(x["texte"])}
+                if isinstance(x.get("types"), list):
+                    envoi["types"] = [str(y) for y in x["types"]]
+                    envoi["publics"] = bool(x.get("publics", False))
+                c.envois.append(envoi)
         etiquettes = d.get("etiquettes", {})
         c.etiquettes = {t: str(j) for t, j in etiquettes.items() if t in c.termes and str(j).strip()} \
             if isinstance(etiquettes, dict) else {}
@@ -1373,7 +1379,10 @@ class Application:
     def enregistrer_envoi(self, texte):
         """Garde le texte exact copié pour l'IA (sans valeur d'origine), pour le rapport de preuve."""
         if texte.strip() and (not self.conv.envois or self.conv.envois[-1]["texte"] != texte):
-            self.conv.envois.append({"date": time.time(), "texte": texte})
+            types = self.conv.types if self.conv.types is not None else self.options.types
+            # Réglages du moment : le rapport distingue une case décochée d'une vraie fuite
+            self.conv.envois.append({"date": time.time(), "texte": texte, "types": sorted(types),
+                                     "publics": bool(self.conv.domaines_publics)})
 
     def copie_manuelle(self):
         try:

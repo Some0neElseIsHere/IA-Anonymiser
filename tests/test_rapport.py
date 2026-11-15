@@ -166,5 +166,25 @@ class Rapport(unittest.TestCase):
                          'C:\\Users\\<span class="jeton">[COMPTE_1]</span>\\x')
 
 
+    def test_type_decoche_n_est_pas_une_fuite(self):
+        # IBAN masqué au premier envoi, puis case IBAN décochée : le 2e envoi le contient en clair, par choix
+        conv, envoi = conversation()
+        iban = next(v for ty, v in conv.moteur.valide.values() if ty == "IBAN")
+        conv.envois.append({"date": time.time(), "texte": "Compte " + iban,
+                            "types": sorted(set(TYPES_AUTO) - {"IBAN"}), "publics": False})
+        page = generer(conv)
+        self.assertIn("type décoché dans la conversation (envoi 2)", page)
+        self.assertNotIn("envoyé en clair (envoi", page)
+        # Le même envoi avec la case cochée est bien une fuite
+        conv.envois[-1]["types"] = sorted(TYPES_AUTO)
+        self.assertIn("envoyé en clair (envoi 2)", generer(conv))
+
+    def test_ancien_envoi_suit_les_reglages_de_la_conversation(self):
+        conv, envoi = conversation()
+        iban = next(v for ty, v in conv.moteur.valide.values() if ty == "IBAN")
+        conv.envois.append({"date": time.time(), "texte": "Compte " + iban})
+        conv.types = set(TYPES_AUTO) - {"IBAN"}
+        self.assertIn("type décoché dans la conversation (envoi 2)", generer(conv))
+
 if __name__ == "__main__":
     unittest.main()
