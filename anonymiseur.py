@@ -999,10 +999,13 @@ class Application:
             self.cases_conv[type_] = var = tk.BooleanVar(value=True)
             ligne = ttk.Frame(grille, padding=(0, 2, 8, 2))
             ligne.grid(row=i // 2, column=i % 2, sticky="w")
-            case = ttk.Checkbutton(ligne, text=t(f"type_{type_}"), variable=var,
+            # Nom court (sans la parenthèse) pour tenir sur deux colonnes ; le nom complet est dans l'info-bulle
+            nom = t(f"type_{type_}")
+            court = re.sub(r"\s*\(.*\)$", "", nom)
+            case = ttk.Checkbutton(ligne, text=court, variable=var,
                                    command=self.options_conversation_changees)
             case.pack(side="left")
-            self.info_bulle(case, t("opt_exemple", e=EXEMPLES[type_]))
+            self.info_bulle(case, (nom + "\n" if court != nom else "") + t("opt_exemple", e=EXEMPLES[type_]))
         ttk.Separator(cadre).pack(fill="x", pady=(10, 8))
         ligne = ttk.Frame(cadre)
         ligne.pack(anchor="w")
