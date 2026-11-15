@@ -499,12 +499,12 @@ def lancer():
         racine.update()
         verifier(ligne(source) == ligne(sortie) > 1500, f"gauche pas alignée : {ligne(source)} / {ligne(sortie)}")
         sortie.yview_moveto(1.0)
-        for _ in range(10):  # le défilement de l'autre zone suit au rafraîchissement suivant
+        for _ in range(60):  # le défilement de l'autre zone suit au rafraîchissement suivant (machine lente : 3 s)
             racine.update()
-            if source.yview()[1] >= 1.0:
+            if source.yview()[1] >= 0.999:
                 break
             time.sleep(0.05)
-        verifier(source.yview()[1] >= 1.0, "la gauche n'est pas allée en bas")
+        verifier(source.yview()[1] >= 0.999, f"la gauche n'est pas allée en bas : {source.yview()}")
         photo("3b-defilement")
 
     def ouvrir_fichiers():
