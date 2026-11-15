@@ -168,11 +168,13 @@ MOTIFS = [
     ("FQDN", re.compile(
         r"(?<![\w.-])\"?(?:[a-z_]*?(?:host[_-]?name|dvc[_-]?host[_-]?name|computer[_-]?name|device[_-]?name|"
         r"endpoint[_-]?name|machine[_-]?name|workstation[_-]?name)|host|computer|workstation|[sd]host|dvchost|"
-        r"[sd]ntdom|client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name|server|data[ _]source|db[_-]?host)"
+        r"[sd]ntdom|client[_-]?name|src[_-]?name|dst[_-]?name|dev[_-]?name|(?<!object )server|data[ _]source|db[_-]?host)"
         r"\\?\"?[ \t]*[:=][ \t]*(?![^\s\"';,|&]*=)\\?\"?(?:tcp:|np:)?(?P<v>[A-Za-z0-9][\w.-]*)",
         re.IGNORECASE)),
     # Entra ID (Azure AD) : nom de l'appareil dans deviceDetail
-    ("FQDN", re.compile(r'"deviceDetail"\s*:\s*\{[^{}]*?"displayName"\s*:\s*"(?P<v>[^"]+)"')),
+    # (guillemets simples, échappés \" dans une chaîne JSON, ou doublés "" dans une cellule CSV)
+    ("FQDN", re.compile(r'(?i)(?:\\?"|"")deviceDetail(?:\\?"|"")\s*:\s*(?:\\?"|"")?\{[^{}]*?(?:\\?"|"")displayName'
+                        r'(?:\\?"|"")\s*:\s*(?:\\?"|"")(?P<v>[^"\\\n]+)')),
     # DNS Windows (journal de débogage) : (5)rds01(8)vallorie(5)local(0)
     ("FQDN", re.compile(r"(?:\(\d{1,2}\)[\w-]+){2,}\(0\)")),
     # DHCP Windows : adresse MAC sans séparateurs dans le journal CSV
@@ -201,6 +203,21 @@ MOTIFS = [
     ("COMPTE", re.compile(
         r"(?<![\w.-])\"?[a-z_]*?(?:user(?:[_-]?name)?|account[_-]?name)\\?\"?[ \t]*[:=][ \t]*"
         r"(?![^\s\"';,|&]*=)(?P<q>\\?[\"'])?(?P<v>[^\s;,\"'<>&()\[\]{}|=]+)", re.IGNORECASE)),
+    # Entra ID : nom affiché de l'utilisateur (userDisplayName, Identity des journaux Sentinel, initiatedBy.user)
+    ("COMPTE", re.compile(
+        r'(?i)(?:\\?"|"")(?:user_?display_?name|identity|actor_?display_?name|initiated_?by_?user(?:_?display_?name)?)'
+        r'(?:\\?"|"")\s*:\s*(?:\\?"|"")(?P<v>[^"\\\n{}\[\]]+)(?:\\?"|"")')),
+    ("COMPTE", re.compile(
+        r'(?i)(?:\\?"|"")user(?:\\?"|"")\s*:\s*\{[^{}]*?(?:\\?"|"")displayName(?:\\?"|"")\s*:\s*'
+        r'(?:\\?"|"")(?P<v>[^"\\\n{}]+)(?:\\?"|"")')),
+    # Entra ID : détails d'une connexion copiés depuis le portail (« User⇥Sophie Lefèvre ») et
+    # sortie PowerShell de Get-MgAuditLogSignIn (« UserDisplayName : Marc Dubois »)
+    ("COMPTE", re.compile(
+        r"(?im)^[ \t]*(?:User|Utilisateur|User display name|Nom d'affichage de l'utilisateur)\t+(?P<v>[^\t\r\n]+?)[ \t]*$")),
+    ("COMPTE", re.compile(
+        r"(?im)^[ \t]*(?:UserDisplayName|InitiatedByUserDisplayName)[ \t]*:[ \t]*(?P<v>[^\r\n]+?)[ \t]*$")),
+    ("FQDN", re.compile(r"(?im)^[ \t]*(?:Device name|Nom de l'appareil|Nom d'appareil)(?:\t+|[ \t]*:[ \t]*)"
+                        r"(?P<v>[A-Za-z0-9][\w.-]*)[ \t]*$")),
     # AWS : numéro de compte et utilisateur ou rôle dans un ARN (arn:aws:iam::123456789012:user/pedro)
     ("COMPTE", re.compile(r"\barn:aws[\w-]*:[\w-]*:[\w-]*:(?P<v>\d{12}):")),
     ("COMPTE", re.compile(r"\barn:aws[\w-]*:(?:iam|sts)::\d{12}:(?:user|role|group|assumed-role)/"
@@ -263,7 +280,8 @@ DESCRIPTIONS = [
     ("Serveur d'un chemin réseau (\\\\fs01\\partage)", "Server in a network path (\\\\fs01\\share)"),
     ("Clé = machine : hostname=, Server= (chaîne de connexion), CEF (shost, dhost…), JSON (SrcHostName…)",
      "Key = machine: hostname=, Server= (connection string), CEF (shost, dhost…), JSON (SrcHostName…)"),
-    ("Entra ID : appareil dans deviceDetail", "Entra ID: device in deviceDetail"),
+    ("Entra ID : appareil dans deviceDetail (JSON, JSON dans une chaîne, cellule CSV)",
+     "Entra ID: device in deviceDetail (JSON, JSON in a string, CSV cell)"),
     ("DNS Windows : (5)srv01(4)acme(5)local(0)", "Windows DNS: (5)srv01(4)acme(5)local(0)"),
     ("DHCP Windows : adresse MAC sans séparateurs", "Windows DHCP: MAC address without separators"),
     ("Événement Windows : domaine et poste (Account Domain, Workstation Name…)",
@@ -275,6 +293,14 @@ DESCRIPTIONS = [
     ("Clé = compte : user=, login=, uid=, acct=, accountId…", "Key = account: user=, login=, uid=, acct=, accountId…"),
     ("Clés préfixées : CEF (suser, duser), JSON (SrcUserName, targetUser…)",
      "Prefixed keys: CEF (suser, duser), JSON (SrcUserName, targetUser…)"),
+    ("Entra ID : nom affiché de l'utilisateur (userDisplayName, Identity…)",
+     "Entra ID: user display name (userDisplayName, Identity…)"),
+    ("Entra ID : nom de l'utilisateur dans initiatedBy.user", "Entra ID: user name in initiatedBy.user"),
+    ("Entra ID : utilisateur copié depuis le portail (User⇥…)", "Entra ID: user copied from the portal (User⇥…)"),
+    ("Entra ID : PowerShell Get-MgAuditLogSignIn (UserDisplayName : …)",
+     "Entra ID: PowerShell Get-MgAuditLogSignIn (UserDisplayName : …)"),
+    ("Entra ID : nom de l'appareil copié depuis le portail (Device name⇥…)",
+     "Entra ID: device name copied from the portal (Device name⇥…)"),
     ("AWS : numéro de compte dans un ARN", "AWS: account number in an ARN"),
     ("AWS : utilisateur ou rôle dans un ARN", "AWS: user or role in an ARN"),
     ("Kerberos : utilisateur/ROYAUME (Zeek, klist)", "Kerberos: user/REALM (Zeek, klist)"),
@@ -308,7 +334,7 @@ DOMAINES_SYSTEME = {"BUILTIN", "NT", "AUTHORITY", "SERVICE", "APPPOOL", "WORKGRO
                     "INTELAUDIO", "TS_USB_HUB_ENUMERATOR", "VMBUS", "WPDBUSENUM", "MMDEVAPI", "UEFI"}
 PROFILS_GENERIQUES = {"public", "default", "default user", "all users", "shared", "guest"}
 # Valeurs qui ne sont pas des comptes : champs vides, booléens, comptes intégrés de Windows
-COMPTES_NEUTRES = {"-", "?", "(unknown)", "unset", "self", "anonymous_principal", "no", "yes", "true", "false", "none", "null", "n/a", "na", "unknown", "nt", "system",
+COMPTES_NEUTRES = {"-", "?", "(unknown)", "not available", "*redacted*", "redacted", "unset", "self", "anonymous_principal", "no", "yes", "true", "false", "none", "null", "n/a", "na", "unknown", "nt", "system",
                    "local service", "network service", "localsystem", "anonymous logon", "nt authority",
                    "service local", "service réseau", "système", "ouverture de session anonyme", "%%1843"}
 MACHINES_NEUTRES = {"?", "(NONE)", "LOCALHOST.LOCALDOMAIN", "UBUNTU", "DEBIAN", "KALI", "WORKGROUP", "BUILTIN", "NT AUTHORITY", "NT", "LOCALHOST", "MSHOME", "ADMIN", "IPC", "PRINT",
@@ -444,6 +470,11 @@ def _accepte(type_, m, valeur):
         avant = m.string[max(0, m.start() - 12):m.start()]
         if re.search(r"\b(?:version|ver\.?|v)[ =:]*$", avant, re.IGNORECASE):
             return False  # « wcp.dll version 0.0.0.6 », « Version=4.0.0.0 »
+        if re.search(r"(?<![\w/:.])[A-Za-z][\w.-]+/$", avant) and valeur.endswith(".0"):
+            return False  # version dans un user-agent : « Chrome/129.0.0.0 », « Edge/18.0.0.0 »
+        if valeur.endswith(".0.0") and re.search(r"\b(?:client|build|release|agent|sdk|runtime|update)[ /]*$",
+                                                 avant, re.IGNORECASE):
+            return False  # « Rich Client 4.36.0.0 » (application cliente des journaux Entra ID)
         if ":" in valeur:  # IPv6 : au moins un chiffre (pas « dead:beef: »)
             return any(c.isdigit() for c in valeur)
         return True
@@ -536,6 +567,93 @@ def _decomposer_dn(m, termes):
             sortie.append((d, f, "DN", valeur))
     fermer()
     return sortie
+
+
+# Exports CSV (portail Entra ID, Log Analytics, Sentinel) : colonnes dont la valeur est une personne ou un appareil.
+# Nom de colonne en minuscules, sans espaces, tirets ni soulignés.
+COLONNES_CSV = {
+    "user": "COMPTE", "userdisplayname": "COMPTE", "identity": "COMPTE", "username": "COMPTE",
+    "userprincipalname": "COMPTE", "signinidentifier": "COMPTE", "alternatesigninname": "COMPTE",
+    "userids": "COMPTE", "actordisplayname": "COMPTE", "initiatedby": "COMPTE",
+    "devicename": "FQDN", "devicedetail": "FQDN",
+}
+_SEPARATEURS_CSV = (",", ";", "\t")
+_GUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+_NOM_AFFICHE_CSV = re.compile(r'(?i)("{1,2})displayName\1\s*:\s*\1(?P<v>[^"\n]+)\1')
+
+
+def _champs_csv(texte, pos, sep):
+    """Lignes CSV à partir de pos : listes de (début, fin) des valeurs, guillemets exclus.
+    Les cellules entre guillemets peuvent contenir des retours à la ligne. S'arrête à une ligne vide."""
+    n = len(texte)
+    while pos < n:
+        if texte[pos] in "\r\n":
+            return
+        ligne = []
+        while True:
+            if pos < n and texte[pos] == '"':
+                d = pos + 1
+                f = d
+                while True:
+                    f = texte.find('"', f)
+                    if f == -1:
+                        return
+                    if texte.startswith('""', f):
+                        f += 2
+                        continue
+                    break
+                ligne.append((d, f))
+                pos = f + 1
+            else:
+                f = pos
+                while f < n and texte[f] not in sep + "\r\n":
+                    f += 1
+                ligne.append((pos, f))
+                pos = f
+            if pos < n and texte[pos] == sep:
+                pos += 1
+                continue
+            while pos < n and texte[pos] not in "\r\n":  # reste illisible de la ligne
+                pos += 1
+            pos += 2 if texte.startswith("\r\n", pos) else 1
+            yield ligne
+            break
+
+
+def colonnes_csv(texte, termes_cf=frozenset()):
+    """(début, fin, type) des valeurs des colonnes de COLONNES_CSV dans les tableaux CSV du texte."""
+    trouves = []
+    for m in re.finditer(r"(?m)^[^\r\n]+", texte):
+        entete = m.group(0)
+        sep = max(_SEPARATEURS_CSV, key=entete.count)
+        if entete.count(sep) < 2:
+            continue
+        noms = [re.sub(r"[\s_-]", "", x.strip().strip('"').lower()) for x in entete.split(sep)]
+        colonnes = {i: COLONNES_CSV[x] for i, x in enumerate(noms) if x in COLONNES_CSV}
+        if not colonnes or len(set(noms)) < 3:
+            continue
+        debut = m.end() + (2 if texte.startswith("\r\n", m.end()) else 1)
+        for ligne in _champs_csv(texte, debut, sep):
+            if len(ligne) != len(noms):
+                continue
+            for i, type_ in colonnes.items():
+                d, f = ligne[i]
+                valeur = texte[d:f]
+                if noms[i] == "devicedetail":
+                    x = _NOM_AFFICHE_CSV.search(valeur)
+                    if x:
+                        trouves.append((d + x.start("v"), d + x.end("v"), "FQDN"))
+                    continue
+                while d < f and texte[d].isspace():
+                    d += 1
+                while f > d and texte[f - 1].isspace():
+                    f -= 1
+                valeur = texte[d:f]
+                if (not valeur or valeur.lower() in COMPTES_NEUTRES or _GUID.fullmatch(valeur) or valeur.isdigit()
+                        or "{" in valeur or "\n" in valeur or valeur.casefold() in termes_cf):
+                    continue
+                trouves.append((d, f, type_))
+    return trouves
 
 
 def _plage(m):
@@ -762,6 +880,8 @@ class Anonymiseur:
                             trouves.append((d, f, sous_type, valeur))
                     continue
                 d, f = _plage(m)
+                if type_ == "COMPTE" and termes_cf and " ".join(texte[d:f].split()).casefold() in termes_cf:
+                    continue  # nom affiché qui est un terme de l'utilisateur : il garde son jeton ([NOM_1], [VICTIME])
                 if f > d and _accepte(type_, m, texte[d:f]):
                     if (self.domaines_publics and type_ == "FQDN" and "tld" in m.re.groupindex
                             and domaine_public(texte[d:f])):
@@ -769,6 +889,11 @@ class Anonymiseur:
                     sorte = type_ip(texte[d:f]) if type_ == "IP" else type_
                     if (types is None or sorte in types) and prendre(d, f):
                         trouves.append((d, f, sorte, texte[d:f]))
+
+        # Tableaux CSV : colonnes User, UserDisplayName, Device name… (exports Entra ID / Sentinel)
+        for d, f, type_ in colonnes_csv(texte, termes_cf):
+            if (types is None or type_ in types) and prendre(d, f):
+                trouves.append((d, f, type_, texte[d:f]))
 
         for brut in motifs:
             try:

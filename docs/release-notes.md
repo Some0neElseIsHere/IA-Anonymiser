@@ -10,6 +10,15 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.16.0** : **journaux de connexion Entra ID (Azure AD)**, testés sur 43 fichiers réels ou d'exemple (exports du portail, Sentinel / Log Analytics, API Graph, journal d'audit unifié Microsoft 365, attaques par pulvérisation de mots de passe) : 1 100 valeurs sensibles, aucune en clair.
+  - **nom affiché des utilisateurs masqué** (« Jane Doe ») : `userDisplayName`, `Identity` (Sentinel), `initiatedBy.user` (journal d'audit), y compris dans du JSON rangé dans une chaîne ou dans une cellule CSV. Le nom est ensuite masqué partout où il réapparaît dans le texte ;
+  - **exports CSV et tableaux** (portail Entra ID, Log Analytics, Sentinel, résultats KQL copiés) : les colonnes User, Username, UserDisplayName, Sign-in identifier, Device name… sont masquées, avec ou sans guillemets, séparées par des virgules, points-virgules ou tabulations ;
+  - **détails d'une connexion copiés depuis le portail** (« User ⇥ Sophie Lefèvre », « Device name ⇥ PC-COMPTA-07 ») et **sortie PowerShell** de `Get-MgAuditLogSignIn` (« UserDisplayName : Marc Dubois ») ;
+  - **nom de l'appareil** (`deviceDetail.displayName`) aussi trouvé dans les exports Sentinel et CSV ;
+  - un **nom que vous avez ajouté** dans « Masquage personnalisé » garde votre jeton ([VICTIME]) même quand il est aussi détecté comme nom affiché ;
+  - **fausses détections corrigées** : les versions de navigateur dans les user-agents (`Chrome/129.0.0.0`) et « Rich Client 4.36.0.0 » ne sont plus prises pour des adresses IP ; « Object Server: Security » (événement Windows 4663) n'est plus pris pour un nom de machine ; « Not Available » et « *REDACTED* » ne sont plus pris pour des comptes.
+  Le nom affiché relève de la case **Compte** de la détection : décochez-la dans l'onglet 3 pour le laisser en clair.
+
 - **v1.15.1** : **rapport : une case décochée n'est plus une fuite**. Si vous décochez un type (IBAN, numéro de sécurité sociale…) dans l'onglet 3, les valeurs de ce type envoyées ensuite sont indiquées « laissé en clair : type décoché dans la conversation » et comptées parmi les éléments laissés en clair volontairement, et non plus « envoyés en clair par erreur ». De même pour les domaines publics laissés lisibles. Chaque envoi garde désormais les réglages du moment ; pour les envois plus anciens, ce sont les réglages actuels de la conversation qui comptent.
 
 - **v1.15.0** : **nouvel onglet « 3. Options de la conversation »** :

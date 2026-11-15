@@ -511,5 +511,87 @@ class DomainesPublics(unittest.TestCase):
         self.assertFalse(domaine_public("acme.github.io"))
 
 
+class EntraID(unittest.TestCase):
+    """Journaux de connexion Entra ID : JSON Graph / Sentinel, exports CSV du portail, copie des détails, PowerShell."""
+
+    def test_json_graph(self):
+        texte = ('{"userDisplayName": "Jane Doe", "userPrincipalName": "jane.doe@contoso.com", "ipAddress": "81.250.12.34", '
+                 '"deviceDetail": {"deviceId": "", "displayName": "PC-JDOE", "operatingSystem": "Windows 10"}, '
+                 '"appDisplayName": "Microsoft Teams"}')
+        self.assertEqual(anon(texte), '{"userDisplayName": "[COMPTE_1]", "userPrincipalName": "[EMAIL_1]", '
+                         '"ipAddress": "[IP_PUB_1]", "deviceDetail": {"deviceId": "", "displayName": "[FQDN_1]", '
+                         '"operatingSystem": "Windows 10"}, "appDisplayName": "Microsoft Teams"}')
+
+    def test_sentinel_json_dans_une_chaine(self):
+        texte = '"Identity": "Admin User", "DeviceDetail": "{\\"deviceId\\": \\"1\\", \\"displayName\\": \\"CONTOSO-LAPTOP-01\\"}"'
+        sortie = anon(texte)
+        self.assertNotIn("Admin User", sortie)
+        self.assertNotIn("CONTOSO-LAPTOP-01", sortie)
+
+    def test_audit_initiated_by(self):
+        texte = '"initiatedBy": {"user": {"id": "1", "displayName": "Paul Martin", "userPrincipalName": "p.martin@acme.fr"}}'
+        self.assertEqual(anon(texte), '"initiatedBy": {"user": {"id": "1", "displayName": "[COMPTE_1]", '
+                                      '"userPrincipalName": "[EMAIL_1]"}}')
+
+    def test_export_csv_du_portail(self):
+        texte = ('"Date (UTC)","User ID","User","Username","Application","IP address","Device ID","Status"\n'
+                 '"2026-11-14T09:12:44Z","6561f0d2-f6eb-4199-815d-a7f4e1eae307","Sophie Lefèvre",'
+                 '"sophie.lefevre@vallorie.fr","Office 365 Exchange Online","81.250.12.34","","Failure"\n'
+                 '"2026-11-14T09:13:00Z","","N/A","x@vallorie.fr","Azure Portal","10.1.2.3","","Success"\n')
+        sortie = anon(texte)
+        self.assertIn('"[COMPTE_1]","[EMAIL_1]","Office 365 Exchange Online","[IP_PUB_1]"', sortie)
+        self.assertIn('"N/A"', sortie)
+        self.assertIn("6561f0d2-f6eb-4199-815d-a7f4e1eae307", sortie)  # identifiant, pas un nom
+
+    def test_csv_log_analytics_json_double(self):
+        texte = ('TimeGenerated,UserDisplayName,DeviceDetail,AppDisplayName\n'
+                 '2026-11-14,Isaac Dunham,"{""deviceId"":"""",""displayName"":""DESKTOP-A1BC2D3E"",""trustType"":""""}",Azure Portal\n')
+        sortie = anon(texte)
+        self.assertNotIn("Isaac Dunham", sortie)
+        self.assertNotIn("DESKTOP-A1BC2D3E", sortie)
+        self.assertIn("Azure Portal", sortie)
+
+    def test_tableau_kql_a_tabulations(self):
+        texte = ("TimeGenerated\tUserDisplayName\tDeviceDetail\n"
+                 '2026-11-14\tClaire Petit\t{"deviceId":"1","displayName":"LAPTOP-CP01"}\n')
+        self.assertEqual(anon(texte), "TimeGenerated\tUserDisplayName\tDeviceDetail\n"
+                                      '2026-11-14\t[COMPTE_1]\t{"deviceId":"1","displayName":"[FQDN_1]"}\n')
+
+    def test_details_copies_du_portail(self):
+        texte = "User\tSophie Lefèvre\nUser type\tMember\nUsername\tsophie@vallorie.fr\nDevice name\tPC-COMPTA-07\n"
+        self.assertEqual(anon(texte), "User\t[COMPTE_1]\nUser type\tMember\nUsername\t[EMAIL_1]\nDevice name\t[FQDN_1]\n")
+
+    def test_powershell(self):
+        texte = "UserDisplayName   : Marc Dubois\nUserPrincipalName : marc.dubois@vallorie.fr\nAppDisplayName    : Microsoft Teams\n"
+        self.assertEqual(anon(texte), "UserDisplayName   : [COMPTE_1]\nUserPrincipalName : [EMAIL_1]\n"
+                                      "AppDisplayName    : Microsoft Teams\n")
+
+    def test_nom_propage_dans_le_reste_du_texte(self):
+        sortie = anon('{"userDisplayName": "Jane Doe"}\nJane Doe s\'est connectée 12 fois')
+        self.assertNotIn("Jane Doe", sortie)
+
+    def test_jeton_parlant_de_la_conversation_prioritaire(self):
+        a = Anonymiseur()
+        sortie = a.anonymiser('{"userDisplayName": "Jane Doe"}', ["Jane Doe"], None, []).texte
+        self.assertEqual(sortie, '{"userDisplayName": "[NOM_1]"}')
+
+    def test_versions_ne_sont_pas_des_ip(self):
+        texte = ("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0, "
+                 "Rich Client 4.36.0.0, depuis 81.250.12.34")
+        self.assertEqual(anon(texte), "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/129.0.0.0 Safari/537.36 "
+                                      "Edg/129.0.0.0, Rich Client 4.36.0.0, depuis [IP_PUB_1]")
+        # mais « client 10.120.20.198 » (Infoblox) et « tcp/10.1.1.1 » restent des adresses
+        self.assertEqual(anon("client 10.120.20.198#57398 tcp/10.1.1.1"), "client [IP_privée_1]#57398 tcp/[IP_privée_2]")
+
+    def test_valeurs_neutres(self):
+        texte = '"UserId": "Not Available", "ObjectId": "*REDACTED*"\nObject Server:\t\tSecurity'
+        self.assertEqual(anon(texte), texte)
+
+    def test_case_decochee(self):
+        texte = '{"userDisplayName": "Jane Doe", "ipAddress": "81.250.12.34"}'
+        types = [t for t in TYPES_AUTO if t != "COMPTE"]
+        self.assertIn("Jane Doe", anon(texte, types=types))
+
+
 if __name__ == "__main__":
     unittest.main()
