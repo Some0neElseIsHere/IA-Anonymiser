@@ -20,7 +20,7 @@ Au premier lancement, un écran d'accueil présente le principe. Ensuite, tant q
 
 1. **Onglet « 1. Anonymiser »** : collez votre texte à gauche, ou ouvrez un fichier de log avec **Ouvrir…** (Ctrl+O) ou en le **glissant sur la fenêtre** depuis l'Explorateur. Les encodages courants sont reconnus (UTF-8, UTF-16 des exports PowerShell, Windows-1252) ; plusieurs fichiers déposés d'un coup sont mis bout à bout, chacun précédé de son nom. Un journal `.evtx` doit d'abord être exporté en texte (`wevtutil qe Security /c:5000 /rd:true /f:text > securite.txt`). La version anonymisée apparaît aussitôt à droite. Les éléments masqués sont surlignés en jaune.
 2. Cliquez sur **Copier pour l'IA** et collez le texte dans votre conversation.
-3. **Onglet « 2. Restaurer la réponse »** : collez la réponse de l'IA à gauche. À droite, les jetons comme `[NOM_1]` sont remplacés par les vraies valeurs. Cliquez sur **Copier**.
+3. **Onglet « 2. Restaurer »** : collez la réponse de l'IA à gauche. À droite, les jetons comme `[NOM_1]` sont remplacés par les vraies valeurs. Cliquez sur **Copier**.
 
 Dans les deux onglets, **passez la souris sur un élément surligné** : une bulle affiche le jeton correspondant (côté texte original ou réponse restaurée) ou la vraie valeur (côté jetons), avec son type. La ligne survolée s'éclaire **des deux côtés**, pour retrouver d'un coup d'œil sa version anonymisée ou restaurée. Les deux zones **défilent ensemble**, ligne à ligne.
 

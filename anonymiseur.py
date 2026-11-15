@@ -590,7 +590,7 @@ class Application:
         style.configure("Statut.TLabel", foreground=p["aide"])
         style.configure("Lien.TLabel", foreground=p["lien"], font=(f, 10, "underline"))
         style.configure("LienDiscret.TLabel", foreground=p["lien"], font=(f, 9))
-        style.configure("TNotebook.Tab", padding=(12, 5))
+        style.configure("TNotebook.Tab", padding=(8, 5))
         hauteur = self.police.metrics("linespace") + int(10 * self.echelle)
         style.configure("Treeview", rowheight=hauteur, font=self.police)
         style.configure("Treeview.Heading", font=(f, 10, "bold"))
@@ -2330,6 +2330,8 @@ def capture(app, chemin):
         app.maj_conversations()
 
     def photo(fenetre, nom):
+        app.root.event_generate("<Motion>", warp=True, x=2, y=2)  # pas d'info-bulle sous le pointeur
+        fenetre.update()
         from PIL import ImageGrab
         app.root.update()
         x, y = fenetre.winfo_rootx(), fenetre.winfo_rooty()
