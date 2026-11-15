@@ -1,0 +1,268 @@
+{
+ "_note": "Journaux réels ou d'exemple publics, récupérés au moment du test à un commit précis (rien n'est copié dans ce dépôt).",
+ "sources": [
+  {
+   "nom": "loghub",
+   "depot": "logpai/loghub",
+   "commit": "dd61d0952749ee7963bde24220d1be5ede023033",
+   "fichiers": [
+    "*/*_2k.log"
+   ],
+   "licence": "recherche, voir le dépôt"
+  },
+  {
+   "nom": "otrf",
+   "depot": "OTRF/Security-Datasets",
+   "commit": "d9d40ef123d2c87d5d3df28c96bcab4f0faccc87",
+   "fichiers": [
+    "datasets/atomic/aws/collection/ec2_proxy_s3_exfiltration.zip",
+    "datasets/atomic/aws/discovery/aws_s3_honeybucketlogs.zip",
+    "datasets/atomic/linux/defense_evasion/host/sh_binary_padding_dd.zip",
+    "datasets/atomic/linux/discovery/host/sh_arp_cache.zip",
+    "datasets/atomic/windows/credential_access/host/cmd_psexec_lsa_secrets_dump.zip",
+    "datasets/atomic/windows/credential_access/host/covenant_dcsync_dcerpc_drsuapi_DsGetNCChanges.zip",
+    "datasets/atomic/windows/credential_access/host/empire_mimikatz_logonpasswords.zip",
+    "datasets/atomic/windows/credential_access/host/empire_shell_rubeus_asktgt_ptt.zip",
+    "datasets/atomic/windows/defense_evasion/host/empire_powerview_ldap_ntsecuritydescriptor.zip",
+    "datasets/atomic/windows/discovery/host/cmd_discover_iexplorer_version_registry.zip",
+    "datasets/atomic/windows/discovery/host/empire_find_localadmin_smb_svcctl_OpenSCManager.zip",
+    "datasets/atomic/windows/discovery/host/empire_getsession_dcerpc_smb_srvsvc_NetSessEnum.zip",
+    "datasets/atomic/windows/lateral_movement/host/aadinternals_export_adfsdatabaseconfig_remotely.zip",
+    "datasets/atomic/windows/lateral_movement/host/covenant_com_wsman_automation.zip",
+    "datasets/atomic/windows/lateral_movement/host/covenant_copy_smb_CreateRequest.zip",
+    "datasets/atomic/windows/lateral_movement/host/covenant_dcom_executeexcel4macro_allowed.zip",
+    "datasets/atomic/windows/persistence/host/cmd_userinitmprlogonscript_batch.zip",
+    "datasets/atomic/windows/privilege_escalation/host/cmd_service_mod_fax.zip",
+    "datasets/atomic/windows/privilege_escalation/host/empire_uac_shellapi_fodhelper.zip",
+    "datasets/compound/LSASS_campaign_01/metasploit_logonpasswords_lsass_memory_dump.zip",
+    "datasets/compound/LSASS_campaign_01/metasploit_logonpasswords_lsass_memory_dump_zeek_logs.zip"
+   ],
+   "licence": "MIT"
+  },
+  {
+   "nom": "sentinel",
+   "depot": "Azure/Azure-Sentinel",
+   "commit": "e5ec64036e226ef87f78bd1c320e37588f6ccda1",
+   "fichiers": [
+    "Sample Data/AADUSerInfo.csv",
+    "Sample Data/ASIM/Cisco_Firepower_ASimNetworkSession_RawLogs.txt",
+    "Sample Data/ASIM/Cisco_Firepower_ASimWebSession_RawLogs.txt",
+    "Sample Data/ASIM/CrowdStrike_FalconHost_ASimAuditEvent_RawLogs.txt",
+    "Sample Data/ASIM/CrowdStrike_FalconHost_ASimNetworkSession_RawLogs.txt",
+    "Sample Data/ASIM/CrowdStrike_Falcon_ASimAuthentication_RawLogs.txt",
+    "Sample Data/ASIM/F5_ASM_ASimWebSession_RawLogs.txt",
+    "Sample Data/ASIM/PaloAlto_CortexDataLake_ASimAuthentication_RawLogs.txt",
+    "Sample Data/ASIM/PaloAlto_CortexDataLake_ASimNetworkSession_RawLogs.txt",
+    "Sample Data/ASIM/PaloAlto_CortexDataLake_ASimWebSession_RawLogs.txt",
+    "Sample Data/ASIM/SentinelOne_ASimAuditEvent_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimAuthentication_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimDns_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimFileEvent_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimNetworkSession_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimProcessEvent_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimRegistryEvent_RawLogs.json",
+    "Sample Data/ASIM/SentinelOne_ASimUserManagement_RawLogs.json",
+    "Sample Data/ASIM/TrendMicroVisionOne_ASimProcessEvent_RawLogs.json",
+    "Sample Data/ASIM/TrendMicroVisionOne_ASimRegistryEvent_RawLogs.json",
+    "Sample Data/ASIM/VMwareCarbonBlackCloud_ASimAuditEvent_RawLogs.json",
+    "Sample Data/ASIM/VMwareCarbonBlackCloud_vimFileEvent_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASimAuthentication_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASimNetworkSessionThreat_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASimNetworkSession_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASimProcessCreateThreat_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASimProcessCreate_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASimProcessTerminate_RawLogs.json",
+    "Sample Data/ASIM/VMware_CarbonBlackCloud_ASim_RegistryEvent_RawLogs.json",
+    "Sample Data/CBS_RawLogs.json",
+    "Sample Data/CEF/AkamaiSIEM.csv",
+    "Sample Data/CEF/ArubaClearPass.json",
+    "Sample Data/CEF/CiscoFirepowerEStreamerCONN.csv",
+    "Sample Data/CEF/CiscoSEG.csv",
+    "Sample Data/CEF/Claroty.json",
+    "Sample Data/CEF/ClarotyxDome_sample_data.csv",
+    "Sample Data/CEF/CrowdStrikeFalconEndpointProtection.json",
+    "Sample Data/CEF/DelineaSourceData.csv",
+    "Sample Data/CEF/DelineaSourceData.json",
+    "Sample Data/CEF/FireEyeNX.json",
+    "Sample Data/CEF/Forcepoint_ngfw_query_data.csv",
+    "Sample Data/CEF/Fortigate.json",
+    "Sample Data/CEF/InfobloxCDC_SOCInsights.csv",
+    "Sample Data/CEF/InfobloxCloudDataConnector-sampledata.csv",
+    "Sample Data/CEF/KasperskySC.csv",
+    "Sample Data/CEF/Morphisec.csv",
+    "Sample Data/CEF/NozomiNetworksEvents.json",
+    "Sample Data/CEF/OSSECEvents.json",
+    "Sample Data/CEF/PaloAltoCDLEvent.json",
+    "Sample Data/CEF/PingFederate.json",
+    "Sample Data/CEF/RadiflowIsid_IngestedLogs.csv",
+    "Sample Data/CEF/RadiflowIsid_RawLogs.txt",
+    "Sample Data/CEF/SonicWallFirewall_Query_Data.csv",
+    "Sample Data/CEF/SymantecDLP.json",
+    "Sample Data/CEF/TrendMicro_ApexOne.json",
+    "Sample Data/CEF/VotiroSampleData.txt",
+    "Sample Data/CEF/WithSecureViaConnectorSampleData.csv",
+    "Sample Data/CEF/WithSecureViaConnectorSampleData.txt",
+    "Sample Data/CEF/ZScaler.json",
+    "Sample Data/CEF/barracudaWAFCEF.txt",
+    "Sample Data/CEF/fortiwebwafsamplelog.txt",
+    "Sample Data/CEF/illusive.csv",
+    "Sample Data/CEF/onapsis_sample_logs.csv",
+    "Sample Data/CEF/vArmour_AppController.csv",
+    "Sample Data/CEF/wirex_sample_DNS.csv",
+    "Sample Data/CEF/wirex_sample_dataDatabase.csv",
+    "Sample Data/CEF/wirex_sample_dataHttp.csv",
+    "Sample Data/CEF/wirex_sample_data_all.csv",
+    "Sample Data/Custom/ESI-HttpProxyLogs-CSV.txt",
+    "Sample Data/Custom/ESI-MessageTrackingLogs-CSV.txt",
+    "Sample Data/Custom/MarkLogic/accesslog.log",
+    "Sample Data/Custom/MarkLogic/auditlog.log",
+    "Sample Data/Custom/MarkLogic/errorlog.log",
+    "Sample Data/Custom/NetwrixAuditor.log",
+    "Sample Data/Custom/OracleWebLogicServer/access.log.txt",
+    "Sample Data/Custom/OracleWebLogicServer/server.log.txt",
+    "Sample Data/Syslog/AlsidForADLog_CL.json",
+    "Sample Data/Syslog/CiscoACI.json",
+    "Sample Data/Syslog/CiscoISEEvent.json",
+    "Sample Data/Syslog/CiscoMeraki.json",
+    "Sample Data/Syslog/CiscoSDWAN.csv",
+    "Sample Data/Syslog/CiscoStealthwatch.json",
+    "Sample Data/Syslog/CiscoUCS.json",
+    "Sample Data/Syslog/CiscoWSA.json",
+    "Sample Data/Syslog/CylancePROTECT.json",
+    "Sample Data/Syslog/DigitalGuardianDLPEvent.json",
+    "Sample Data/Syslog/Forescout.json",
+    "Sample Data/Syslog/GitLabAudit.json",
+    "Sample Data/Syslog/InfobloxNIOS.json",
+    "Sample Data/Syslog/IvantiUEM.json",
+    "Sample Data/Syslog/JuniperSRX.json",
+    "Sample Data/Syslog/McAfeeNSP.json",
+    "Sample Data/Syslog/McAfee_ePO.json",
+    "Sample Data/Syslog/OpenVPN.txt",
+    "Sample Data/Syslog/OracleDatabaseAudit.txt",
+    "Sample Data/Syslog/PulseConnectSecure.json",
+    "Sample Data/Syslog/SecurID.json",
+    "Sample Data/Syslog/SymantecEndpointProtection.json",
+    "Sample Data/Syslog/SymantecProxySG.json",
+    "Sample Data/Syslog/SymantecVIP.json",
+    "Sample Data/Syslog/Tenable_IE_CL.json",
+    "Sample Data/Syslog/Tenable_ad_CL.json",
+    "Sample Data/Syslog/Tomcat.csv",
+    "Sample Data/Syslog/VMwareESXi.json",
+    "Sample Data/Syslog/Veeam_GetFinishedConfigurationBackupSessions.csv",
+    "Sample Data/Syslog/Veeam_GetJobFinished.csv",
+    "Sample Data/Syslog/Veeam_GetSecurityEvents.csv",
+    "Sample Data/Syslog/Veeam_GetVeeamONEAlarms.csv",
+    "Sample Data/Syslog/WatchGuardFireBoxV.csv",
+    "Sample Data/Syslog/barracudasamplelogs.txt",
+    "Sample Data/VMwareSASE_SDWAN/cwsdlplogs.txt",
+    "Sample Data/VMwareSASE_SDWAN/cwsweblogs.txt",
+    "Sample Data/VMwareSASE_SDWAN/efs_fwlogs.txt",
+    "Sample Data/VMwareSASE_SDWAN/efs_fwlogs2.txt",
+    "Sample Data/VMwareSASE_SDWAN/vecoauditlogs.txt",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/SigninLogs_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AADNonInteractiveUserSignInLogs_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/ADFSSignInLogs_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AADServicePrincipalSignInLogs_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AADManagedIdentitySignInLogs_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AuditLogs_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AADRiskyUsers_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AADUserRiskEvents_mock.json",
+    "Solutions/Microsoft Entra ID/Sample Data/Tables/AADProvisioningLogs_mock.json",
+    "Playbooks/AS-Microsoft-DCR-Log-Ingestion/Samples/SignInLogsSample.json"
+   ],
+   "licence": "MIT"
+  },
+  {
+   "nom": "entra-bhis",
+   "depot": "strandjs/IntroLabs",
+   "commit": "5371b97f83192d399632c11d5298e5f012c5c4f2",
+   "fichiers": [
+    "IntroClassFiles/Tools/IntroClass/AZURE-MSP-WRITEUP-main/logs/InteractiveSignIns_Domain_spray_logs.csv",
+    "IntroClassFiles/Tools/IntroClass/AZURE-MSP-WRITEUP-main/logs/Activities-rmm.csv"
+   ]
+  },
+  {
+   "nom": "entra-bec",
+   "depot": "IsaacDunham/bec_telemetry",
+   "commit": "a921d2b7f2e26db490193acc7054f59ce1d5f91e",
+   "fichiers": [
+    "SigninLogs.csv"
+   ]
+  },
+  {
+   "nom": "entra-kaushik",
+   "depot": "iamkaushiksaha/azure-security",
+   "commit": "5a86ef5e7963e248b17698ee9cee6216244ef159",
+   "fichiers": [
+    "sentinel/sampledata/SigninLogs_sample_important_columns_110rows.csv"
+   ]
+  },
+  {
+   "nom": "entra-msol",
+   "depot": "blueteam0ps/det-eng-samples",
+   "commit": "1b6d227dd76085d6f5d34f3e7127887412c6506c",
+   "fichiers": [
+    "dataset/t1110.003_msolspray-powershell.json",
+    "dataset/t1110.003_msolspray-python.json",
+    "dataset/t1110.003_msolspraywithsuccess_1.csv",
+    "dataset/t1110.003_o365spray_default.json",
+    "dataset/t1110.003_o365spray_reporting.csv",
+    "dataset/t1110.003_o365spray_reporting.json"
+   ]
+  },
+  {
+   "nom": "entra-o365",
+   "depot": "iandday/o365AuditParser",
+   "commit": "035166d7b18ae499dda6001b315dc205864563ec",
+   "fichiers": [
+    "examples/output/json/o365AuditLog-AzureActiveDirectory.json"
+   ]
+  },
+  {
+   "nom": "entra-phoenix",
+   "depot": "servais1983/phoenix-dfir",
+   "commit": "367922f1311e4d49b2f68ef1e9fc9ebfd9fcd388",
+   "fichiers": [
+    "eval/suite/identity_benign_admin/InteractiveSignIns_2026-10-12_2026-10-14.csv",
+    "eval/suite/identity_benign_admin/entra_audit_logs.json"
+   ]
+  },
+  {
+   "nom": "entra-sekoia",
+   "depot": "SEKOIA-IO/automation-library",
+   "commit": "c1dc7162844477a2eed8b54b1068c50e029065ed",
+   "fichiers": [
+    "MicrosoftEntraID/action_get_signins.json"
+   ]
+  },
+  {
+   "nom": "entra-graph",
+   "depot": "microsoftgraph/microsoft-graph-docs-contrib",
+   "commit": "2329b086341e67d36de55a5743af1a47224046ca",
+   "fichiers": [
+    "api-reference/v1.0/api/signin-list.md",
+    "api-reference/v1.0/api/signin-get.md",
+    "api-reference/beta/api/signin-list.md",
+    "api-reference/beta/api/signin-get.md"
+   ]
+  },
+  {
+   "nom": "entra-appomni",
+   "depot": "AppOmni-Labs/event-maturity-matrix",
+   "commit": "5e6e31384754526cb43f0eef16ae6a60f15da437",
+   "fichiers": [
+    "products/microsoft_365/event_examples/azure_ad/*.json"
+   ],
+   "assembler": true
+  },
+  {
+   "nom": "entra-aisoc",
+   "depot": "beenuar/AiSOC",
+   "commit": "6854d4a32da3070b9fd61eccf6c3800fe125ffa1",
+   "fichiers": [
+    "detections/fixtures/*/entra-*.json"
+   ],
+   "assembler": true
+  }
+ ]
+}

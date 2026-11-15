@@ -125,6 +125,8 @@ L'empreinte affichée doit correspondre à celle indiquée dans le fichier, qui 
 
 Ajoutez d'abord les nouveautés en tête de [docs/release-notes.md](docs/release-notes.md) (une entrée `- **vX.Y.Z** : …`) : sans elle, la publication est refusée. Ensuite, dans l'onglet **Actions**, ouvrez **Construction et release**, cliquez sur **Run workflow** et saisissez le numéro de version (par exemple `v1.4.0`). Les tests sont lancés, puis l'exe est compilé et publié dans une release.
 
+**Batterie sur journaux réels.** À chaque modification, environ 200 journaux publics (Windows, Linux, Sentinel, Entra ID…) sont récupérés depuis leurs dépôts d'origine, à un commit précis, et anonymisés ([tests/corpus](tests/corpus)). Une valeur qui était masquée et ne l'est plus, ou une restauration qui ne redonne plus le texte d'origine, bloque la construction et la release. Les nouvelles valeurs masquées sont listées dans le résumé du workflow ; après vérification, on les accepte avec `python tests/corpus/corpus.py --maj`, puis on commite `tests/corpus/reference.json`. La référence ne contient que des empreintes, aucune valeur en clair.
+
 ## Licence
 
 GNU GPL v3. IA-Anonymiser utilise Python (licence PSF), Tcl/Tk (licence BSD) et le thème [Sun Valley](https://github.com/rdbende/Sun-Valley-ttk-theme) (licence MIT).
