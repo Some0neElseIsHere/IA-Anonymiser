@@ -593,5 +593,31 @@ class EntraID(unittest.TestCase):
         self.assertIn("Jane Doe", anon(texte, types=types))
 
 
+class RenommerUnElementDetecte(unittest.TestCase):
+    """Onglet 4 : renommer le jeton d'une valeur détectée automatiquement (IP, e-mail…)."""
+
+    def test_le_terme_gagne_sur_la_detection(self):
+        a = Anonymiseur()
+        a.etiquettes = {"81.250.12.34": "PASSERELLE"}
+        sortie = a.anonymiser("Connexion depuis 81.250.12.34 puis 81.250.12.34", ["81.250.12.34"], None, []).texte
+        self.assertEqual(sortie, "Connexion depuis [PASSERELLE] puis [PASSERELLE]")
+
+    def test_renommage_annonce_a_l_ia(self):
+        a = Anonymiseur()
+        self.assertEqual(a.anonymiser("depuis 81.250.12.34", [], None, []).texte, "depuis [IP_PUB_1]")
+        a.valider()
+        a.etiquettes = {"81.250.12.34": "PASSERELLE"}
+        self.assertEqual(a.anonymiser("depuis 81.250.12.34", ["81.250.12.34"], None, []).texte, "depuis [PASSERELLE]")
+        self.assertEqual(a.renommages(), {"[IP_PUB_1]": "[PASSERELLE]"})
+        a.valider()
+        # les réponses de l'IA avec l'ancien ou le nouveau jeton se restaurent
+        self.assertEqual(a.restaurer("[IP_PUB_1] et [PASSERELLE]").texte, "81.250.12.34 et 81.250.12.34")
+
+    def test_email_renomme(self):
+        a = Anonymiseur()
+        a.etiquettes = {"jean@acme.fr": "DIRECTEUR"}
+        self.assertEqual(a.anonymiser("De : jean@acme.fr", ["jean@acme.fr"], None, []).texte, "De : [DIRECTEUR]")
+
+
 if __name__ == "__main__":
     unittest.main()

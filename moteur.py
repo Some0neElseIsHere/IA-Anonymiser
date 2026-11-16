@@ -3,6 +3,7 @@
 Les correspondances jeton -> valeur restent en mémoire uniquement.
 """
 import bisect
+import itertools
 import ipaddress
 import re
 import collections
@@ -788,6 +789,8 @@ class Anonymiseur:
             perso = next((j for t, j in self.etiquettes.items() if _cle(t, "NOM") == cle[1] and j), None)
         if perso:
             jeton = f"[{perso}]"
+            if not existant or existant not in self.valide:  # valeur déjà envoyée sous un autre type ([IP_PUB_1])
+                existant = self._valide_par_valeur().get(" ".join(valeur.split()).casefold(), existant)
             if existant and existant != jeton and existant in self.valide:
                 self._renommages[existant] = jeton  # l'IA connaît l'ancien jeton : il faudra la prévenir
             if jeton not in self.valide:
@@ -805,6 +808,14 @@ class Anonymiseur:
         self._apercu[jeton] = (type_, valeur)
         self._apercu_index[cle] = jeton
         return jeton
+
+    def _valide_par_valeur(self):
+        """Valeur (sans casse ni espaces multiples) → jeton déjà envoyé à l'IA ; recalculé si valide a changé."""
+        cle = len(self.valide)
+        if getattr(self, "_cache_par_valeur", (None,))[0] != cle:
+            self._cache_par_valeur = (cle, {" ".join(v.split()).casefold(): j for j, (_, v) in self.valide.items()
+                                            if JETON_RE.fullmatch(j)})
+        return self._cache_par_valeur[1]
 
     def info(self, jeton):
         return self.valide.get(jeton) or self._apercu.get(jeton)
@@ -879,6 +890,21 @@ class Anonymiseur:
             fins.insert(i, f)
             return True
 
+        # Occurrences des termes de l'utilisateur : une détection automatique qui tombe dedans (« acme.fr »
+        # dans le terme « jean@acme.fr ») leur laisse la place ; le terme est masqué à la fin, avec son jeton.
+        motifs_termes = []
+        for terme in sorted({" ".join(t.split()) for t in termes if len(" ".join(t.split())) >= 2},
+                            key=len, reverse=True):
+            motifs_termes.append((terme, re.compile(
+                r"(?<!\w)" + r"\s+".join(map(_motif_mot, terme.split())) + r"(?!\w)", re.IGNORECASE)))
+        zones_termes = sorted(m.span() for _, motif in motifs_termes for m in motif.finditer(texte))
+        debuts_termes = [d for d, _ in zones_termes]
+        fin_max = list(itertools.accumulate((f for _, f in zones_termes), max))
+
+        def dans_un_terme(d, f):
+            i = bisect.bisect_right(debuts_termes, d) - 1
+            return i >= 0 and fin_max[i] >= f
+
         for numero, (type_, motif) in enumerate(MOTIFS):
             if types is not None and type_ not in types and not (type_ == "IP" and set(TYPES_IP) & set(types)):
                 continue
@@ -886,12 +912,12 @@ class Anonymiseur:
             for m in motif.finditer(texte):
                 if type_ == "DN":
                     for d, f, sous_type, valeur in _decomposer_dn(m, termes_cf):
-                        if f > d and prendre(d, f):
+                        if f > d and not (zones_termes and dans_un_terme(d, f)) and prendre(d, f):
                             trouves.append((d, f, sous_type, valeur))
                     continue
                 d, f = _plage(m)
-                if type_ == "COMPTE" and termes_cf and " ".join(texte[d:f].split()).casefold() in termes_cf:
-                    continue  # nom affiché qui est un terme de l'utilisateur : il garde son jeton ([NOM_1], [VICTIME])
+                if zones_termes and dans_un_terme(d, f):
+                    continue  # valeur (ou partie) d'un terme de l'utilisateur : elle garde son jeton ([VICTIME])
                 if f > d and _accepte(type_, m, texte[d:f]):
                     if (self.domaines_publics and type_ == "FQDN" and "tld" in m.re.groupindex
                             and domaine_public(texte[d:f])):
@@ -903,7 +929,7 @@ class Anonymiseur:
         yield 0.75
         # Tableaux CSV : colonnes User, UserDisplayName, Device name… (exports Entra ID / Sentinel)
         for d, f, type_ in colonnes_csv(texte, termes_cf):
-            if (types is None or type_ in types) and prendre(d, f):
+            if (types is None or type_ in types) and not (zones_termes and dans_un_terme(d, f)) and prendre(d, f):
                 trouves.append((d, f, type_, texte[d:f]))
 
         for brut in motifs:
@@ -929,16 +955,15 @@ class Anonymiseur:
                 if utilisateur.lower() not in COMPTES_NEUTRES:
                     connues.append((utilisateur, "COMPTE"))
         yield 0.8
+        if termes_cf:  # une valeur devenue terme (renommée) n'est plus propagée sous son ancien jeton
+            connues = [(v, t) for v, t in connues if " ".join(v.split()).casefold() not in termes_cf]
         occurrences = yield from self._etapes_occurrences(texte, connues, types)
         for d, f, type_, valeur in occurrences:
-            if prendre(d, f):
+            if not (zones_termes and dans_un_terme(d, f)) and prendre(d, f):
                 trouves.append((d, f, type_, valeur))
 
         yield 0.9
-        propres = {" ".join(t.split()) for t in termes}
-        for terme in sorted((t for t in propres if len(t) >= 2), key=len, reverse=True):
-            motif = re.compile(
-                r"(?<!\w)" + r"\s+".join(map(_motif_mot, terme.split())) + r"(?!\w)", re.IGNORECASE)
+        for terme, motif in motifs_termes:
             for m in motif.finditer(texte):
                 if prendre(*m.span()):
                     trouves.append((m.start(), m.end(), "NOM", terme))

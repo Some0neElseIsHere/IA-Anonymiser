@@ -1126,6 +1126,8 @@ class Application:
         self.arbre.bind("<<TreeviewSelect>>", lambda e: self.selection_element())
         self.arbre.bind("<Double-1>", lambda e: self.basculer_element())
         self.arbre.bind("<Button-3>", self.menu_element)
+        self.arbre.bind("<Control-c>", lambda e: self.copier_element(valeur=True))
+        self.arbre.bind("<Control-C>", lambda e: self.copier_element(valeur=True))
         self.aide_adaptee(cadre, t("aide_elements")).pack(fill="x", pady=(6, 0))
         self.arbre_elements_couleurs()
         return cadre
@@ -1709,8 +1711,8 @@ class Application:
             self.moteur.exclus.add(jeton)
         self.actualiser()
 
-    def ajouter_terme(self, terme=None, permanent=False):
-        jeton, ancien = "", None
+    def ajouter_terme(self, terme=None, permanent=False, jeton=None):
+        jeton, ancien = jeton or "", None
         if terme is None:  # saisie du panneau : terme + jeton facultatif, ou modification d'une ligne
             terme, jeton = self.termes.saisie()
             ancien = self.termes.en_modification()
@@ -1852,9 +1854,68 @@ class Application:
         if not ligne:
             return
         self.arbre.selection_set(ligne)
-        self.menu.delete(0, "end")
-        if self.ajouter_bascule(self.menu, ligne):
-            self.menu.tk_popup(evenement.x_root, evenement.y_root)
+        t, menu = self.t, self.menu
+        menu.delete(0, "end")
+        if not self.moteur.info(ligne):
+            return
+        menu.add_command(label=t("menu_copier_valeur"), accelerator="Ctrl+C",
+                         command=lambda: self.copier_element(ligne, valeur=True))
+        menu.add_command(label=t("menu_copier_jeton"), command=lambda: self.copier_element(ligne, valeur=False))
+        menu.add_command(label=t("menu_renommer_jeton"), command=lambda: self.renommer_element(ligne))
+        menu.add_separator()
+        self.ajouter_bascule(menu, ligne)
+        menu.tk_popup(evenement.x_root, evenement.y_root)
+
+    def copier_element(self, jeton=None, valeur=True):
+        """Copie la valeur d'origine (ou le jeton) de l'élément choisi dans l'onglet 4."""
+        if jeton is None:
+            selection = self.arbre.selection()
+            if not selection:
+                return "break"
+            jeton = selection[0]
+        info = self.moteur.info(jeton)
+        if info:
+            texte = info[1] if valeur else jeton
+            self.ecrire_presse_papiers(texte)
+            court = texte if len(texte) <= 50 else texte[:47] + "…"
+            self.message(self.t("msg_element_copie", v=court))
+        return "break"
+
+    def renommer_element(self, jeton):
+        """Donne un jeton parlant à n'importe quel élément, détecté automatiquement ou non : la valeur
+        devient un terme de la conversation avec ce jeton (onglet 3). Si l'ancien jeton a déjà été envoyé,
+        l'IA est prévenue du changement à la prochaine copie."""
+        info = self.moteur.info(jeton)
+        if not info:
+            return
+        type_, valeur = info
+        valeur = normaliser(valeur)
+        court = valeur if len(valeur) <= 60 else valeur[:57] + "…"
+        saisi = simpledialog.askstring(self.t("renommer_jeton_titre"),
+                                       self.t("renommer_jeton_question", v=court, j=jeton),
+                                       initialvalue=jeton[1:-1], parent=self.root)
+        nouveau = normaliser_etiquette(saisi or "")
+        if not nouveau or f"[{nouveau}]" == jeton:
+            return
+        permanent = next((t for t in self.options.permanents if t.casefold() == valeur.casefold()), None)
+        if permanent:  # terme de Options → Masquage personnalisé : le jeton y est enregistré
+            if etiquette_reservee(nouveau):
+                self.message(self.t("opt_jeton_reserve", j=nouveau))
+                return
+            autre = next((t for t, j in {**self.options.etiquettes, **self.conv.etiquettes}.items()
+                          if j == nouveau and t.casefold() != valeur.casefold()), None)
+            if autre:
+                self.message(self.t("opt_jeton_pris", j=nouveau, t=autre))
+                return
+            self.options.etiquettes[permanent] = nouveau
+            self.sauver_options()
+            self.actualiser()
+        else:
+            self.ajouter_terme(valeur, jeton=nouveau)
+            terme = next((t for t in self.conv.termes if t.casefold() == valeur.casefold()), None)
+            if self.conv.etiquettes.get(terme) != nouveau:
+                return  # refusé (jeton déjà pris, réservé…) : ajouter_terme a affiché pourquoi
+        self.message(self.t("msg_jeton_renomme", a=jeton, n=f"[{nouveau}]"))
 
     # --- presse-papiers ---------------------------------------------------
     def vider(self, zone):

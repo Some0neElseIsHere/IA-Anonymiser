@@ -707,6 +707,41 @@ def lancer():
         app.basculer_colonne()  # laissée réduite : la relance doit s'en souvenir
         racine.update()
 
+    def elements_copier_renommer():
+        """Onglet 4 : copier la valeur ou le jeton d'un élément, renommer le jeton d'une IP détectée."""
+        app.nouvelle_conversation()
+        racine.update()
+        app.source.ecrire("VPN depuis 81.250.12.34 par jean.morel@acme.fr\nRefus 81.250.12.34")
+        app.actualiser()
+        attendre_calcul()
+        app.texte_pour_ia()  # l'IA connaît maintenant [IP_PUB_1]
+        app.onglets.select(3)
+        racine.update()
+        ip = next(j for j in app.moteur.jetons() if app.moteur.info(j)[1] == "81.250.12.34")
+        app.copier_element(ip, valeur=True)
+        verifier(racine.clipboard_get() == "81.250.12.34", "copier la valeur")
+        app.copier_element(ip, valeur=False)
+        verifier(racine.clipboard_get() == ip, "copier le jeton")
+        mail = next(j for j in app.moteur.jetons() if "@" in app.moteur.info(j)[1])
+        app.arbre.selection_set(mail)
+        app.arbre.focus_set()
+        app.arbre.event_generate("<Control-c>")
+        racine.update()
+        verifier(racine.clipboard_get() == "jean.morel@acme.fr", f"Ctrl+C dans la liste : {racine.clipboard_get()!r}")
+        REPONSES["askstring"] = "PASSERELLE"
+        app.renommer_element(ip)
+        REPONSES["askstring"] = "Incident AD"
+        attendre_calcul()
+        racine.update()
+        sortie = app.sortie.lire()
+        verifier(sortie.count("[PASSERELLE]") == 2 and ip not in sortie, f"renommage : {sortie!r}")
+        verifier(app.arbre.exists("[PASSERELLE]"), "nouveau jeton absent de l'onglet 4")
+        copie = app.texte_pour_ia()
+        verifier(ip in copie and "[PASSERELLE]" in copie.split("\n")[0] + copie, "renommage non annoncé à l'IA")
+        photo("3f-elements-renommer")
+        app.fermer_conversation()
+        racine.update()
+
     def quitter_phase1():
         app.arbre_conv.selection_set(contexte["premiere"].id)
         app.changer_conversation()
@@ -878,7 +913,7 @@ def lancer():
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
-            tres_gros_log, gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, quitter_phase1],
+            tres_gros_log, gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, elements_copier_renommer, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, journal_lignes_longues, fin],
         3: [relance_avec_gros_journal, fin],
     }[PHASE]
