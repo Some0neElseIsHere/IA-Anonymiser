@@ -485,6 +485,74 @@ def lancer():
         verifier(duree < 5, f"gros log trop lent : {duree:.2f} s")
         verifier("10.0." not in app.sortie.lire(), "IP en clair dans le gros log")
 
+    def tres_gros_log():
+        """Journal de 6 Mo : temps de chaque étape, écrits dans perf.txt (pour repérer ce qui fige l'interface)."""
+        import generateur_systemes as g
+        morceaux, taille, i = [], 0, 0
+        while taille < 6_000_000:
+            u = g.Univers(i)
+            morceau = g.document(u, 6)
+            morceaux.append(morceau)
+            taille += len(morceau) + 1
+            i += 1
+        texte = "\n".join(morceaux)
+        mesures = []
+
+        def chrono(nom, objet, attribut):
+            origine = getattr(objet, attribut)
+
+            def mesure(*a, **k):
+                debut = time.perf_counter()
+                try:
+                    return origine(*a, **k)
+                finally:
+                    mesures.append((nom, time.perf_counter() - debut))
+            setattr(objet, attribut, mesure)
+            return lambda: setattr(objet, attribut, origine)
+
+        def etape(nom, action):
+            debut = time.perf_counter()
+            action()
+            racine.update()
+            mesures.append((nom, time.perf_counter() - debut))
+
+        precedente = app.conv
+        app.nouvelle_conversation()
+        racine.update()
+        grosse = app.conv
+
+        def aller(conv):
+            app.arbre_conv.selection_set(conv.id)
+            app.changer_conversation()
+
+        retablir = [chrono("  moteur.anonymiser", app.moteur, "anonymiser"),
+                    chrono("  source.surligner", app.source, "surligner"),
+                    chrono("  sortie.ecrire (avec surlignage)", app.sortie, "ecrire"),
+                    chrono("  remplir_elements", app, "remplir_elements"),
+                    chrono("  stockage.sauver_conversations", anonymiseur.stockage, "sauver_conversations")]
+        try:
+            etape("coller 6 Mo dans la zone source", lambda: app.source.ecrire(texte))
+            etape("actualiser (total)", app.actualiser)
+            etape("actualiser une 2e fois (rien n'a changé)", app.actualiser)
+            etape("sauvegarder", app.sauvegarder)
+            etape("sauvegarder une 2e fois (rien n'a changé)", app.sauvegarder)
+            etape("texte_pour_ia", app.texte_pour_ia)
+            etape("défiler au milieu", lambda: app.source.texte.yview_moveto(0.5))
+            etape("onglet 4", lambda: app.onglets.select(3))
+            etape("onglet 1", lambda: app.onglets.select(0))
+            etape("passer à une autre conversation", lambda: aller(precedente))
+            etape("revenir à la conversation de 6 Mo", lambda: aller(grosse))
+        finally:
+            for r in retablir:
+                r()
+        lignes = [f"Journal de {len(texte) / 1e6:.1f} Mo, {texte.count(chr(10)) + 1} lignes, "
+                  f"{len(app.moteur.jetons())} éléments masqués"]
+        lignes += [f"{d:7.2f} s  {nom}" for nom, d in mesures]
+        open(os.path.join(SORTIE, "perf.txt"), "w", encoding="utf-8").write("\n".join(lignes) + "\n")
+        total = sum(d for nom, d in mesures if not nom.startswith("  "))
+        verifier(total < 120, f"journal de 6 Mo : {total:.0f} s au total")
+        app.fermer_conversation()
+
     def defilement_jumele():
         app.onglets.select(0)
         racine.update()
@@ -667,7 +735,7 @@ def lancer():
             copier_pour_ia, reponse_ia, verifier_restauration, survol, ne_pas_masquer, jeton_personnalise, verifier_annonce,
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
-            gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, quitter_phase1],
+            tres_gros_log, gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, fin],
     }[PHASE]
 

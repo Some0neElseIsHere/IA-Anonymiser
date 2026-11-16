@@ -5,6 +5,7 @@ Les correspondances jeton -> valeur restent en mémoire uniquement.
 import bisect
 import ipaddress
 import re
+import collections
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -656,6 +657,10 @@ def colonnes_csv(texte, termes_cf=frozenset()):
     return trouves
 
 
+_MOT = re.compile(r"\w+")
+_PREMIER_MOT = re.compile(r"\w+")
+
+
 def _plage(m):
     """Partie à masquer : le groupe « v » s'il existe, sinon tout ; sans espaces en bout."""
     debut, fin = m.span("v") if "v" in m.re.groupindex and m.group("v") else m.span()
@@ -956,14 +961,18 @@ class Anonymiseur:
     def _occurrences_connues(texte, connues, types):
         """Occurrences littérales de valeurs déjà connues : (début, fin, type, texte trouvé).
 
-        Recherche directe (str.find) valeur par valeur : une seule expression régulière avec des
-        milliers d'alternatives serait trente fois plus lente sur un gros fichier de logs.
+        Une valeur qui commence par une lettre ou un chiffre ne peut commencer qu'au début d'un mot du
+        texte : on parcourt donc les mots une seule fois et on ne compare que les valeurs dont le premier
+        mot correspond. Chercher chaque valeur dans tout le texte (str.find) prenait 8 s pour 2 000 valeurs
+        dans 6 Mo de logs ; une expression régulière à milliers d'alternatives est plus lente encore.
         """
         par_valeur = {}
         for valeur, type_ in connues:
             if len(valeur) >= 3 and "\n" not in valeur and (types is None or type_.rstrip("\\") in types or
                                                             type_ in ("NOM", "PERSO")):
                 par_valeur.setdefault(valeur if type_ in EXACTS else valeur.lower(), (type_, valeur))
+        if not par_valeur:
+            return []
         minuscules = texte.lower()
         if len(minuscules) != len(texte):  # caractère dont la minuscule change la longueur : cas rare
             minuscules = None
@@ -971,29 +980,47 @@ class Anonymiseur:
         def mot(c):
             return c.isalnum() or c == "_"
 
-        sortie = []
-        for cle in sorted(par_valeur, key=len, reverse=True):  # les plus longues d'abord
+        cles = sorted(par_valeur, key=len, reverse=True)  # les plus longues d'abord
+        rang = {cle: i for i, cle in enumerate(cles)}
+        candidats = []  # (rang de la valeur, position)
+        par_premier_mot = collections.defaultdict(list)
+        for cle in cles:
             type_, valeur = par_valeur[cle]
+            premier = _PREMIER_MOT.match(valeur)
+            if premier and minuscules is not None:
+                par_premier_mot[premier.group(0).lower()].append(cle)
+                continue
             exact = type_ in EXACTS
-            if exact or minuscules is not None:
+            if exact or minuscules is not None:  # valeur qui commence par un symbole : recherche directe
                 cible = texte if exact else minuscules
-                positions = []
                 pos = cible.find(cle)
                 while pos != -1:
-                    positions.append(pos)
+                    candidats.append((rang[cle], pos))
                     pos = cible.find(cle, pos + 1)
             else:
-                positions = [m.start() for m in re.finditer(re.escape(valeur), texte, re.IGNORECASE)]
+                candidats += [(rang[cle], m.start()) for m in re.finditer(re.escape(valeur), texte, re.IGNORECASE)]
+        if par_premier_mot:
+            for m in _MOT.finditer(minuscules):
+                liste = par_premier_mot.get(m.group(0))
+                if liste:
+                    pos = m.start()
+                    for cle in liste:
+                        cible = texte if par_valeur[cle][0] in EXACTS else minuscules
+                        if cible.startswith(cle, pos):
+                            candidats.append((rang[cle], pos))
+        candidats.sort()
+
+        sortie = []
+        for r, pos in candidats:
+            type_, valeur = par_valeur[cles[r]]
             n = len(valeur)
-            devant_barre = type_.endswith("\\")  # domaine NetBIOS déduit d'un DOMAINE\utilisateur
-            for pos in positions:
-                if devant_barre and (pos + n >= len(texte) or texte[pos + n] != "\\"):
-                    continue
-                if mot(valeur[0]) and pos > 0 and mot(texte[pos - 1]):
-                    continue
-                if mot(valeur[-1]) and pos + n < len(texte) and mot(texte[pos + n]):
-                    continue
-                sortie.append((pos, pos + n, type_.rstrip("\\"), texte[pos:pos + n]))
+            if type_.endswith("\\") and (pos + n >= len(texte) or texte[pos + n] != "\\"):
+                continue  # domaine NetBIOS déduit d'un DOMAINE\utilisateur : seulement devant « \ »
+            if mot(valeur[0]) and pos > 0 and mot(texte[pos - 1]):
+                continue
+            if mot(valeur[-1]) and pos + n < len(texte) and mot(texte[pos + n]):
+                continue
+            sortie.append((pos, pos + n, type_.rstrip("\\"), texte[pos:pos + n]))
         return sortie
 
     def _jetons_trouves(self, texte):
