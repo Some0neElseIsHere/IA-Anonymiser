@@ -43,7 +43,8 @@ API_DERNIERE = "https://api.github.com/repos/Some0neElseIsHere/IA-Anonymiser/rel
 DELAI_MS = 250
 SAUVEGARDE_MS = 15000
 GROS_TEXTE = 300_000
-LIGNE_MAX = 3000  # au-delà (caractères sur une ligne), la ligne est coupée à l'affichage (aperçu)  # au-delà (caractères), le calcul se fait par étapes avec son avancement
+LIGNE_MAX = 3000  # au-delà (caractères sur une ligne), la ligne est découpée à l'écran…
+SEGMENT = 1000    # … en morceaux d'environ 1 000 caractères, en retrait sous le premier  # au-delà (caractères), le calcul se fait par étapes avec son avancement
 THEME_MS = 4000
 
 PALETTES = {
@@ -171,6 +172,29 @@ class Conversation:
         return c
 
 
+def reporter_coupures(coupures, res):
+    """Coupures d'écran de la zone de gauche, reportées dans le texte de droite (les jetons n'ont pas la
+    longueur des valeurs) : les deux zones ont ainsi le même nombre de lignes et défilent ensemble."""
+    if not coupures:
+        return []
+    paires = list(zip(res.spans_source, res.spans_sortie))
+    debuts = [s[0] for s, _ in paires]
+    ecarts, total = [0], 0  # décalage cumulé après chaque élément remplacé
+    for (d, f, _), (d2, f2, _) in paires:
+        total += (f2 - d2) - (f - d)
+        ecarts.append(total)
+    reportees = []
+    for p in coupures:
+        i = bisect.bisect_right(debuts, p) - 1
+        if i >= 0 and p < paires[i][0][1]:  # coupure au milieu d'une valeur : après son jeton
+            q = paires[i][1][1]
+        else:
+            q = p + ecarts[i + 1]
+        if not reportees or q > reportees[-1]:
+            reportees.append(q)
+    return reportees
+
+
 class Zone(ttk.Frame):
     """Zone de texte avec un titre, des boutons et une barre de défilement."""
 
@@ -182,7 +206,7 @@ class Zone(ttk.Frame):
         # Texte aux lignes très longues (JSON d'un export Entra ID sur une seule ligne…) : Tk recalcule
         # toute la ligne à chaque affichage et fige l'application. On affiche alors un aperçu où ces lignes
         # sont coupées ; le texte complet reste celui qui est lu, anonymisé et copié.
-        self.complet = None
+        self.complet, self.coupures, self._coupures_affichees, self.apres_copie = None, [], [], []
         self.avis = ttk.Label(self, style="Aide.TLabel", wraplength=600, justify="left")
         self.avis.bind("<Configure>", lambda e: self.avis.configure(wraplength=max(e.width - 10, 200)))
         cadre = self.cadre = ttk.Frame(self)
@@ -209,6 +233,8 @@ class Zone(ttk.Frame):
         self.texte.bind("<Leave>", lambda _: self._quitter(), add="+")
         self._ligne = None
         self.texte.bind("<MouseWheel>", lambda _: self._cacher_bulle(), add="+")
+        self.texte.bind("<<Copy>>", self.copier)
+        self.texte.tag_configure("suite", lmargin1=28, lmargin2=28)
         self.lecture_seule = lecture_seule
         if lecture_seule:
             self.texte.configure(state="disabled")
@@ -296,24 +322,52 @@ class Zone(ttk.Frame):
     def lignes_trop_longues(contenu):
         return re.search(r"[^\n]{%d}" % (LIGNE_MAX + 1), contenu) is not None
 
-    def ecrire(self, contenu, spans=(), tag=None):
+    @staticmethod
+    def calculer_coupures(contenu):
+        """Positions où découper à l'écran les lignes de plus de LIGNE_MAX caractères : tous les
+        SEGMENT caractères environ, de préférence après une virgule, une accolade ou une espace."""
+        coupures = []
+        for m in re.finditer(r"[^\n]{%d,}" % (LIGNE_MAX + 1), contenu):
+            debut, fin = m.span()
+            pos = debut + SEGMENT
+            while pos < fin - 100:
+                meilleure = max(contenu.rfind(c, pos - 200, pos) for c in ",} ;|")
+                coupure = meilleure + 1 if meilleure > pos - 200 else pos
+                coupures.append(coupure)
+                pos = coupure + SEGMENT
+        return coupures
+
+    def ecrire(self, contenu, spans=(), tag=None, coupures=None):
+        """coupures : positions (dans contenu) des retours à la ligne ajoutés à l'écran seulement ; calculées
+        ici si elles ne sont pas fournies (la zone de droite reprend celles de la zone de gauche)."""
         position = self.texte.yview()[0]
         self.texte.configure(state="normal")
         self.texte.delete("1.0", "end")
-        apercu = self.lignes_trop_longues(contenu)
-        self.complet = contenu if apercu else None
-        if apercu:
-            affiche = "\n".join(
-                ligne if len(ligne) <= LIGNE_MAX else
-                ligne[:LIGNE_MAX] + " " + self.app.t("apercu_coupe", n=f"{len(ligne) - LIGNE_MAX:,}".replace(",", "\u202f"))
-                for ligne in contenu.split("\n"))
+        if coupures is None:
+            coupures = self.calculer_coupures(contenu) if self.lignes_trop_longues(contenu) else []
+        self.coupures = coupures
+        self._coupures_affichees = [p + i for i, p in enumerate(coupures)]  # position du « \n » ajouté
+        self.complet = contenu if coupures else None
+        if coupures:
+            bornes = [0, *coupures, len(contenu)]
+            affiche = "\n".join(contenu[a:b] for a, b in zip(bornes, bornes[1:]))
             self.texte.insert("1.0", affiche)
-            self.avis.configure(text=self.app.t("apercu_avis", n=LIGNE_MAX,
-                                                mo=f"{len(contenu) / 1e6:.1f}".replace(".", ",")
-                                                if self.app.t.langue == "fr" else f"{len(contenu) / 1e6:.1f}"))
+            self._lignes = self._debuts_de_ligne(affiche)
+            # retrait des morceaux qui continuent la ligne précédente
+            suites = []
+            for d in self._coupures_affichees:
+                ligne = bisect.bisect_right(self._lignes, d + 1)
+                suites += (f"{ligne}.0", f"{ligne}.end")
+                if len(suites) >= 1000:
+                    self.texte.tag_add("suite", *suites)
+                    suites = []
+            if suites:
+                self.texte.tag_add("suite", *suites)
+            self.avis.configure(text=self.app.t("apercu_avis"))
             self.avis.pack(fill="x", pady=(0, 6), before=self.cadre)
         else:
             self.texte.insert("1.0", contenu)
+            self._lignes = self._debuts_de_ligne(contenu)
             self.avis.pack_forget()
         gros = len(contenu) > GROS_TEXTE
         if (self.texte.cget("wrap") == "none") != gros:
@@ -322,13 +376,12 @@ class Zone(ttk.Frame):
                 self.barre_h.pack(side="bottom", fill="x", before=self.texte)
             else:
                 self.barre_h.pack_forget()
-        self._lignes = self._debuts_de_ligne(contenu)
         if tag:
             self.surligner(spans, tag, contenu)
         self.texte.yview_moveto(position)
         if self.jumelle and self.paire["meneur"] is self.jumelle:
             self.suivre(self.jumelle)
-        if self.lecture_seule or apercu:  # l'aperçu ne se modifie pas : Effacer, Coller ou Ouvrir le remplacent
+        if self.lecture_seule or coupures:  # texte découpé : Effacer, Coller, Ouvrir ou Ctrl+V le remplacent
             self.texte.configure(state="disabled")
         else:
             self.texte.edit_reset()
@@ -343,16 +396,40 @@ class Zone(ttk.Frame):
             position = contenu.find("\n", position + 1)
         return lignes
 
+    def _affiche(self, n, fin=False):
+        """Position à l'écran d'une position du texte complet."""
+        return n + (bisect.bisect_left if fin else bisect.bisect_right)(self.coupures, n)
+
+    def _plein(self, n):
+        """Position dans le texte complet d'une position à l'écran."""
+        return n - bisect.bisect_left(self._coupures_affichees, n)
+
     def decalage(self, index):
         """Position dans le texte complet (en caractères) d'un index Tk « ligne.colonne »."""
         ligne, colonne = map(int, self.texte.index(index).split("."))
-        if self.complet is None:
+        if not self.coupures:
             return len(self.texte.get("1.0", index))
-        lignes = self._lignes
-        if ligne > len(lignes):
+        if ligne > len(self._lignes):
             return len(self.complet)
-        fin = lignes[ligne] - 1 if ligne < len(lignes) else len(self.complet)
-        return min(lignes[ligne - 1] + min(colonne, LIGNE_MAX), fin)
+        return self._plein(self._lignes[ligne - 1] + colonne)
+
+    def selection(self):
+        """Texte sélectionné, tel qu'il est dans le texte complet (sans les découpages de l'écran)."""
+        if not self.texte.tag_ranges("sel"):
+            return ""
+        if not self.coupures:
+            return self.texte.get("sel.first", "sel.last")
+        return self.complet[self.decalage("sel.first"):self.decalage("sel.last")]
+
+    def copier(self, _=None):
+        """Ctrl+C : la sélection du texte complet ; « apres_copie » est prévenu (envoi enregistré)."""
+        texte = self.selection()
+        if texte:
+            self.clipboard_clear()
+            self.clipboard_append(texte)
+            for rappel in self.apres_copie:
+                rappel(texte)
+        return "break"
 
     def _element_sous(self, x, y):
         """(étiquette, élément) sous le pointeur, ou None. L'élément est le jeton (ou le texte s'il est inconnu)."""
@@ -362,9 +439,11 @@ class Zone(ttk.Frame):
             return None  # pointeur après la fin de la ligne
         noms = self.texte.tag_names(index)
         ligne, colonne = map(int, index.split("."))
-        if ligne > len(self._lignes) or (self.complet is not None and colonne >= LIGNE_MAX):
-            return None  # au-delà de la coupure de l'aperçu
+        if ligne > len(self._lignes):
+            return None
         n = self._lignes[ligne - 1] + colonne
+        if self.coupures:
+            n = self._plein(n)
         for tag in ("inconnu", "masque", "jeton"):
             plages = self._plages.get(tag)
             if tag in noms and plages:
@@ -434,23 +513,18 @@ class Zone(ttk.Frame):
         self._plages[tag] = sorted(spans)
         if not spans:
             return
-        contenu = self.lire() if contenu is None else contenu
-        lignes = self._lignes = self._debuts_de_ligne(contenu)
-        apercu = self.complet is not None
+        lignes = self._lignes  # débuts de ligne à l'écran, calculés par ecrire
+        decoupe = bool(self.coupures)
 
-        def index(n):
+        def index(n, fin=False):
+            if decoupe:
+                n = self._affiche(n, fin)
             ligne = bisect.bisect_right(lignes, n) - 1
-            return ligne + 1, n - lignes[ligne]
+            return f"{ligne + 1}.{n - lignes[ligne]}"
 
         plages = []
         for debut, fin, _ in spans:
-            (l1, c1), (l2, c2) = index(debut), index(fin)
-            if apercu:  # seulement la partie visible des lignes coupées
-                if c1 >= LIGNE_MAX:
-                    continue
-                if l2 == l1:
-                    c2 = min(c2, LIGNE_MAX)
-            plages += (f"{l1}.{c1}", f"{l2}.{c2}")
+            plages += (index(debut), index(fin, True))
             if len(plages) >= 1000:
                 self.texte.tag_add(tag, *plages)
                 plages = []
@@ -768,7 +842,7 @@ class Application:
         self.source.texte.bind("<<Modified>>", lambda e: self.modifie(self.source.texte, self.actualiser))
         self.reponse.texte.bind("<<Modified>>",
                                 lambda e: self.modifie(self.reponse.texte, self.actualiser_reponse))
-        self.sortie.texte.bind("<<Copy>>", lambda e: self.copie_manuelle(), add="+")
+        self.sortie.apres_copie.append(lambda _: self.copie_manuelle())
         for zone in (self.source, self.reponse):
             for evenement in ("<Key>", "<<Paste>>", "<<Cut>>"):
                 zone.texte.bind(evenement, self.activite, add="+")
@@ -823,7 +897,7 @@ class Application:
         self.onglets.select(0)
         z = self.source
         try:
-            selection = z.texte.get("sel.first", "sel.last")
+            selection = z.selection()
         except tk.TclError:
             selection = ""
         if selection and "\n" not in selection:
@@ -1266,7 +1340,8 @@ class Application:
     def afficher_resultat(self, res):
         self.resultat = res
         self.source.surligner(res.spans_source, "masque")
-        self.sortie.ecrire(res.texte, res.spans_sortie, "jeton")
+        self.sortie.ecrire(res.texte, res.spans_sortie, "jeton",
+                           coupures=reporter_coupures(self.source.coupures, res))
         self.remplir_elements(res)
         if self.recherche_ouverte():
             self.chercher(garder=True)
@@ -1278,7 +1353,8 @@ class Application:
         res = self.resultat_reponse = self.moteur.restaurer(self.reponse.lire())
         self.reponse.surligner(res.spans_source, "jeton")
         self.reponse.surligner(res.inconnus, "inconnu")
-        self.restauree.ecrire(res.texte, res.spans_sortie, "jeton")
+        self.restauree.ecrire(res.texte, res.spans_sortie, "jeton",
+                              coupures=reporter_coupures(self.reponse.coupures, res))
         if not self.reponse.lire().strip():
             return
         texte = self.t("msg_restaure", n=sum(res.compte.values()))
@@ -1535,7 +1611,7 @@ class Application:
 
     def copie_manuelle(self):
         try:
-            self.enregistrer_envoi(self.sortie.texte.get("sel.first", "sel.last"))
+            self.enregistrer_envoi(self.sortie.selection())
         except tk.TclError:
             pass
         self.valider()
@@ -1710,7 +1786,7 @@ class Application:
 
     def selection_source(self):
         try:
-            return normaliser(self.source.texte.get("sel.first", "sel.last"))
+            return normaliser(self.source.selection())
         except tk.TclError:
             return ""
 
@@ -1750,7 +1826,7 @@ class Application:
         if jeton:
             separer = self.ajouter_bascule(menu, jeton)
         try:
-            selection = normaliser(texte.get("sel.first", "sel.last"))
+            selection = normaliser(zone.selection())
         except tk.TclError:
             selection = ""
         if zone is self.source and len(selection) >= 2:

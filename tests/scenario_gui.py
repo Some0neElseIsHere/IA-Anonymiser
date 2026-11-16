@@ -840,6 +840,17 @@ def lancer():
                  and "jean.martin@vallorie.fr" not in app.sortie.lire(), "ligne collée non anonymisée")
         longueur_affichee = max(len(l) for l in app.source.texte.get("1.0", "end-1c").split("\n"))
         verifier(longueur_affichee < anonymiseur.LIGNE_MAX + 100, f"ligne affichée de {longueur_affichee} caractères")
+        affiche = app.source.texte.get("1.0", "end-1c")
+        verifier(affiche.replace("\n", "") == app.source.lire().replace("\n", ""), "texte découpé incomplet à l'écran")
+        verifier(int(app.source.texte.index("end-1c").split(".")[0]) == int(app.sortie.texte.index("end-1c").split(".")[0]),
+                 "les deux zones n'ont pas le même nombre de lignes à l'écran")
+        # Ctrl+C sur plusieurs morceaux : le texte copié n'est pas découpé
+        app.sortie.texte.tag_add("sel", "4.0", "9.0")
+        app.sortie.copier()
+        copie = racine.clipboard_get()
+        attendu = app.sortie.lire()[app.sortie.decalage("4.0"):app.sortie.decalage("9.0")]
+        verifier(copie == attendu and copie.count("\n") < 5, f"copie d'une sélection découpée : {copie[:80]!r}")
+        app.sortie.texte.tag_remove("sel", "1.0", "end")
         photo("6-apercu-lignes-longues")
 
     def fin():
