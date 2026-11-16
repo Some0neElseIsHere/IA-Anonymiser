@@ -333,8 +333,8 @@ class Zone(ttk.Frame):
             debut, fin = m.span()
             pos = debut + SEGMENT
             while pos < fin - 50:
-                meilleure = max(contenu.rfind(c, pos - 60, pos) for c in ",} ;|")
-                coupure = meilleure + 1 if meilleure > pos - 60 else pos
+                meilleure = max(contenu.rfind(c, pos - 120, pos) for c in ",} ;|")
+                coupure = meilleure + 1 if meilleure > pos - 120 else pos
                 coupures.append(coupure)
                 pos = coupure + SEGMENT
         return coupures
