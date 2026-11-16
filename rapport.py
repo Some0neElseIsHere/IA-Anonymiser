@@ -239,8 +239,8 @@ def generer(conversation, options, t, version, libelle_type, maintenant=None, ut
                    if non_detecte(*moteur.valide[j], envois[n - 1], types_conv, publics)] for j in jetons}
     en_clair = {j: [n for n in tous_en_clair[j] if n not in choisis[j]] for j in jetons}
     fuites = [j for j in jetons if en_clair[j] and j not in moteur.exclus]
-    from textes import CONSIGNES
-    consignes = [getattr(options, "consigne_texte", None)] + [c for c in CONSIGNES.values()]
+    from textes import ANCIENNES_CONSIGNES, CONSIGNES
+    consignes = [getattr(options, "consigne_texte", None)] + list(CONSIGNES.values()) + ANCIENNES_CONSIGNES
     consignes = [c for c in consignes if c]
     presences = presence(jetons, envois, consignes)
     remplaces = renommages(moteur, {j: p[0] for j, p in presences.items()})

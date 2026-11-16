@@ -88,7 +88,7 @@ Pour l'enregistrer en PDF, imprimez-le depuis le navigateur (Ctrl+P → « Enreg
 - **Masquage personnalisé** : la liste des termes et motifs toujours masqués. Saisissez le terme ou le motif, cochez **Expression régulière** pour un motif, puis donnez si vous le souhaitez un jeton (texte exact) ou un titre (expression régulière). L'icône ⓘ à côté de la case rappelle la syntaxe. En ajoutant un motif, vous voyez combien de fois il apparaît dans le texte en cours. Cliquez sur une ligne pour la modifier.
 
   Les motifs utilisent le moteur d'expressions régulières de **Python** (module `re`), très proche de PCRE, de JavaScript et de .NET. Un motif testé dans PowerShell avec `'PC-0815' -match 'PC-\d{4}'` fonctionne donc ici, y compris la syntaxe .NET `(?<v>…)` pour ne masquer qu'une partie. La casse est ignorée.
-- **Consigne pour l'IA** : un texte ajouté au début de ce que vous copiez, qui demande à l'IA de garder les jetons tels quels. Vous pouvez le modifier, le désactiver ou rétablir le texte par défaut.
+- **Consigne pour l'IA** : un texte ajouté au début de ce que vous copiez, qui explique à l'IA ce que sont les jetons (le nom indique ce qu'ils remplacent : IP interne ou publique, compte, machine…) et lui demande de les garder tels quels, y compris dans les commandes et les scripts qu'elle propose, sans inventer ni deviner les vraies valeurs. Vous pouvez le modifier, le désactiver ou rétablir le texte par défaut.
 - **Général** :
   - la langue (automatique, français ou anglais) ;
   - le thème (automatique comme Windows, clair ou sombre) ;

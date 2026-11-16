@@ -26,7 +26,7 @@ import rapport
 import stockage
 from moteur import (EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, etiquette_reservee, expressions,
                     normaliser_etiquette)
-from textes import CONSIGNES, TEXTES, Traducteur, libelle_jour
+from textes import ANCIENNES_CONSIGNES, CONSIGNES, TEXTES, Traducteur, libelle_jour
 
 try:
     import sv_ttk  # thème Sun Valley (style Windows 11), clair et sombre
@@ -537,7 +537,9 @@ class Application:
         return self.options.permanents + self.conv.termes
 
     def consigne(self):
-        texte = self.options.consigne_texte or CONSIGNES[self.t.langue]
+        texte = self.options.consigne_texte
+        if not texte or texte.strip() in ANCIENNES_CONSIGNES:  # ancien texte par défaut : on prend le nouveau
+            texte = CONSIGNES[self.t.langue]
         return texte.rstrip() + "\n\n"
 
     # --- apparence --------------------------------------------------------
@@ -1966,7 +1968,8 @@ class Application:
         zone_consigne.texte.configure(height=7, width=60)
         zone_consigne.pack(fill="both", expand=True)
         zone_consigne.colorer(self.palette)
-        zone_consigne.ecrire(self.options.consigne_texte or CONSIGNES[t.langue])
+        actuelle = self.options.consigne_texte
+        zone_consigne.ecrire(CONSIGNES[t.langue] if not actuelle or actuelle.strip() in ANCIENNES_CONSIGNES else actuelle)
         ttk.Button(o, text=t("opt_consigne_defaut"),
                    command=lambda: zone_consigne.ecrire(CONSIGNES[t.langue])).pack(anchor="e", pady=(8, 0))
 

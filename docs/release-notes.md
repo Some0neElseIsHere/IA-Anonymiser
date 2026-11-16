@@ -10,6 +10,12 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.17.0** : **consigne pour l'IA améliorée**. Elle explique maintenant que le nom d'un jeton indique ce qu'il remplace (`[IP_privée_2]` : adresse interne, `[IP_PUB_1]` : adresse publique, `[COMPTE_1]` : compte…), qu'il peut aussi s'agir de vos jetons parlants (`[CLIENT]`), et demande à l'IA :
+  - de garder les jetons **y compris dans les commandes, scripts et exemples de code**, au lieu d'écrire `Get-ADUser jdupont` ou `<utilisateur>` : après restauration, la commande est prête à l'emploi ;
+  - de ne pas inventer ni deviner les vraies valeurs ;
+  - de suivre les lignes « Changement de jeton » envoyées quand vous renommez un jeton.
+  Si vous aviez gardé le texte par défaut, le nouveau s'applique tout seul ; un texte que vous aviez modifié est conservé. Le rapport reconnaît toujours l'ancienne consigne dans les envois passés.
+
 - **v1.16.1** : **titres d'onglets entiers** : à la taille minimale de la fenêtre, les quatre titres étaient coupés (« 3. Options de la conversatio »). L'onglet 2 s'appelle maintenant « 2. Restaurer », et dans l'onglet 3 les types de détection s'affichent sous leur nom court (« Secret », « Compte »), le nom complet restant dans l'info-bulle. Captures du README mises à jour, dont l'onglet 3.
 
 - **v1.16.0** : **journaux de connexion Entra ID (Azure AD)**, testés sur 43 fichiers réels ou d'exemple (exports du portail, Sentinel / Log Analytics, API Graph, journal d'audit unifié Microsoft 365, attaques par pulvérisation de mots de passe) : 1 100 valeurs sensibles, aucune en clair.

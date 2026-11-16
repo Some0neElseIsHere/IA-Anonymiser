@@ -528,16 +528,34 @@ TEXTES = {
 
 CONSIGNES = {
     "fr": (
-        "Consigne : ce texte contient des jetons comme [NOM_1] ou [EMAIL_1] qui remplacent des données "
-        "confidentielles. Un même jeton désigne toujours le même élément dans toute notre conversation. "
-        "Reprends les jetons exactement tels quels dans ta réponse, sans les modifier, les traduire ni les compléter."
+        "Consigne : dans ce texte, les données confidentielles sont remplacées par des jetons entre crochets, "
+        "comme [NOM_1], [IP_privée_2] ou [CLIENT]. Le nom du jeton indique ce qu'il remplace (adresse IP interne "
+        "ou publique, compte, machine…). Un même jeton désigne toujours le même élément dans toute notre "
+        "conversation. Reprends les jetons exactement tels quels, y compris dans les commandes, scripts et "
+        "exemples de code : ne les modifie pas, ne les traduis pas, ne les remplace pas par des valeurs inventées "
+        "ou des exemples génériques, et ne cherche pas à deviner les vraies valeurs. Si une ligne « Changement "
+        "de jeton » apparaît, utilise le nouveau nom à partir de là."
     ),
     "en": (
-        "Note: this text contains tokens such as [NAME_1] or [EMAIL_1] that replace confidential data. "
-        "A given token always refers to the same item throughout our conversation. "
-        "Keep the tokens exactly as they are in your answer, without changing, translating or completing them."
+        "Note: in this text, confidential data is replaced by tokens in square brackets, such as [NAME_1], "
+        "[IP_private_2] or [CLIENT]. The token name tells what it replaces (internal or public IP address, "
+        "account, machine…). A given token always refers to the same item throughout our conversation. Keep the "
+        "tokens exactly as they are, including in commands, scripts and code examples: do not change or "
+        "translate them, do not replace them with made-up values or generic placeholders, and do not try to "
+        "guess the real values. If a \"Token change\" line appears, use the new name from then on."
     ),
 }
+
+# Consignes par défaut des versions précédentes : encore présentes en tête des anciens envois,
+# le rapport doit les reconnaître pour ne pas compter leurs jetons d'exemple
+ANCIENNES_CONSIGNES = [
+    "Consigne : ce texte contient des jetons comme [NOM_1] ou [EMAIL_1] qui remplacent des données "
+    "confidentielles. Un même jeton désigne toujours le même élément dans toute notre conversation. "
+    "Reprends les jetons exactement tels quels dans ta réponse, sans les modifier, les traduire ni les compléter.",
+    "Note: this text contains tokens such as [NAME_1] or [EMAIL_1] that replace confidential data. "
+    "A given token always refers to the same item throughout our conversation. "
+    "Keep the tokens exactly as they are in your answer, without changing, translating or completing them.",
+]
 
 
 MOIS = {

@@ -161,6 +161,23 @@ class Rapport(unittest.TestCase):
             self.assertIn('<td data-tri="1">1</td><td>1</td>', ligne)
         self.assertRegex(page, r"Envoi 2, le [\d-]+ [\d:]+ · 0 jeton\(s\)")
 
+    def test_ancienne_consigne_ne_compte_pas(self):
+        # envoi fait avec la consigne par défaut d'avant la v1.17 : ses exemples [NOM_1], [EMAIL_1] ne comptent pas
+        from textes import ANCIENNES_CONSIGNES
+        moteur = Anonymiseur("fr")
+        moteur.anonymiser("Acme SAS et jean@acme.fr", ["Acme SAS"], None, [])
+        moteur.valider()
+        conv = SimpleNamespace(nom="x", moteur=moteur, termes=[], cree=None, activite=time.time(),
+                               envois=[{"date": 1, "texte": ANCIENNES_CONSIGNES[0] + "\n\nRien."}])
+        self.assertRegex(html.unescape(generer(conv)), r"Envoi 1, le [\d-]+ [\d:]+ · 0 jeton\(s\)")
+
+    def test_consigne_par_defaut_reprend_le_vocabulaire_des_jetons(self):
+        from textes import CONSIGNES, TEXTES
+        self.assertIn("[IP_privée_2]", CONSIGNES["fr"])
+        self.assertIn("[IP_private_2]", CONSIGNES["en"])
+        self.assertIn(TEXTES["fr"]["annonce_renommage"].split(" :")[0], CONSIGNES["fr"])
+        self.assertIn(TEXTES["en"]["annonce_renommage"].split(":")[0], CONSIGNES["en"])
+
     def test_barre_oblique_hors_du_jeton(self):
         self.assertEqual(rapport._texte_envoi("C:\\Users\\[COMPTE_1]\\x", [], ["[COMPTE_1]"]),
                          'C:\\Users\\<span class="jeton">[COMPTE_1]</span>\\x')
