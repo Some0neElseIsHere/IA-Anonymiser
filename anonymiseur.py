@@ -1177,7 +1177,6 @@ class Application:
 
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
-        self.annuler_calcul()
         self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in
                                   {**self.options.etiquettes, **self.conv.etiquettes}.items() if j}
         self.moteur.domaines_publics = self.conv.domaines_publics
@@ -1188,8 +1187,12 @@ class Application:
         signature = self.signature(texte, termes, motifs)
         cache = getattr(self.conv, "cache", None)
         if cache and cache[0] == signature:
+            self.annuler_calcul()  # un calcul pour un texte intermédiaire ne doit pas écraser ce résultat
             self.afficher_resultat(cache[1])
             return
+        if self.calcul and self.calcul["signature"] == signature and self.calcul["conv"] is self.conv:
+            return  # le même calcul est déjà en cours : on le laisse finir au lieu de le relancer
+        self.annuler_calcul()
         etapes = self.moteur.etapes(texte, termes, self.conv.types, motifs)
         self.calcul = {"conv": self.conv, "etapes": etapes, "signature": signature}
         if len(texte) < GROS_TEXTE:

@@ -929,7 +929,8 @@ class Anonymiseur:
                 if utilisateur.lower() not in COMPTES_NEUTRES:
                     connues.append((utilisateur, "COMPTE"))
         yield 0.8
-        for d, f, type_, valeur in self._occurrences_connues(texte, connues, types):
+        occurrences = yield from self._etapes_occurrences(texte, connues, types)
+        for d, f, type_, valeur in occurrences:
             if prendre(d, f):
                 trouves.append((d, f, type_, valeur))
 
@@ -976,6 +977,15 @@ class Anonymiseur:
 
     @staticmethod
     def _occurrences_connues(texte, connues, types):
+        etapes = Anonymiseur._etapes_occurrences(texte, connues, types)
+        while True:
+            try:
+                next(etapes)
+            except StopIteration as fin:
+                return fin.value
+
+    @staticmethod
+    def _etapes_occurrences(texte, connues, types):
         """Occurrences littérales de valeurs déjà connues : (début, fin, type, texte trouvé).
 
         Une valeur qui commence par une lettre ou un chiffre ne peut commencer qu'au début d'un mot du
@@ -1021,9 +1031,11 @@ class Anonymiseur:
             else:
                 candidats += [(rang[cle], m.start()) for m in re.finditer(re.escape(valeur), texte, re.IGNORECASE)]
         if par_premier_mot or exactes:
-            for m in _MOT.finditer(minuscules):
+            for numero, m in enumerate(_MOT.finditer(minuscules)):
                 mot_ = m.group(0)
                 pos = m.start()
+                if numero % 100_000 == 0:  # rend la main à l'interface de temps en temps
+                    yield 0.8 + 0.1 * pos / max(len(texte), 1)
                 for index, cible in ((par_premier_mot, minuscules), (exactes, texte)):
                     longueurs = index.get(mot_)
                     if longueurs:
