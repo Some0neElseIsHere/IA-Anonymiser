@@ -10,6 +10,12 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.18.0** : **gros journaux beaucoup plus rapides**. Mesures sur un journal de 6 Mo (110 000 lignes, 16 000 éléments masqués), sur la machine Windows de test :
+  - anonymisation : **4 s au lieu de 93 s**. La recherche des valeurs déjà connues ailleurs dans le texte et le classement des éléments étaient les goulots d'étranglement (60 s à eux deux) ;
+  - au-delà de 300 000 caractères, le calcul se fait **par étapes** : la fenêtre reste utilisable et affiche « Anonymisation… 40 % ». Si vous modifiez le texte pendant ce temps, le calcul repart ; si vous cliquez sur « Copier pour l'IA », il est d'abord terminé, pour que le texte copié corresponde toujours au texte d'origine ;
+  - **revenir sur une conversation** déjà calculée ne relance plus l'anonymisation : 1,5 s au lieu de 50 s ;
+  - la **sauvegarde automatique** (toutes les 15 s) n'écrit plus rien quand rien n'a changé.
+
 - **v1.17.0** : **consigne pour l'IA améliorée**. Elle explique maintenant que le nom d'un jeton indique ce qu'il remplace (`[IP_privée_2]` : adresse interne, `[IP_PUB_1]` : adresse publique, `[COMPTE_1]` : compte…), qu'il peut aussi s'agir de vos jetons parlants (`[CLIENT]`), et demande à l'IA :
   - de garder les jetons **y compris dans les commandes, scripts et exemples de code**, au lieu d'écrire `Get-ADUser jdupont` ou `<utilisateur>` : après restauration, la commande est prête à l'emploi ;
   - de ne pas inventer ni deviner les vraies valeurs ;
