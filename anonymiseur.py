@@ -42,7 +42,8 @@ DEPOT = "https://github.com/Some0neElseIsHere/IA-Anonymiser"
 API_DERNIERE = "https://api.github.com/repos/Some0neElseIsHere/IA-Anonymiser/releases/latest"
 DELAI_MS = 250
 SAUVEGARDE_MS = 15000
-GROS_TEXTE = 300_000  # au-delà (caractères), le calcul se fait par étapes avec son avancement
+GROS_TEXTE = 300_000
+LIGNE_MAX = 3000  # au-delà (caractères sur une ligne), la ligne est coupée à l'affichage (aperçu)  # au-delà (caractères), le calcul se fait par étapes avec son avancement
 THEME_MS = 4000
 
 PALETTES = {
@@ -178,6 +179,12 @@ class Zone(ttk.Frame):
         self.entete = ttk.Frame(self)
         self.entete.pack(fill="x", pady=(0, 6))
         ttk.Label(self.entete, text=titre, style="Titre.TLabel").pack(side="left")
+        # Texte aux lignes très longues (JSON d'un export Entra ID sur une seule ligne…) : Tk recalcule
+        # toute la ligne à chaque affichage et fige l'application. On affiche alors un aperçu où ces lignes
+        # sont coupées ; le texte complet reste celui qui est lu, anonymisé et copié.
+        self.complet = None
+        self.avis = ttk.Label(self, style="Aide.TLabel", wraplength=600, justify="left")
+        self.avis.bind("<Configure>", lambda e: self.avis.configure(wraplength=max(e.width - 10, 200)))
         cadre = self.cadre = ttk.Frame(self)
         cadre.pack(fill="both", expand=True)
         self.texte = tk.Text(cadre, wrap="word", font=app.police, undo=not lecture_seule, relief="flat",
@@ -277,23 +284,64 @@ class Zone(ttk.Frame):
             self.indication.configure(background=self.texte.cget("background"), foreground=p["aide"])
 
     def lire(self):
+        if self.complet is not None:
+            return self.complet
         return self.texte.get("1.0", "end-1c")
+
+    @staticmethod
+    def lignes_trop_longues(contenu):
+        return re.search(r"[^\n]{%d}" % (LIGNE_MAX + 1), contenu) is not None
 
     def ecrire(self, contenu, spans=(), tag=None):
         position = self.texte.yview()[0]
         self.texte.configure(state="normal")
         self.texte.delete("1.0", "end")
-        self.texte.insert("1.0", contenu)
+        apercu = self.lignes_trop_longues(contenu)
+        self.complet = contenu if apercu else None
+        if apercu:
+            affiche = "\n".join(
+                ligne if len(ligne) <= LIGNE_MAX else
+                ligne[:LIGNE_MAX] + " " + self.app.t("apercu_coupe", n=f"{len(ligne) - LIGNE_MAX:,}".replace(",", "\u202f"))
+                for ligne in contenu.split("\n"))
+            self.texte.insert("1.0", affiche)
+            self.avis.configure(text=self.app.t("apercu_avis", n=LIGNE_MAX,
+                                                mo=f"{len(contenu) / 1e6:.1f}".replace(".", ",")
+                                                if self.app.t.langue == "fr" else f"{len(contenu) / 1e6:.1f}"))
+            self.avis.pack(fill="x", pady=(0, 6), before=self.cadre)
+        else:
+            self.texte.insert("1.0", contenu)
+            self.avis.pack_forget()
+        self._lignes = self._debuts_de_ligne(contenu)
         if tag:
             self.surligner(spans, tag, contenu)
         self.texte.yview_moveto(position)
         if self.jumelle and self.paire["meneur"] is self.jumelle:
             self.suivre(self.jumelle)
-        if self.lecture_seule:
+        if self.lecture_seule or apercu:  # l'aperçu ne se modifie pas : Effacer, Coller ou Ouvrir le remplacent
             self.texte.configure(state="disabled")
         else:
             self.texte.edit_reset()
         self.maj_indication()
+
+    @staticmethod
+    def _debuts_de_ligne(contenu):
+        lignes = [0]
+        position = contenu.find("\n")
+        while position != -1:
+            lignes.append(position + 1)
+            position = contenu.find("\n", position + 1)
+        return lignes
+
+    def decalage(self, index):
+        """Position dans le texte complet (en caractères) d'un index Tk « ligne.colonne »."""
+        ligne, colonne = map(int, self.texte.index(index).split("."))
+        if self.complet is None:
+            return len(self.texte.get("1.0", index))
+        lignes = self._lignes
+        if ligne > len(lignes):
+            return len(self.complet)
+        fin = lignes[ligne] - 1 if ligne < len(lignes) else len(self.complet)
+        return min(lignes[ligne - 1] + min(colonne, LIGNE_MAX), fin)
 
     def _element_sous(self, x, y):
         """(étiquette, élément) sous le pointeur, ou None. L'élément est le jeton (ou le texte s'il est inconnu)."""
@@ -303,8 +351,8 @@ class Zone(ttk.Frame):
             return None  # pointeur après la fin de la ligne
         noms = self.texte.tag_names(index)
         ligne, colonne = map(int, index.split("."))
-        if ligne > len(self._lignes):
-            return None
+        if ligne > len(self._lignes) or (self.complet is not None and colonne >= LIGNE_MAX):
+            return None  # au-delà de la coupure de l'aperçu
         n = self._lignes[ligne - 1] + colonne
         for tag in ("inconnu", "masque", "jeton"):
             plages = self._plages.get(tag)
@@ -326,7 +374,7 @@ class Zone(ttk.Frame):
     def _ligne_sous(self, y):
         index = self.texte.index(f"@0,{y}")
         info = self.texte.dlineinfo(index)
-        if not info or y > info[1] + info[3] or not self.texte.get("1.0", "end-1c"):
+        if not info or y > info[1] + info[3] or self.texte.compare("end-1c", "==", "1.0"):
             return None  # sous la dernière ligne, ou zone vide
         return int(index.split(".")[0])
 
@@ -376,20 +424,22 @@ class Zone(ttk.Frame):
         if not spans:
             return
         contenu = self.lire() if contenu is None else contenu
-        lignes = [0]
-        position = contenu.find("\n")
-        while position != -1:
-            lignes.append(position + 1)
-            position = contenu.find("\n", position + 1)
-        self._lignes = lignes
+        lignes = self._lignes = self._debuts_de_ligne(contenu)
+        apercu = self.complet is not None
 
         def index(n):
             ligne = bisect.bisect_right(lignes, n) - 1
-            return f"{ligne + 1}.{n - lignes[ligne]}"
+            return ligne + 1, n - lignes[ligne]
 
         plages = []
         for debut, fin, _ in spans:
-            plages += (index(debut), index(fin))
+            (l1, c1), (l2, c2) = index(debut), index(fin)
+            if apercu:  # seulement la partie visible des lignes coupées
+                if c1 >= LIGNE_MAX:
+                    continue
+                if l2 == l1:
+                    c2 = min(c2, LIGNE_MAX)
+            plages += (f"{l1}.{c1}", f"{l2}.{c2}")
             if len(plages) >= 1000:
                 self.texte.tag_add(tag, *plages)
                 plages = []
@@ -711,6 +761,7 @@ class Application:
         for zone in (self.source, self.reponse):
             for evenement in ("<Key>", "<<Paste>>", "<<Cut>>"):
                 zone.texte.bind(evenement, self.activite, add="+")
+            zone.texte.bind("<<Paste>>", lambda e, z=zone: self.coller_long(z), add="+")
         self.menu = tk.Menu(root, tearoff=0)
         self.menu_conv = tk.Menu(root, tearoff=0)
         for zone, spans in ((self.source, lambda: self.resultat and self.resultat.spans_source),
@@ -1660,8 +1711,7 @@ class Application:
         """Jeton (ou valeur masquée) sous le pointeur, ou None."""
         if not spans:
             return None
-        index = zone.texte.index(f"@{evenement.x},{evenement.y}")
-        position = len(zone.texte.get("1.0", index))
+        position = zone.decalage(f"@{evenement.x},{evenement.y}")
         i = bisect.bisect_right([d for d, _, _ in spans], position) - 1
         if i >= 0 and spans[i][0] <= position < spans[i][1]:
             return spans[i][2]
@@ -1717,6 +1767,29 @@ class Application:
     def vider(self, zone):
         zone.ecrire("")
         zone.texte.edit_modified(True)
+
+    def coller_long(self, zone):
+        """Ctrl+V d'un texte aux lignes très longues : collé dans le texte complet, affiché en aperçu,
+        au lieu de laisser Tk afficher une ligne de plusieurs Mo (ce qui fige l'application)."""
+        try:
+            texte = self.root.clipboard_get()
+        except tk.TclError:
+            return None
+        if zone.complet is None and not Zone.lignes_trop_longues(texte):
+            return None  # collage normal par Tk
+        complet = zone.lire()
+        if zone.complet is None and zone.texte.tag_ranges("sel"):
+            debut, fin = zone.decalage("sel.first"), zone.decalage("sel.last")
+        elif zone.complet is None:
+            debut = fin = zone.decalage("insert")
+        else:  # aperçu non modifiable : le texte collé s'ajoute à la fin
+            debut = fin = len(complet)
+            if complet and not complet.endswith("\n"):
+                texte = "\n" + texte
+        zone.ecrire(complet[:debut] + texte + complet[fin:])
+        zone.texte.edit_modified(True)
+        self.activite()
+        return "break"
 
     def coller(self, zone):
         try:

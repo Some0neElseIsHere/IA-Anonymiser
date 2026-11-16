@@ -797,12 +797,14 @@ def lancer():
         etape("défiler au début (la longue ligne)", lambda: app.source.texte.yview_moveto(0.0))
         etape("défiler à la fin", lambda: app.source.texte.yview_moveto(1.0))
         def taper():
-            app.source.texte.insert("end", " x")
+            racine.clipboard_clear()
+            racine.clipboard_append("Contact : jean.martin@vallorie.fr")
+            app.source.texte.event_generate("<<Paste>>")  # aperçu : le texte collé s'ajoute à la fin
             fin_attente = time.perf_counter() + anonymiseur.DELAI_MS * 4 / 1000 + 0.5
             while time.perf_counter() < fin_attente:  # le recalcul part après une pause dans la frappe
                 racine.update()
 
-        etape("taper un caractère puis attendre le recalcul", taper)
+        etape("Ctrl+V d'une ligne de plus puis recalcul", taper)
         etape("sauvegarder", app.sauvegarder)
         lignes = [f"Phase 2 : journal de {len(texte) / 1e6:.1f} Mo, plus longue ligne {len(une_ligne) / 1e6:.1f} Mo, "
                   f"{len(app.moteur.jetons())} éléments masqués"]
@@ -810,6 +812,14 @@ def lancer():
         with open(os.path.join(SORTIE, "perf.txt"), "a", encoding="utf-8") as f:
             f.write("\n" + "\n".join(lignes) + "\n")
         verifier("sophie.lefevre@vallorie.fr" not in app.sortie.lire(), "ligne JSON non anonymisée")
+        verifier(app.source.complet is not None and app.source.avis.winfo_ismapped(), "aperçu non affiché")
+        verifier(app.source.lire().startswith(texte) and app.source.lire().endswith("jean.martin@vallorie.fr"),
+                 "texte complet perdu ou collage non ajouté")
+        verifier(app.sortie.lire().endswith("[EMAIL_" + app.sortie.lire().rsplit("[EMAIL_", 1)[-1])
+                 and "jean.martin@vallorie.fr" not in app.sortie.lire(), "ligne collée non anonymisée")
+        longueur_affichee = max(len(l) for l in app.source.texte.get("1.0", "end-1c").split("\n"))
+        verifier(longueur_affichee < anonymiseur.LIGNE_MAX + 100, f"ligne affichée de {longueur_affichee} caractères")
+        photo("6-apercu-lignes-longues")
 
     def fin():
         app.quitter()
