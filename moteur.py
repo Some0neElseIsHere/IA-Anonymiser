@@ -78,8 +78,8 @@ EXEMPLES = {
     "COMPTE": r"ACME\mlefevre, C:\Users\mlefevre, /home/mlefevre",
     "DN": "CN=Marc Lefevre,OU=Compta,DC=acme,DC=local",
     "SID": "S-1-5-21-3623811015-3361044348-30300820-1013",
-    "TENANT": "homeTenantName « Contoso », homeTenantId 72f988bf-86f1-41af-91ab-2d7cd011db47",
-    "LIEU": "latitude 45.7667, longitude 4.8833, emplacement nommé « Siège Lyon »",
+    "TENANT": "Contoso (homeTenantName), homeTenantId",
+    "LIEU": "45.7667, 4.8833 (GPS), « Siège Lyon »",
 }
 
 # Un « domaine » qui se termine par une extension de fichier est un nom de fichier (rapport.pdf).
