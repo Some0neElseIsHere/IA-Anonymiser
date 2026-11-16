@@ -145,7 +145,7 @@ TEXTES = {
         # messages
         "calcul_en_cours": "Anonymisation… {p} %",
         "apercu_coupe": "… [{n} caractères de plus, non affichés]",
-        "apercu_avis": "Aperçu : les lignes de plus de {n} caractères sont coupées à l'affichage, pour que la fenêtre reste fluide. Le texte complet ({mo} Mo) est bien anonymisé et copié pour l'IA. Pour le changer : Effacer, Coller ou Ouvrir.",
+        "apercu_avis": "Aperçu : lignes de plus de {n} caractères coupées à l'écran. Le texte complet ({mo} Mo) est bien anonymisé et copié pour l'IA.",
         "msg_compte": "{r} remplacement(s), {e} élément(s) différent(s). Relisez le texte de droite, puis cliquez sur « Copier pour l'IA ».",
         "msg_restaure": "{n} jeton(s) restauré(s).",
         "msg_inconnus": " {n} jeton(s) inconnu(s), en rouge : la réponse vient sans doute d'une autre conversation.",
@@ -410,7 +410,7 @@ TEXTES = {
         "type_permanent": "Permanent term",
         "calcul_en_cours": "Anonymizing… {p}%",
         "apercu_coupe": "… [{n} more characters, not shown]",
-        "apercu_avis": "Preview: lines longer than {n} characters are cut on screen to keep the window responsive. The full text ({mo} MB) is still anonymized and copied for the AI. To change it: Clear, Paste or Open.",
+        "apercu_avis": "Preview: lines longer than {n} characters are cut on screen. The full text ({mo} MB) is still anonymized and copied for the AI.",
         "msg_compte": "{r} replacement(s), {e} distinct item(s). Check the text on the right, then click \"Copy for the AI\".",
         "msg_restaure": "{n} token(s) restored.",
         "msg_inconnus": " {n} unknown token(s), in red: the answer probably comes from another conversation.",

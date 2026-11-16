@@ -10,6 +10,13 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.18.1** : **plus de blocage avec un journal aux lignes très longues** (JSON d'un export Entra ID ou de l'API Graph sur une seule ligne, par exemple). L'affichage d'une ligne de plusieurs Mo figeait la fenêtre indéfiniment, y compris à chaque démarrage tant que la conversation restait ouverte. Mesures sur la machine Windows de test avec 6 Mo dont une ligne de 3 Mo :
+  - **démarrage avec cette conversation ouverte** : fenêtre affichée en 1 s, texte anonymisé en 11 s, avec l'avancement affiché. Avant : fenêtre figée, test arrêté au bout de 11 minutes ;
+  - les lignes de plus de 3 000 caractères sont **coupées à l'écran seulement** (« … [2 900 000 caractères de plus, non affichés] ») ; le texte complet est bien anonymisé, copié pour l'IA et enregistré. Un bandeau le signale. Dans cet aperçu, le texte ne se modifie pas directement : Effacer, Coller, Ouvrir ou Ctrl+V (qui ajoute à la fin) ;
+  - au-delà de 300 000 caractères, plus de retour à la ligne automatique (Tk calculait la hauteur de chaque ligne coupée) : une barre de défilement horizontale apparaît ;
+  - une modification pendant le calcul ne relance plus deux fois le même calcul ;
+  - le survol d'une zone ne recopie plus tout le texte à chaque mouvement de la souris.
+
 - **v1.18.0** : **gros journaux beaucoup plus rapides**. Mesures sur un journal de 6 Mo (110 000 lignes, 16 000 éléments masqués), sur la machine Windows de test :
   - anonymisation : **4 s au lieu de 93 s**. La recherche des valeurs déjà connues ailleurs dans le texte et le classement des éléments étaient les goulots d'étranglement (60 s à eux deux) ;
   - au-delà de 300 000 caractères, le calcul se fait **par étapes** : la fenêtre reste utilisable et affiche « Anonymisation… 40 % ». Si vous modifiez le texte pendant ce temps, le calcul repart ; si vous cliquez sur « Copier pour l'IA », il est d'abord terminé, pour que le texte copié corresponde toujours au texte d'origine ;
