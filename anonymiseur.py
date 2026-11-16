@@ -44,8 +44,7 @@ DELAI_MS = 250
 SAUVEGARDE_MS = 15000
 GROS_TEXTE = 300_000
 # Au-delà de LIGNE_MAX caractères, une ligne est découpée à l'écran en morceaux d'environ SEGMENT
-# caractères, en retrait sous le premier. Des morceaux courts : avec le retour à la ligne automatique, Tk met
-# 17 s à afficher 3 Mo en lignes de 1 000 caractères, et 2 s en lignes de 200.
+# caractères, en retrait sous le premier : des morceaux qui tiennent presque dans la largeur de la zone.
 LIGNE_MAX = 3000
 SEGMENT = 200  # au-delà (caractères), le calcul se fait par étapes avec son avancement
 THEME_MS = 4000
@@ -219,6 +218,10 @@ class Zone(ttk.Frame):
         self.barre = barre = ttk.Scrollbar(cadre, command=self.texte.yview)
         self.texte.configure(yscrollcommand=self._defile)
         barre.pack(side="right", fill="y", padx=(4, 0))
+        # Gros texte : pas de retour à la ligne automatique. Avec, Tk calcule la hauteur de chaque ligne de
+        # tout le texte dès qu'on défile ou repositionne la vue : 17 à 22 s figées pour 6 Mo de journal.
+        self.barre_h = ttk.Scrollbar(cadre, orient="horizontal", command=self.texte.xview)
+        self.texte.configure(xscrollcommand=self.barre_h.set)
         self.texte.pack(side="left", fill="both", expand=True)
         # Défilement jumelé : la zone que l'utilisateur manipule entraîne l'autre
         self.jumelle, self.paire = None, {"meneur": self}
@@ -368,6 +371,13 @@ class Zone(ttk.Frame):
             self.texte.insert("1.0", contenu)
             self._lignes = self._debuts_de_ligne(contenu)
             self.avis.pack_forget()
+        gros = len(contenu) > GROS_TEXTE
+        if (self.texte.cget("wrap") == "none") != gros:
+            self.texte.configure(wrap="none" if gros else "word")
+            if gros:
+                self.barre_h.pack(side="bottom", fill="x", before=self.texte)
+            else:
+                self.barre_h.pack_forget()
         if tag:
             self.surligner(spans, tag, contenu)
         self.texte.yview_moveto(position)
