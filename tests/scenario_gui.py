@@ -86,8 +86,9 @@ def trouver_bouton(widget, textes):
 def lancer():
     racine = tk.Tk()
     anonymiseur.activer_dpi()
+    debut_lancement = time.perf_counter()
     app = anonymiseur.Application(racine)
-    resultats, contexte = [], {}
+    resultats, contexte = [], {"lancement": time.perf_counter() - debut_lancement}
 
     def photo(nom):
         try:
@@ -753,8 +754,82 @@ def lancer():
         verifier(b"slefevre" not in brut and b"Paie#2026" not in brut, "valeurs lisibles dans le fichier chiffré")
         photo("5-relance")
 
+    def journal_lignes_longues():
+        """Journal de 6 Mo dont une partie en JSON sur une seule ligne (export Entra ID, Graph) : Tk est
+        réputé très lent sur les lignes de plusieurs Mo. La conversation reste ouverte pour la phase 3."""
+        import random as alea
+        hasard = alea.Random(3)
+        prenoms = ["Sophie", "Marc", "Claire", "Jean", "Nadia", "Paul", "Lucie", "Hugo"]
+        noms = ["Lefèvre", "Dubois", "Petit", "Martin", "Haddad", "Morel", "Garnier", "Roux"]
+        enregistrements = []
+        while sum(len(json.dumps(e)) for e in enregistrements[-1:]) * len(enregistrements) < 3_000_000:
+            p, n = hasard.choice(prenoms), hasard.choice(noms)
+            enregistrements.append({
+                "createdDateTime": f"2026-11-{hasard.randint(1, 28):02d}T{hasard.randint(0, 23):02d}:12:44Z",
+                "userDisplayName": f"{p} {n}", "userPrincipalName": f"{p.lower()}.{n.lower()}@vallorie.fr",
+                "appDisplayName": "Microsoft Teams", "ipAddress": f"81.250.{hasard.randint(0, 255)}.{hasard.randint(1, 254)}",
+                "status": {"errorCode": hasard.choice([0, 50126, 50074])},
+                "deviceDetail": {"deviceId": "", "displayName": f"PC-{n.upper()[:4]}{hasard.randint(1, 99):02d}",
+                                 "operatingSystem": "Windows 10"},
+                "location": {"city": "Lyon", "countryOrRegion": "FR"}})
+        une_ligne = json.dumps({"value": enregistrements}, ensure_ascii=False)
+        import generateur_systemes as g
+        morceaux, taille, i = [une_ligne], len(une_ligne), 0
+        while taille < 6_000_000:
+            morceau = g.document(g.Univers(10_000 + i), 6)
+            morceaux.append(morceau)
+            taille += len(morceau) + 1
+            i += 1
+        texte = "\n".join(morceaux)
+        mesures = []
+
+        def etape(nom, action):
+            debut = time.perf_counter()
+            action()
+            racine.update()
+            pire = attendre_calcul()
+            mesures.append((nom, time.perf_counter() - debut, pire))
+
+        app.nouvelle_conversation()
+        racine.update()
+        etape("coller (dont une ligne JSON de 3 Mo)", lambda: app.source.ecrire(texte))
+        etape("anonymiser", app.actualiser)
+        etape("défiler au début (la longue ligne)", lambda: app.source.texte.yview_moveto(0.0))
+        etape("défiler à la fin", lambda: app.source.texte.yview_moveto(1.0))
+        def taper():
+            app.source.texte.insert("end", " x")
+            fin_attente = time.perf_counter() + anonymiseur.DELAI_MS * 4 / 1000 + 0.5
+            while time.perf_counter() < fin_attente:  # le recalcul part après une pause dans la frappe
+                racine.update()
+
+        etape("taper un caractère puis attendre le recalcul", taper)
+        etape("sauvegarder", app.sauvegarder)
+        lignes = [f"Phase 2 : journal de {len(texte) / 1e6:.1f} Mo, plus longue ligne {len(une_ligne) / 1e6:.1f} Mo, "
+                  f"{len(app.moteur.jetons())} éléments masqués"]
+        lignes += [f"{d:7.2f} s  {nom}  (interface bloquée au plus {pire:.2f} s)" for nom, d, pire in mesures]
+        with open(os.path.join(SORTIE, "perf.txt"), "a", encoding="utf-8") as f:
+            f.write("\n" + "\n".join(lignes) + "\n")
+        verifier("sophie.lefevre@vallorie.fr" not in app.sortie.lire(), "ligne JSON non anonymisée")
+
     def fin():
         app.quitter()
+
+    # ------------------------------------------------------------------ phase 3
+    def relance_avec_gros_journal():
+        """Relance avec la conversation de 6 Mo ouverte : c'est le cas qui fige l'application au démarrage."""
+        debut = time.perf_counter()
+        racine.update()
+        affichee = time.perf_counter() - debut
+        pire = attendre_calcul()
+        total = time.perf_counter() - debut
+        lignes = [f"Phase 3 : relance avec la conversation de {len(app.source.lire()) / 1e6:.1f} Mo ouverte",
+                  f"{contexte['lancement']:7.2f} s  création de la fenêtre (chargement et déchiffrement inclus)",
+                  f"{affichee:7.2f} s  premier affichage",
+                  f"{total:7.2f} s  jusqu'au texte anonymisé (interface bloquée au plus {pire:.2f} s)"]
+        with open(os.path.join(SORTIE, "perf.txt"), "a", encoding="utf-8") as f:
+            f.write("\n" + "\n".join(lignes) + "\n")
+        verifier("sophie.lefevre@vallorie.fr" not in app.sortie.lire(), "relance : texte non anonymisé")
+        verifier(contexte["lancement"] + total < 60, f"relance trop longue : {contexte['lancement'] + total:.0f} s")
 
     etapes = {
         1: [accueil, langue_fr, reglages, masquage_personnalise, renommer, termes_conversation, jeton_terme_conversation, coller_log, verifier_anonymisation, recherche, tri_elements,
@@ -762,7 +837,8 @@ def lancer():
             verifier_annonce_unique, rapport, conversations, epingler, restaurer_ancienne_reponse,
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
             tres_gros_log, gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, quitter_phase1],
-        2: [relance, relance_restauration, verifier_relance_restauration, fin],
+        2: [relance, relance_restauration, verifier_relance_restauration, journal_lignes_longues, fin],
+        3: [relance_avec_gros_journal, fin],
     }[PHASE]
 
     def suivante(i=0):

@@ -50,6 +50,14 @@ jobs:
           $env:APPDATA = "$env:RUNNER_TEMP\appdata-scenario"
           python tests/scenario_gui.py 2 resultats-e2e
 
+      - name: Phase 3 (relance avec un journal de 6 Mo ouvert)
+        id: phase3
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:APPDATA = "$env:RUNNER_TEMP\appdata-scenario"
+          python tests/scenario_gui.py 3 resultats-e2e
+
       - name: Déposer les résultats sur la branche tests-e2e
         if: always()
         shell: bash
@@ -61,6 +69,6 @@ jobs:
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" tests-e2e
 
       - name: Échec si une étape a échoué
-        if: steps.phase1.outcome != 'success' || steps.phase2.outcome != 'success'
+        if: steps.phase1.outcome != 'success' || steps.phase2.outcome != 'success' || steps.phase3.outcome != 'success'
         shell: bash
         run: exit 1
