@@ -478,12 +478,24 @@ def lancer():
         debut = time.perf_counter()
         app.source.ecrire("\n".join(lignes))
         app.actualiser()
+        attendre_calcul()
         racine.update()
         duree = time.perf_counter() - debut
         contexte["duree"] = duree
         contexte["elements_gros_log"] = len(app.moteur.jetons())
         verifier(duree < 5, f"gros log trop lent : {duree:.2f} s")
         verifier("10.0." not in app.sortie.lire(), "IP en clair dans le gros log")
+
+    def attendre_calcul(limite=180):
+        """Le calcul d'un gros texte se fait par étapes : on laisse tourner l'interface jusqu'au résultat.
+        Renvoie le plus long blocage de l'interface pendant ce temps (secondes)."""
+        debut, dernier, pire = time.perf_counter(), time.perf_counter(), 0.0
+        while app.calcul is not None and time.perf_counter() - debut < limite:
+            racine.update()
+            maintenant = time.perf_counter()
+            pire, dernier = max(pire, maintenant - dernier), maintenant
+        verifier(app.calcul is None, "calcul toujours en cours")
+        return pire
 
     def tres_gros_log():
         """Journal de 6 Mo : temps de chaque étape, écrits dans perf.txt (pour repérer ce qui fige l'interface)."""
@@ -514,7 +526,10 @@ def lancer():
             debut = time.perf_counter()
             action()
             racine.update()
+            pire = attendre_calcul()
             mesures.append((nom, time.perf_counter() - debut))
+            if pire > 0.3:
+                mesures.append((f"  interface bloquée au plus {pire:.2f} s d'affilée", 0.0))
 
         precedente = app.conv
         app.nouvelle_conversation()
@@ -532,11 +547,22 @@ def lancer():
                     chrono("  stockage.sauver_conversations", anonymiseur.stockage, "sauver_conversations")]
         try:
             etape("coller 6 Mo dans la zone source", lambda: app.source.ecrire(texte))
-            etape("actualiser (total)", app.actualiser)
+            app.actualiser()
+            racine.update()
+            verifier(app.avancement.cget("text").startswith("Anonymisation"), "pas d'avancement affiché")
+            etape("actualiser (total, par étapes)", lambda: None)
             etape("actualiser une 2e fois (rien n'a changé)", app.actualiser)
             etape("sauvegarder", app.sauvegarder)
             etape("sauvegarder une 2e fois (rien n'a changé)", app.sauvegarder)
             etape("texte_pour_ia", app.texte_pour_ia)
+            verifier(app.calcul is None, "calcul relancé après la copie")
+            # copier pendant un calcul : il est terminé d'abord, le texte copié correspond au texte actuel
+            app.source.texte.insert("end", "\nContact : jean.dupont@vallorie.fr")
+            app.actualiser()
+            racine.update()
+            etape("copier pendant le calcul", lambda: contexte.__setitem__("copie", app.texte_pour_ia()))
+            verifier("jean.dupont@vallorie.fr" not in contexte["copie"] and "[EMAIL_" in contexte["copie"][-40:],
+                     "copie faite avant la fin du calcul")
             etape("défiler au milieu", lambda: app.source.texte.yview_moveto(0.5))
             etape("onglet 4", lambda: app.onglets.select(3))
             etape("onglet 1", lambda: app.onglets.select(0))

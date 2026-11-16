@@ -9,6 +9,17 @@ import stockage  # noqa: E402
 
 
 class Stockage(unittest.TestCase):
+    def test_sauvegarde_inutile_evitee(self):
+        with tempfile.TemporaryDirectory() as d:
+            donnees = {"conversations": [{"nom": "x", "source": "a" * 100_000}]}
+            self.assertTrue(stockage.sauver_conversations(donnees, d))
+            self.assertFalse(stockage.sauver_conversations(donnees, d))  # rien n'a changé
+            donnees["conversations"][0]["nom"] = "y"
+            self.assertTrue(stockage.sauver_conversations(donnees, d))
+            os.remove(stockage.chemin_conversations(d))  # fichier supprimé entre-temps : on le réécrit
+            self.assertTrue(stockage.sauver_conversations(donnees, d))
+            self.assertEqual(stockage.charger_conversations(d)["conversations"][0]["nom"], "y")
+
     def test_conversations_aller_retour(self):
         with tempfile.TemporaryDirectory() as d:
             donnees = {"conversations": [{"nom": "Test é", "valide": {"[NOM_1]": ["NOM", "Jean Dupont"]}}]}

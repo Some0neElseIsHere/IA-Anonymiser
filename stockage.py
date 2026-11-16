@@ -4,6 +4,7 @@ Les conversations contiennent les vraies valeurs : sous Windows, elles sont chif
 DPAPI (CryptProtectData), c'est-à-dire avec le compte Windows de l'utilisateur. Un autre compte,
 ou une copie du fichier sur une autre machine, ne peut pas les lire.
 """
+import hashlib
 import json
 import locale
 import os
@@ -201,12 +202,26 @@ def chemin_conversations(dossier=None):
     return os.path.join(dossier or dossier_config(), "conversations.dat")
 
 
+_DERNIERES_SAUVEGARDES = {}
+
+
 def sauver_conversations(donnees, dossier=None):
+    """Enregistre les conversations ; renvoie False sans rien écrire si rien n'a changé depuis la dernière fois.
+
+    La sauvegarde a lieu toutes les 15 s : avec un journal de plusieurs Mo, chiffrer et réécrire le fichier
+    à chaque fois figeait l'interface pour rien.
+    """
     chemin = chemin_conversations(dossier)
+    brut = json.dumps(donnees, ensure_ascii=False).encode("utf-8")
+    empreinte = hashlib.sha256(brut).digest()
+    if _DERNIERES_SAUVEGARDES.get(chemin) == empreinte and os.path.exists(chemin):
+        return False
     temporaire = chemin + ".tmp"
     with open(temporaire, "wb") as f:
-        f.write(proteger(json.dumps(donnees, ensure_ascii=False).encode("utf-8")))
+        f.write(proteger(brut))
     os.replace(temporaire, chemin)
+    _DERNIERES_SAUVEGARDES[chemin] = empreinte
+    return True
 
 
 def charger_conversations(dossier=None):

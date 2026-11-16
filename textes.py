@@ -143,6 +143,7 @@ TEXTES = {
         "type_NOM": "Terme de la conversation",
         "type_permanent": "Terme permanent",
         # messages
+        "calcul_en_cours": "Anonymisation… {p} %",
         "msg_compte": "{r} remplacement(s), {e} élément(s) différent(s). Relisez le texte de droite, puis cliquez sur « Copier pour l'IA ».",
         "msg_restaure": "{n} jeton(s) restauré(s).",
         "msg_inconnus": " {n} jeton(s) inconnu(s), en rouge : la réponse vient sans doute d'une autre conversation.",
@@ -405,6 +406,7 @@ TEXTES = {
         "type_PERSO": "Custom pattern",
         "type_NOM": "Conversation term",
         "type_permanent": "Permanent term",
+        "calcul_en_cours": "Anonymizing… {p}%",
         "msg_compte": "{r} replacement(s), {e} distinct item(s). Check the text on the right, then click \"Copy for the AI\".",
         "msg_restaure": "{n} token(s) restored.",
         "msg_inconnus": " {n} unknown token(s), in red: the answer probably comes from another conversation.",

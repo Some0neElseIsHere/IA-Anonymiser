@@ -854,13 +854,17 @@ class Anonymiseur:
     # --- traitements ------------------------------------------------------
     def anonymiser(self, texte, termes=(), types=None, motifs=()):
         """types : types détectés automatiquement (None = tous) ; motifs : expressions personnalisées."""
-        # Les jetons d'un aperçu non copié sont recalculés à chaque fois : taper
-        # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
-        self._apercu, self._apercu_index, self._renommages = {}, {}, {}
-        self._compteurs = Counter(t for t, _ in self.valide.values())
-        # Jetons écrits tels quels dans le texte d'origine et inconnus de la conversation : réservés
-        self._reserves = {jeton_canonique(m.group(1), m.group(2)) for m in JETON_RE.finditer(texte)} - set(self.valide)
+        etapes = self.etapes(texte, termes, types, motifs)
+        while True:
+            try:
+                next(etapes)
+            except StopIteration as fin:
+                return fin.value
 
+    def etapes(self, texte, termes=(), types=None, motifs=()):
+        """Même calcul qu'anonymiser, par étapes : rend la main (avec l'avancement, de 0 à 1) entre deux
+        expressions, pour que l'interface reste réactive sur un journal de plusieurs Mo. Le résultat est la
+        valeur de retour du générateur. Un calcul abandonné en cours de route est simplement relancé."""
         trouves = []
         termes_cf = {" ".join(t.split()).casefold() for t in termes}
         debuts, fins = [], []  # intervalles déjà pris, triés et sans chevauchement
@@ -875,9 +879,10 @@ class Anonymiseur:
             fins.insert(i, f)
             return True
 
-        for type_, motif in MOTIFS:
+        for numero, (type_, motif) in enumerate(MOTIFS):
             if types is not None and type_ not in types and not (type_ == "IP" and set(TYPES_IP) & set(types)):
                 continue
+            yield 0.75 * numero / len(MOTIFS)
             for m in motif.finditer(texte):
                 if type_ == "DN":
                     for d, f, sous_type, valeur in _decomposer_dn(m, termes_cf):
@@ -895,6 +900,7 @@ class Anonymiseur:
                     if (types is None or sorte in types) and prendre(d, f):
                         trouves.append((d, f, sorte, texte[d:f]))
 
+        yield 0.75
         # Tableaux CSV : colonnes User, UserDisplayName, Device name… (exports Entra ID / Sentinel)
         for d, f, type_ in colonnes_csv(texte, termes_cf):
             if (types is None or type_ in types) and prendre(d, f):
@@ -922,10 +928,12 @@ class Anonymiseur:
                     connues.append((domaine, "FQDN\\"))  # seulement devant « \ » : pas « Acme SAS »
                 if utilisateur.lower() not in COMPTES_NEUTRES:
                     connues.append((utilisateur, "COMPTE"))
+        yield 0.8
         for d, f, type_, valeur in self._occurrences_connues(texte, connues, types):
             if prendre(d, f):
                 trouves.append((d, f, type_, valeur))
 
+        yield 0.9
         propres = {" ".join(t.split()) for t in termes}
         for terme in sorted((t for t in propres if len(t) >= 2), key=len, reverse=True):
             motif = re.compile(
@@ -934,12 +942,21 @@ class Anonymiseur:
                 if prendre(*m.span()):
                     trouves.append((m.start(), m.end(), "NOM", terme))
 
+        # L'état du moteur ne change qu'ici, après la dernière étape : un calcul abandonné ne laisse rien.
+        # Les jetons d'un aperçu non copié sont recalculés à chaque fois : taper
+        # « jean@ex.f » puis « jean@ex.fr » ne crée pas deux jetons.
+        self._apercu, self._apercu_index, self._renommages = {}, {}, {}
+        self._compteurs = Counter(t for t, _ in self.valide.values())
+        # Jetons écrits tels quels dans le texte d'origine et inconnus de la conversation : réservés
+        self._reserves = {jeton_canonique(m.group(1), m.group(2)) for m in JETON_RE.finditer(texte)} - set(self.valide)
         trouves.sort()
         res = Resultat(texte="")
         morceaux, pos, taille = [], 0, 0
+        vus = set()  # « jeton in res.ordre » sur une liste : 5 s pour 16 000 éléments dans 6 Mo
         for d, f, type_, valeur in trouves:
             jeton = self._jeton(type_, valeur)
-            if jeton not in res.ordre:
+            if jeton not in vus:
+                vus.add(jeton)
                 res.ordre.append(jeton)
             if jeton in self.exclus:
                 res.ignores[jeton] += 1
@@ -983,12 +1000,16 @@ class Anonymiseur:
         cles = sorted(par_valeur, key=len, reverse=True)  # les plus longues d'abord
         rang = {cle: i for i, cle in enumerate(cles)}
         candidats = []  # (rang de la valeur, position)
-        par_premier_mot = collections.defaultdict(list)
+        # premier mot → longueur → valeurs : à chaque mot du texte, une tranche par longueur possible et une
+        # recherche dans un ensemble, au lieu de comparer une à une des milliers d'IP qui commencent par « 10 »
+        par_premier_mot = collections.defaultdict(lambda: collections.defaultdict(set))
+        exactes = collections.defaultdict(lambda: collections.defaultdict(set))
         for cle in cles:
             type_, valeur = par_valeur[cle]
             premier = _PREMIER_MOT.match(valeur)
             if premier and minuscules is not None:
-                par_premier_mot[premier.group(0).lower()].append(cle)
+                index = exactes if type_ in EXACTS else par_premier_mot
+                index[premier.group(0).lower()][len(cle)].add(cle)
                 continue
             exact = type_ in EXACTS
             if exact or minuscules is not None:  # valeur qui commence par un symbole : recherche directe
@@ -999,15 +1020,17 @@ class Anonymiseur:
                     pos = cible.find(cle, pos + 1)
             else:
                 candidats += [(rang[cle], m.start()) for m in re.finditer(re.escape(valeur), texte, re.IGNORECASE)]
-        if par_premier_mot:
+        if par_premier_mot or exactes:
             for m in _MOT.finditer(minuscules):
-                liste = par_premier_mot.get(m.group(0))
-                if liste:
-                    pos = m.start()
-                    for cle in liste:
-                        cible = texte if par_valeur[cle][0] in EXACTS else minuscules
-                        if cible.startswith(cle, pos):
-                            candidats.append((rang[cle], pos))
+                mot_ = m.group(0)
+                pos = m.start()
+                for index, cible in ((par_premier_mot, minuscules), (exactes, texte)):
+                    longueurs = index.get(mot_)
+                    if longueurs:
+                        for n, ensemble in longueurs.items():
+                            tranche = cible[pos:pos + n]
+                            if tranche in ensemble:
+                                candidats.append((rang[tranche], pos))
         candidats.sort()
 
         sortie = []

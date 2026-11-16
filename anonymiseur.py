@@ -42,6 +42,7 @@ DEPOT = "https://github.com/Some0neElseIsHere/IA-Anonymiser"
 API_DERNIERE = "https://api.github.com/repos/Some0neElseIsHere/IA-Anonymiser/releases/latest"
 DELAI_MS = 250
 SAUVEGARDE_MS = 15000
+GROS_TEXTE = 300_000  # au-delà (caractères), le calcul se fait par étapes avec son avancement
 THEME_MS = 4000
 
 PALETTES = {
@@ -496,6 +497,7 @@ class Application:
         self.courante = 0
         self.numero = 0
         self.resultat = None
+        self.calcul = None  # anonymisation en cours sur un gros texte (par étapes)
         self.attentes = {}
         self.theme_applique = None
         self.erreurs_vues = set()
@@ -664,6 +666,9 @@ class Application:
         self.info_bulle(ouvrir, t("ouvrir_bulle"))
         self.sortie = Zone(self, p1, t("texte_ia"), lecture_seule=True, marge=(6, 0, 0, 0))
         self.bouton_copier_ia = self.sortie.bouton(t("copier_ia"), self.copier_sortie, accent=True)
+        # Avancement du calcul sur un gros journal (« Anonymisation… 40 % »)
+        self.avancement = ttk.Label(self.sortie.entete, style="Aide.TLabel")
+        self.avancement.pack(side="left", padx=(10, 0))
         p1.add(self.source, weight=1)
         p1.add(self.sortie, weight=1)
         Zone.jumeler(self.source, self.sortie)
@@ -1111,15 +1116,89 @@ class Application:
         delai = DELAI_MS if int(widget.index("end-1c").split(".")[0]) < 2000 else 4 * DELAI_MS
         self.attentes[action] = self.root.after(delai, action)
 
+    def signature(self, texte, termes, motifs):
+        """Tout ce dont dépend le texte anonymisé : si rien n'a changé, on reprend le dernier résultat
+        (revenir sur une conversation de 6 Mo ne relance pas 10 s de calcul)."""
+        m = self.moteur
+        return (len(texte), hash(texte), tuple(termes), frozenset(self.conv.types), repr(motifs),
+                len(m.valide), len(m.index), frozenset(m.exclus), frozenset(m.etiquettes.items()),
+                m.domaines_publics, m.langue)
+
     def actualiser(self):
         self.attentes.pop(self.actualiser, None)
+        self.annuler_calcul()
         self.moteur.etiquettes = {normaliser(p).casefold(): j for p, j in
                                   {**self.options.etiquettes, **self.conv.etiquettes}.items() if j}
         self.moteur.domaines_publics = self.conv.domaines_publics
         if self.conv.types is None:  # conversation d'avant la v1.15 : elle reprend les réglages des Options
             self.conv.types = set(self.options.types)
-        res = self.moteur.anonymiser(self.source.lire(), self.termes_actifs(), self.conv.types,
-                                     stockage.expressions(self.options.motifs))
+        texte, termes = self.source.lire(), self.termes_actifs()
+        motifs = stockage.expressions(self.options.motifs)
+        signature = self.signature(texte, termes, motifs)
+        cache = getattr(self.conv, "cache", None)
+        if cache and cache[0] == signature:
+            self.afficher_resultat(cache[1])
+            return
+        etapes = self.moteur.etapes(texte, termes, self.conv.types, motifs)
+        self.calcul = {"conv": self.conv, "etapes": etapes, "signature": signature}
+        if len(texte) < GROS_TEXTE:
+            self.terminer_calcul()
+        else:  # gros journal : calcul par étapes, l'interface reste utilisable et montre l'avancement
+            self.avancer_calcul()
+
+    def avancer_calcul(self):
+        """Fait avancer le calcul pendant 50 ms au plus, puis rend la main à l'interface."""
+        calcul = self.calcul
+        if not calcul:
+            return
+        calcul["attente"] = None
+        limite = time.perf_counter() + 0.05
+        try:
+            while True:
+                avancement = next(calcul["etapes"])
+                if time.perf_counter() > limite:
+                    break
+        except StopIteration as fin:
+            self.fin_calcul(calcul, fin.value)
+            return
+        self.avancement.configure(text=self.t("calcul_en_cours", p=int(avancement * 100)))
+        calcul["attente"] = self.root.after(1, self.avancer_calcul)
+
+    def terminer_calcul(self):
+        """Termine tout de suite un calcul en cours (avant de copier le texte pour l'IA, par exemple)."""
+        calcul = self.calcul
+        if not calcul:
+            return
+        if calcul.get("attente"):
+            self.root.after_cancel(calcul["attente"])
+        gros = self.avancement.cget("text")
+        if gros:
+            self.root.configure(cursor="watch")
+            self.root.update_idletasks()
+        try:
+            while True:
+                next(calcul["etapes"])
+        except StopIteration as fin:
+            self.fin_calcul(calcul, fin.value)
+        finally:
+            if gros:
+                self.root.configure(cursor="")
+
+    def annuler_calcul(self):
+        calcul, self.calcul = getattr(self, "calcul", None), None
+        if calcul and calcul.get("attente"):
+            self.root.after_cancel(calcul["attente"])
+        if hasattr(self, "avancement"):
+            self.avancement.configure(text="")
+
+    def fin_calcul(self, calcul, res):
+        self.calcul = None
+        self.avancement.configure(text="")
+        calcul["conv"].cache = (calcul["signature"], res)
+        if calcul["conv"] is self.conv:
+            self.afficher_resultat(res)
+
+    def afficher_resultat(self, res):
         self.resultat = res
         self.source.surligner(res.spans_source, "masque")
         self.sortie.ecrire(res.texte, res.spans_sortie, "jeton")
@@ -1706,6 +1785,10 @@ class Application:
 
     def texte_pour_ia(self):
         """Texte anonymisé, précédé des annonces de changement de jeton et de la consigne ; l'envoi est enregistré."""
+        if self.attentes.get(self.actualiser):  # modification pas encore prise en compte
+            self.root.after_cancel(self.attentes[self.actualiser])
+            self.actualiser()
+        self.terminer_calcul()  # le texte affiché doit correspondre au texte d'origine actuel
         texte = self.sortie.lire()
         if not texte.strip():
             return None
@@ -1718,6 +1801,11 @@ class Application:
         self.enregistrer_envoi(texte)
         self.valider()
         self.moteur.renommages_annonces()
+        # Valider ne change pas le texte anonymisé : le résultat reste bon, sans recalcul
+        cache = getattr(self.conv, "cache", None)
+        if cache and cache[1] is self.resultat:
+            self.conv.cache = (self.signature(self.source.lire(), self.termes_actifs(),
+                                              stockage.expressions(self.options.motifs)), self.resultat)
         return texte
 
     def copier_sortie(self):
