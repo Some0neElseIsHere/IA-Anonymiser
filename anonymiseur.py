@@ -192,6 +192,10 @@ class Zone(ttk.Frame):
         self.barre = barre = ttk.Scrollbar(cadre, command=self.texte.yview)
         self.texte.configure(yscrollcommand=self._defile)
         barre.pack(side="right", fill="y", padx=(4, 0))
+        # Gros texte : pas de retour à la ligne automatique (Tk calcule sinon la hauteur de chaque ligne
+        # coupée, plusieurs secondes pour 6 Mo) et une barre de défilement horizontale
+        self.barre_h = ttk.Scrollbar(cadre, orient="horizontal", command=self.texte.xview)
+        self.texte.configure(xscrollcommand=self.barre_h.set)
         self.texte.pack(side="left", fill="both", expand=True)
         # Défilement jumelé : la zone que l'utilisateur manipule entraîne l'autre
         self.jumelle, self.paire = None, {"meneur": self}
@@ -311,6 +315,13 @@ class Zone(ttk.Frame):
         else:
             self.texte.insert("1.0", contenu)
             self.avis.pack_forget()
+        gros = len(contenu) > GROS_TEXTE
+        if (self.texte.cget("wrap") == "none") != gros:
+            self.texte.configure(wrap="none" if gros else "word")
+            if gros:
+                self.barre_h.pack(side="bottom", fill="x", before=self.texte)
+            else:
+                self.barre_h.pack_forget()
         self._lignes = self._debuts_de_ligne(contenu)
         if tag:
             self.surligner(spans, tag, contenu)
