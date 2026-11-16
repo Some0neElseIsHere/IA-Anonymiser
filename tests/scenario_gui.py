@@ -549,7 +549,7 @@ def lancer():
             etape("coller 6 Mo dans la zone source", lambda: app.source.ecrire(texte))
             app.actualiser()
             racine.update()
-            verifier(app.avancement.cget("text").startswith("Anonymisation"), "pas d'avancement affiché")
+            verifier(app.avancement.cget("text").endswith("%"), f"pas d'avancement affiché : {app.avancement.cget('text')!r}")
             etape("actualiser (total, par étapes)", lambda: None)
             etape("actualiser une 2e fois (rien n'a changé)", app.actualiser)
             etape("sauvegarder", app.sauvegarder)
