@@ -8,6 +8,7 @@ Usage : python tests/scenario_gui.py <phase 1|2> <dossier de sortie>
 Les fenêtres modales (confirmations, choix de fichier, renommage) sont simulées. Chaque étape est
 vérifiée ; le résultat est écrit dans resultats-phase<N>.txt et le code de sortie vaut 1 en cas d'échec.
 """
+import collections
 import json
 import os
 import re
@@ -792,6 +793,24 @@ def lancer():
 
         app.nouvelle_conversation()
         racine.update()
+        details = collections.defaultdict(list)
+
+        def chrono(nom, objet, attribut):
+            origine = getattr(objet, attribut)
+
+            def mesure(*a, **k):
+                debut = time.perf_counter()
+                try:
+                    return origine(*a, **k)
+                finally:
+                    details[nom].append(time.perf_counter() - debut)
+            setattr(objet, attribut, mesure)
+
+        for nom in ("avancer_calcul", "afficher_resultat", "remplir_elements", "actualiser"):
+            chrono(nom, app, nom)
+        for zone in ("source", "sortie"):
+            for nom in ("surligner", "ecrire"):
+                chrono(f"{zone}.{nom}", getattr(app, zone), nom)
         etape("coller (dont une ligne JSON de 3 Mo)", lambda: app.source.ecrire(texte))
         etape("anonymiser", app.actualiser)
         etape("défiler au début (la longue ligne)", lambda: app.source.texte.yview_moveto(0.0))
@@ -809,6 +828,8 @@ def lancer():
         lignes = [f"Phase 2 : journal de {len(texte) / 1e6:.1f} Mo, plus longue ligne {len(une_ligne) / 1e6:.1f} Mo, "
                   f"{len(app.moteur.jetons())} éléments masqués"]
         lignes += [f"{d:7.2f} s  {nom}  (interface bloquée au plus {pire:.2f} s)" for nom, d, pire in mesures]
+        lignes += [f"     {nom} : {len(v)} appel(s), {sum(v):.2f} s au total, {max(v):.2f} s au plus"
+                   for nom, v in details.items()]
         with open(os.path.join(SORTIE, "perf.txt"), "a", encoding="utf-8") as f:
             f.write("\n" + "\n".join(lignes) + "\n")
         verifier("sophie.lefevre@vallorie.fr" not in app.sortie.lire(), "ligne JSON non anonymisée")
