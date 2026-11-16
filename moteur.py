@@ -14,10 +14,10 @@ from dataclasses import dataclass, field
 PREFIXES = {
     "fr": {"EMAIL": "EMAIL", "TEL": "TEL", "IBAN": "IBAN", "CARTE": "CARTE", "SECU": "SECU",
            "IP": "IP_privée", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "COMPTE",
-           "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NOM"},
+           "DN": "DN", "SID": "SID", "TENANT": "TENANT", "LIEU": "LIEU", "PERSO": "REF", "NOM": "NOM"},
     "en": {"EMAIL": "EMAIL", "TEL": "PHONE", "IBAN": "IBAN", "CARTE": "CARD", "SECU": "SSN",
            "IP": "IP_private", "IPPUB": "IP_PUB", "MAC": "MAC", "FQDN": "FQDN", "SECRET": "SECRET", "COMPTE": "ACCOUNT",
-           "DN": "DN", "SID": "SID", "PERSO": "REF", "NOM": "NAME"},
+           "DN": "DN", "SID": "SID", "TENANT": "TENANT", "LIEU": "LOCATION", "PERSO": "REF", "NOM": "NAME"},
 }
 # Préfixes reconnus à la restauration : ceux d'aujourd'hui, et « IP » des versions avant la 1.12.1
 TOUS_PREFIXES = sorted({p for d in PREFIXES.values() for p in d.values()} | {"IP"}, key=len, reverse=True)
@@ -55,7 +55,10 @@ def jeton_canonique(prefixe, numero):
 
 # Types détectés automatiquement (les termes et les motifs personnalisés sont à part).
 # Ordre d'affichage dans Options → Détection (deux colonnes) : IP locales et publiques côte à côte
-TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "MAC", "IP", "IPPUB", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
+TYPES_AUTO = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "MAC", "IP", "IPPUB", "FQDN", "SECRET", "COMPTE", "DN", "SID",
+              "TENANT", "LIEU"]
+# Types connus jusqu'à la v1.20 : ceux apparus depuis sont activés dans les conversations déjà enregistrées
+TYPES_V120 = ["EMAIL", "TEL", "IBAN", "CARTE", "SECU", "MAC", "IP", "IPPUB", "FQDN", "SECRET", "COMPTE", "DN", "SID"]
 # Les deux types d'adresse IP sont trouvés par les mêmes expressions, puis classés selon la plage d'adresses
 TYPES_IP = ("IP", "IPPUB")
 # Types de la version 1.3 : les types ajoutés depuis sont activés pour les utilisateurs existants.
@@ -75,6 +78,8 @@ EXEMPLES = {
     "COMPTE": r"ACME\mlefevre, C:\Users\mlefevre, /home/mlefevre",
     "DN": "CN=Marc Lefevre,OU=Compta,DC=acme,DC=local",
     "SID": "S-1-5-21-3623811015-3361044348-30300820-1013",
+    "TENANT": "homeTenantName « Contoso », homeTenantId 72f988bf-86f1-41af-91ab-2d7cd011db47",
+    "LIEU": "latitude 45.7667, longitude 4.8833, emplacement nommé « Siège Lyon »",
 }
 
 # Un « domaine » qui se termine par une extension de fichier est un nom de fichier (rapport.pdf).
@@ -220,6 +225,29 @@ MOTIFS = [
         r"(?im)^[ \t]*(?:UserDisplayName|InitiatedByUserDisplayName)[ \t]*:[ \t]*(?P<v>[^\r\n]+?)[ \t]*$")),
     ("FQDN", re.compile(r"(?im)^[ \t]*(?:Device name|Nom de l'appareil|Nom d'appareil)(?:\t+|[ \t]*:[ \t]*)"
                         r"(?P<v>[A-Za-z0-9][\w.-]*)[ \t]*$")),
+    # Entra ID : UPN, nom de connexion ou identifiant saisi qui ne sont pas des adresses e-mail
+    ("COMPTE", re.compile(
+        r'(?i)(?:\\?"|"")(?:user_?principal_?name|alternate_?sign_?in_?name|sign_?in_?identifier)(?:\\?"|"")'
+        r'\s*:\s*(?:\\?"|"")(?P<v>[^"\\\n{}\[\]]+)(?:\\?"|"")')),
+    # Entra ID : nom et identifiant du tenant (l'organisation)
+    ("TENANT", re.compile(
+        r'(?i)(?:\\?"|"")(?:home_?tenant_?name|resource_?tenant_?name|tenant_?display_?name)(?:\\?"|"")'
+        r'\s*:\s*(?:\\?"|"")(?P<v>[^"\\\n{}\[\]]+)(?:\\?"|"")')),
+    ("TENANT", re.compile(
+        r'(?i)(?:\\?"|"")(?:home_?tenant_?id|resource_?tenant_?id|tenant_?id|aad_?tenant_?id)(?:\\?"|"")'
+        r'\s*:\s*(?:\\?"|"")(?P<v>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\\?"|"")'
+        r'|/tenants/(?P<w>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?=/|\b)')),
+    # Entra ID : coordonnées GPS de la connexion (au moins trois décimales)
+    ("LIEU", re.compile(
+        r'(?i)(?:\\?"|"")(?:latitude|longitude)(?:\\?"|"")\s*:\s*(?:\\?"|"")?(?P<v>-?\d{1,3}\.\d{3,})')),
+    # Entra ID : détail de la MFA (numéro de téléphone, nom du téléphone : « iPhone de Sophie »)
+    ("TEL", re.compile(
+        r'(?i)(?:\\?"|"")(?:auth_?detail|authentication_?method_?detail)(?:\\?"|"")\s*:\s*(?:\\?"|"")'
+        r"'?(?P<v>\+[\dX][\dX ().-]{5,}\d)(?:\\?\"|\"\")")),
+    # (nom d'appareil : au moins un chiffre ou deux mots, pas un état comme « Denied » ou « succeeded »)
+    ("FQDN", re.compile(
+        r'(?i)(?:\\?"|"")auth_?detail(?:\\?"|"")\s*:\s*(?:\\?"|"")'
+        r'(?P<v>(?=[^"\\\n]*(?:\d|\S\s+\S))[^"\\\n{}\[\]+\'][^"\\\n{}\[\]]*)(?:\\?"|"")')),
     # AWS : numéro de compte et utilisateur ou rôle dans un ARN (arn:aws:iam::123456789012:user/pedro)
     ("COMPTE", re.compile(r"\barn:aws[\w-]*:[\w-]*:[\w-]*:(?P<v>\d{12}):")),
     ("COMPTE", re.compile(r"\barn:aws[\w-]*:(?:iam|sts)::\d{12}:(?:user|role|group|assumed-role)/"
@@ -247,7 +275,7 @@ MOTIFS = [
     ("COMPTE", re.compile(r"\bnet\s+use\b[^\n]*?/u(?:ser)?:(?P<v>[^\s\\\"]+)(?=[\s\"]|$)", re.IGNORECASE)),
     ("IP", re.compile(r"(?<![\w.~])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)")),
     ("IP", re.compile(
-        r"(?<![\w:.])(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}"           # IPv6 complète
+        r"(?<![\w:.])(?:(?:::)?(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}"     # IPv6 complète (« :: » devant : Azure Monitor)
         r"|(?:[0-9a-f]{1,4}:){1,6}(?::[0-9a-f]{1,4}){1,6}"              # abrégée : 2a01:e0a::17
         r"|(?:[0-9a-f]{1,4}:){1,7}:|::(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})"
         r"(?:%[\w.]+)?(?![\w:])", re.IGNORECASE)),
@@ -303,6 +331,13 @@ DESCRIPTIONS = [
      "Entra ID: PowerShell Get-MgAuditLogSignIn (UserDisplayName : …)"),
     ("Entra ID : nom de l'appareil copié depuis le portail (Device name⇥…)",
      "Entra ID: device name copied from the portal (Device name⇥…)"),
+    ("Entra ID : UPN ou identifiant de connexion qui n'est pas une adresse e-mail",
+     "Entra ID: UPN or sign-in identifier that is not an e-mail address"),
+    ("Entra ID : nom du tenant (homeTenantName…)", "Entra ID: tenant name (homeTenantName…)"),
+    ("Entra ID : identifiant du tenant (homeTenantId, /tenants/…)", "Entra ID: tenant ID (homeTenantId, /tenants/…)"),
+    ("Entra ID : coordonnées GPS (latitude, longitude)", "Entra ID: GPS coordinates (latitude, longitude)"),
+    ("Entra ID : téléphone utilisé pour la MFA (authDetail)", "Entra ID: phone used for MFA (authDetail)"),
+    ("Entra ID : appareil utilisé pour la MFA (authDetail)", "Entra ID: device used for MFA (authDetail)"),
     ("AWS : numéro de compte dans un ARN", "AWS: account number in an ARN"),
     ("AWS : utilisateur ou rôle dans un ARN", "AWS: user or role in an ARN"),
     ("Kerberos : utilisateur/ROYAUME (Zeek, klist)", "Kerberos: user/REALM (Zeek, klist)"),
@@ -375,10 +410,22 @@ _PLAGES_LOCALES = [ipaddress.ip_network(r) for r in (
     "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "198.18.0.0/15", "fc00::/7", "fe80::/10", "ff00::/8")]
 
 
+def _adresse_ip(valeur):
+    """Adresse IP, ou ValueError. Accepte « ::2a02:cf40:…:6fc6 » : IPv6 complète précédée de « :: », telle
+    qu'on la trouve dans callerIpAddress des journaux Entra ID exportés par Azure Monitor."""
+    valeur = valeur.split("%")[0]
+    try:
+        return ipaddress.ip_address(valeur)
+    except ValueError:
+        if valeur.startswith("::") and valeur.count(":") == 9:
+            return ipaddress.ip_address(valeur[2:])
+        raise
+
+
 def type_ip(valeur):
     """« IP » pour une adresse locale (privée, CGNAT, lien local, multicast, documentation), « IPPUB » sinon."""
     try:
-        adresse = ipaddress.ip_address(valeur.split("%")[0])
+        adresse = _adresse_ip(valeur)
     except ValueError:
         return "IP"
     if adresse.version == 6 and adresse.ipv4_mapped:
@@ -453,6 +500,10 @@ EXACTS = ("SECRET", "COMPTE")
 
 
 def _accepte(type_, m, valeur):
+    if not any(c.isalnum() for c in valeur):
+        return False  # « , » pris entre deux guillemets doublés (« "tenantId":"","x" ») : rien à masquer
+    if type_ == "LIEU" and re.fullmatch(r"-?0+\.0+", valeur):
+        return False  # coordonnées 0.000000 : non renseignées
     if type_ == "SECRET":
         if re.match(r"(?:[/~]|[A-Za-z]:\\)", valeur):
             return False  # PWD=/home/x (dossier courant dans sudo) ou un chemin : pas un mot de passe
@@ -462,7 +513,7 @@ def _accepte(type_, m, valeur):
             return False  # objet affiché (token=Token{a64f992}, {fsn=-1}), ou rien qu'une ponctuation
     if type_ == "IP":
         try:
-            adresse = ipaddress.ip_address(valeur.split("%")[0])
+            adresse = _adresse_ip(valeur)
         except ValueError:
             return False
         if adresse.is_loopback or adresse.is_unspecified or str(adresse) in IP_NEUTRES:
@@ -500,6 +551,8 @@ def _accepte(type_, m, valeur):
         if len(etiquettes) == 2 and tld.lower() == "app" and etiquettes[0][:1].isupper():
             return False  # application macOS : Weather.app
         return True
+    if type_ == "TENANT":
+        return not valeur.startswith("00000000-") and valeur.lower() not in COMPTES_NEUTRES
     if type_ == "COMPTE":
         domaine = m.groupdict().get("d")
         if domaine and (domaine in DOMAINES_SYSTEME or domaine.startswith("HKEY")):
@@ -578,6 +631,8 @@ COLONNES_CSV = {
     "userprincipalname": "COMPTE", "signinidentifier": "COMPTE", "alternatesigninname": "COMPTE",
     "userids": "COMPTE", "actordisplayname": "COMPTE", "initiatedby": "COMPTE",
     "devicename": "FQDN", "devicedetail": "FQDN",
+    "hometenantname": "TENANT", "resourcetenantname": "TENANT", "hometenantid": "TENANT", "resourcetenantid": "TENANT",
+    "multifactorauthenticationauthdetail": "FQDN",
 }
 _SEPARATEURS_CSV = (",", ";", "\t")
 _GUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -651,10 +706,30 @@ def colonnes_csv(texte, termes_cf=frozenset()):
                 while f > d and texte[f - 1].isspace():
                     f -= 1
                 valeur = texte[d:f]
-                if (not valeur or valeur.lower() in COMPTES_NEUTRES or _GUID.fullmatch(valeur) or valeur.isdigit()
+                genre = type_
+                if genre == "FQDN" and re.fullmatch(r"\+[\dX][\dX ().-]{5,}\d", valeur):
+                    genre = "TEL"  # détail de la MFA : un numéro de téléphone
+                if (not valeur or valeur.lower() in COMPTES_NEUTRES
+                        or (_GUID.fullmatch(valeur) and (genre != "TENANT" or valeur.startswith("00000000")))
+                        or valeur.isdigit()
                         or "{" in valeur or "\n" in valeur or valeur.casefold() in termes_cf):
                     continue
-                trouves.append((d, f, type_))
+                trouves.append((d, f, genre))
+    return trouves
+
+
+# Listes JSON dont chaque élément est sensible : emplacements nommés d'Entra ID (« Siège Lyon »)
+_LISTES_JSON = re.compile(r'(?i)(?:\\?"|"")network_?names(?:\\?"|"")\s*:\s*\[([^\]\n]*)\]')
+_ELEMENT_JSON = re.compile(r'(?:\\?"|"")(?P<v>[^"\\\n]+)(?:\\?"|"")')
+
+
+def listes_json(texte):
+    """(début, fin, type) de chaque élément des listes de _LISTES_JSON."""
+    trouves = []
+    for m in _LISTES_JSON.finditer(texte):
+        for e in _ELEMENT_JSON.finditer(texte, m.start(1), m.end(1)):
+            if e.group("v").strip() and e.group("v").strip().lower() not in COMPTES_NEUTRES:
+                trouves.append((e.start("v"), e.end("v"), "LIEU"))
     return trouves
 
 
@@ -664,7 +739,13 @@ _PREMIER_MOT = re.compile(r"\w+")
 
 def _plage(m):
     """Partie à masquer : le groupe « v » s'il existe, sinon tout ; sans espaces en bout."""
-    debut, fin = m.span("v") if "v" in m.re.groupindex and m.group("v") else m.span()
+    groupes = m.re.groupindex
+    if "v" in groupes and m.group("v"):
+        debut, fin = m.span("v")
+    elif "w" in groupes and m.group("w"):  # second emplacement possible de la valeur (/tenants/<id>/)
+        debut, fin = m.span("w")
+    else:
+        debut, fin = m.span()
     texte = m.string
     while fin > debut and texte[fin - 1].isspace():
         fin -= 1
@@ -927,6 +1008,9 @@ class Anonymiseur:
                         trouves.append((d, f, sorte, texte[d:f]))
 
         yield 0.75
+        for d, f, type_ in listes_json(texte):
+            if (types is None or type_ in types) and not (zones_termes and dans_un_terme(d, f)) and prendre(d, f):
+                trouves.append((d, f, type_, texte[d:f]))
         # Tableaux CSV : colonnes User, UserDisplayName, Device name… (exports Entra ID / Sentinel)
         for d, f, type_ in colonnes_csv(texte, termes_cf):
             if (types is None or type_ in types) and not (zones_termes and dans_un_terme(d, f)) and prendre(d, f):

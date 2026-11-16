@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.request
 import zipfile
 
 ICI = os.path.dirname(os.path.abspath(__file__))
@@ -59,8 +60,23 @@ def recuperer(sources, cache):
             subprocess.run(git + ["remote", "add", "origin", f"https://github.com/{s['depot']}.git"], check=True)
         subprocess.run(git + ["sparse-checkout", "set", "--no-cone"] + [_motif_sparse(f) for f in s["fichiers"]],
                        check=True)
-        subprocess.run(git + ["fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", s["commit"]], check=True)
-        subprocess.run(git + ["checkout", "-q", "FETCH_HEAD"], check=True)
+        if subprocess.run(git + ["fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", s["commit"]]).returncode:
+            # certains serveurs refusent de servir un commit par son identifiant : la branche par défaut, puis le commit
+            subprocess.run(git + ["fetch", "-q", "--depth", "200", "--filter=blob:none", "origin", "HEAD"], check=True)
+        subprocess.run(git + ["checkout", "-q", s["commit"]], check=True)
+        if s.get("lfs"):  # fichiers stockés avec Git LFS : le dépôt ne contient qu'un pointeur
+            for racine, _, fichiers in os.walk(dossier):
+                if ".git" in racine.replace("\\", "/").split("/"):
+                    continue
+                for nom in fichiers:
+                    chemin = os.path.join(racine, nom)
+                    with open(chemin, "rb") as f:
+                        debut = f.read(40)
+                    if debut.startswith(b"version https://git-lfs"):
+                        relatif = os.path.relpath(chemin, dossier).replace("\\", "/")
+                        url = f"https://media.githubusercontent.com/media/{s['depot']}/{s['commit']}/{relatif}"
+                        with urllib.request.urlopen(url, timeout=60) as r, open(chemin, "wb") as f:
+                            f.write(r.read())
         open(marque, "w", encoding="utf-8").write(attendu)
         print(f"récupéré : {s['depot']}@{s['commit'][:7]}", flush=True)
 
@@ -108,8 +124,11 @@ def _evenements_windows(texte):
 # Journaux Entra ID : champs dont la valeur doit disparaître (nom de clé ou de colonne, sans espaces ni _)
 CLES_ENTRA = {"userprincipalname", "username", "alternatesigninname", "signinidentifier", "userids", "actorupn",
               "user", "userdisplayname", "identity", "actordisplayname", "ipaddress", "clientip", "actoripaddress",
-              "ipaddress(seenbyresource)", "devicename"}
-NEUTRES = {"", "-", "null", "none", "n/a", "unknown", "not available", "*redacted*", "{}", "[]", "true", "false"}
+              "ipaddress(seenbyresource)", "devicename", "calleripaddress", "ipaddressfromresourceprovider",
+              "hometenantname", "resourcetenantname", "authdetail", "multifactorauthenticationauthdetail",
+              "networknames"}
+NEUTRES = {"", "-", "null", "<null>", "none", "n/a", "unknown", "not available", "*redacted*", "{}", "[]", "true",
+           "false", "0.0.0.0"}
 GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
@@ -124,6 +143,8 @@ def _ajouter(verite, cle, valeur, parent):
     if v.lower() in NEUTRES or GUID.match(v) or len(v) < 3 or "PLACEHOLDER" in v:
         return
     n = _norme(cle)
+    if n in ("authdetail", "multifactorauthenticationauthdetail") and re.fullmatch(r"[A-Za-z]+", v):
+        return  # état de la MFA (« Denied », « Succeeded »), pas un appareil
     if n in CLES_ENTRA or (n == "displayname" and parent in ("devicedetail", "user")) or (n == "userid" and "@" in v):
         verite.add(v)
 
@@ -131,6 +152,9 @@ def _ajouter(verite, cle, valeur, parent):
 def _parcourir(o, verite, parent=""):
     if isinstance(o, dict):
         for k, v in o.items():
+            if _norme(k) == "networknames" and isinstance(v, list):  # emplacements nommés
+                for x in v:
+                    _ajouter(verite, "networknames", x, parent)
             if isinstance(v, (dict, list)):
                 _parcourir(v, verite, _norme(k))
             elif isinstance(v, str) and v.strip()[:1] in "{[":
@@ -147,7 +171,7 @@ def _parcourir(o, verite, parent=""):
 
 def _verite_entra(texte):
     verite = set()
-    if texte.lstrip()[:1] in "{[":
+    if texte.lstrip()[:1] in "{[" or texte.lstrip().startswith('{"'):
         for bloc in re.split(r"\n\s*\n(?=[{\[])", texte):
             try:
                 _parcourir(json.loads(bloc), verite)
@@ -210,7 +234,7 @@ def preparer(sources, cache):
                 texte = "\n\n".join(b for b in re.findall(r"```(?:json|http)?\n(.*?)```", texte, re.S) if "{" in b)
             texte = _couper(texte)
             verite = _verite_entra(texte) if s["nom"].startswith("entra") or "Entra ID" in relatif \
-                or "SignInLogs" in relatif else set()
+                or re.search(r"(?i)sign_?in_?logs|auditlogs|azure_?ad", relatif) else set()
             corpus[f"{s['nom']}/{relatif}"] = (texte, verite)
     return corpus
 

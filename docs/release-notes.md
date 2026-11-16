@@ -10,6 +10,15 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.21.0** : **journaux Entra ID complets**, testés sur 117 nouveaux fichiers réels ou de test (journaux d'un tenant de recherche de Splunk, tests d'Elastic, de Sekoia, de Sentinel, de TIRED Labs…) et sur leurs équivalents en export du portail (JSON et CSV). Valeurs qui passaient en clair, désormais masquées :
+  - **nouveau type « Tenant Entra ID »** (`[TENANT_1]`) : nom du tenant (`homeTenantName`, colonne « Home tenant name ») et identifiant (`homeTenantId`, `resourceTenantId`, `tenantId`, `/tenants/…` dans `resourceId`). Le nom est ensuite masqué partout où il réapparaît, par exemple dans le nom d'une stratégie d'accès conditionnel ;
+  - **nouveau type « Localisation »** (`[LIEU_1]`) : coordonnées GPS (`latitude`, `longitude`) et emplacements nommés (`networkNames` : « Siège Lyon »). La ville et le pays restent lisibles ;
+  - **détail de la MFA** : numéro de téléphone (même partiellement masqué par Microsoft : `+X XXXXXXXX92`) et nom de l'appareil (« iPhone de Sophie ») ;
+  - **UPN et identifiant de connexion qui ne sont pas des adresses e-mail** (`userPrincipalName`, `signInIdentifier`, `alternateSignInName`) ;
+  - **adresse IPv6 précédée de « :: »** (`callerIpAddress` des journaux exportés par Azure Monitor).
+  Les deux nouveaux types sont activés dans les réglages et dans les conversations existantes ; ils se décochent dans Options → Détection ou l'onglet 3.
+  Corrections : une chaîne vide (`"tenantId":""`) ne produit plus de jeton pour une virgule ; les coordonnées 0.000000 restent en clair. La batterie permanente passe de 193 à 323 journaux.
+
 - **v1.20.0** : **onglet « 4. Éléments masqués » : copier et renommer**.
   - Clic droit sur un élément : **Copier la valeur**, **Copier le jeton**, **Renommer le jeton…**. Ctrl+C copie la valeur de la ligne choisie. Avant, rien ne pouvait être copié depuis cette liste.
   - **Renommer** marche pour tous les éléments, y compris ceux détectés automatiquement (IP, e-mails, machines…) : `[IP_PUB_1]` peut devenir `[PASSERELLE]`. La valeur devient un terme de la conversation avec ce jeton (visible dans l'onglet 3). Si l'IA connaissait déjà l'ancien jeton, la ligne « Changement de jeton » le lui annonce à la prochaine copie, et ses réponses avec l'ancien comme avec le nouveau jeton se restaurent.

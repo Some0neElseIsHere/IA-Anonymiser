@@ -24,7 +24,7 @@ import fichiers
 import glisser
 import rapport
 import stockage
-from moteur import (EXEMPLES, TYPES_AUTO, Anonymiseur, compiler_motif, etiquette_reservee, expressions,
+from moteur import (EXEMPLES, TYPES_AUTO, TYPES_V120, Anonymiseur, compiler_motif, etiquette_reservee, expressions,
                     normaliser_etiquette)
 from textes import ANCIENNES_CONSIGNES, CONSIGNES, TEXTES, Traducteur, libelle_jour
 
@@ -145,7 +145,7 @@ class Conversation:
                 "moteur": self.moteur.etat(), "id": self.id, "activite": self.activite,
                 "epingle": self.epingle, "cree": self.cree, "envois": self.envois, "etiquettes": self.etiquettes,
                 "domaines_publics": self.domaines_publics,
-                "types": sorted(self.types) if self.types is not None else None}
+                "types": sorted(self.types) if self.types is not None else None, "types_connus": TYPES_AUTO}
 
     @classmethod
     def depuis_etat(cls, d, langue):
@@ -172,6 +172,9 @@ class Conversation:
         c.domaines_publics = bool(d.get("domaines_publics", False))
         types = d.get("types")
         c.types = {x for x in types if x in TYPES_AUTO} if isinstance(types, list) else None
+        if c.types is not None:  # types apparus depuis l'enregistrement : activés
+            connus = d.get("types_connus") if isinstance(d.get("types_connus"), list) else TYPES_V120
+            c.types |= set(TYPES_AUTO) - set(connus)
         return c
 
 

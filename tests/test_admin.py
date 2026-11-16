@@ -593,6 +593,59 @@ class EntraID(unittest.TestCase):
         self.assertIn("Jane Doe", anon(texte, types=types))
 
 
+class EntraIDSchemaComplet(unittest.TestCase):
+    """Champs du schéma complet des connexions Entra ID (Graph, Azure Monitor), trouvés dans de vrais journaux."""
+
+    def test_tenant_nom_et_identifiant(self):
+        texte = ('"homeTenantName": "Vallorie", "homeTenantId": "3e9f1c2a-1111-2222-3333-444455556666", '
+                 '"resourceId": "/tenants/3E9F1C2A-1111-2222-3333-444455556666/providers/Microsoft.aadiam", '
+                 '"policy": "MFA - Tous les utilisateurs Vallorie", "appId": "00000002-0000-0ff1-ce00-000000000000"')
+        sortie = anon(texte)
+        self.assertNotIn("Vallorie", sortie)
+        self.assertNotIn("3e9f1c2a", sortie.lower())
+        self.assertIn("00000002-0000-0ff1-ce00-000000000000", sortie)  # identifiant d'application Microsoft
+
+    def test_coordonnees_et_emplacements_nommes(self):
+        texte = ('"geoCoordinates": {"latitude": 45.7667, "longitude": 4.8833, "altitude": null}, '
+                 '"networkLocationDetails": [{"networkType": "namedNetwork", "networkNames": ["Siège Lyon", "IP corp"]}], '
+                 '"location": {"latitude": 0.000000}')
+        self.assertEqual(anon(texte), '"geoCoordinates": {"latitude": [LIEU_1], "longitude": [LIEU_2], "altitude": null}, '
+                         '"networkLocationDetails": [{"networkType": "namedNetwork", "networkNames": ["[LIEU_3]", "[LIEU_4]"]}], '
+                         '"location": {"latitude": 0.000000}')
+
+    def test_detail_de_la_mfa(self):
+        texte = ('"mfaDetail": {"authMethod": "PhoneAppNotification", "authDetail": "iPhone de Sophie"}, '
+                 '"authenticationMethodDetail": "+X XXXXXXXX92", "autre": {"authDetail": "+33 6 12 34 56 78"}')
+        sortie = anon(texte)
+        self.assertNotIn("Sophie", sortie)
+        self.assertNotIn("XXXXXXXX92", sortie)
+        self.assertNotIn("34 56 78", sortie)
+        self.assertIn("PhoneAppNotification", sortie)
+
+    def test_upn_qui_n_est_pas_un_email(self):
+        self.assertEqual(anon('"userPrincipalName": "jdupont", "signInIdentifier": "jdupont"'),
+                         '"userPrincipalName": "[COMPTE_1]", "signInIdentifier": "[COMPTE_1]"')
+
+    def test_ipv6_precedee_de_deux_points(self):
+        self.assertEqual(anon('"callerIpAddress": "::2a02:cf40:add:4002:91f2:a9b2:e09a:6fc6"'),
+                         '"callerIpAddress": "[IP_PUB_1]"')
+
+    def test_chaine_vide_ne_fait_pas_de_jeton(self):
+        texte = '"homeTenantName":"","userPrincipalName":"","x":1'
+        self.assertEqual(anon(texte), texte)
+
+    def test_export_csv_du_portail(self):
+        texte = ('"User","Username","Home tenant name","Home tenant ID","Multifactor authentication auth detail"\n'
+                 '"Sophie Lefèvre","sophie@vallorie.fr","Vallorie","3e9f1c2a-1111-2222-3333-444455556666","+X XXXXXXXX92"\n')
+        sortie = anon(texte)
+        for valeur in ("Sophie", "Vallorie", "3e9f1c2a", "XXXXXXXX92"):
+            self.assertNotIn(valeur, sortie)
+
+    def test_cases_decochees(self):
+        texte = '"homeTenantName": "Vallorie", "latitude": 45.7667'
+        self.assertEqual(anon(texte, types=[t for t in TYPES_AUTO if t not in ("TENANT", "LIEU")]), texte)
+
+
 class RenommerUnElementDetecte(unittest.TestCase):
     """Onglet 4 : renommer le jeton d'une valeur détectée automatiquement (IP, e-mail…)."""
 

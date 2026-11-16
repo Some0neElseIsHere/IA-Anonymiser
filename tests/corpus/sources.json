@@ -168,7 +168,11 @@
     "Solutions/Microsoft Entra ID/Sample Data/Tables/AADRiskyUsers_mock.json",
     "Solutions/Microsoft Entra ID/Sample Data/Tables/AADUserRiskEvents_mock.json",
     "Solutions/Microsoft Entra ID/Sample Data/Tables/AADProvisioningLogs_mock.json",
-    "Playbooks/AS-Microsoft-DCR-Log-Ingestion/Samples/SignInLogsSample.json"
+    "Playbooks/AS-Microsoft-DCR-Log-Ingestion/Samples/SignInLogsSample.json",
+    "Sample Data/Tables/SigninLogs/base-event.json",
+    "Sample Data/Tables/AADNonInteractiveUserSignInLogs/base-event.json",
+    "Sample Data/Tables/AADServicePrincipalSignInLogs/base-event.json",
+    "Sample Data/Tables/AuditLogs/base-event.json"
    ],
    "licence": "MIT"
   },
@@ -263,6 +267,107 @@
     "detections/fixtures/*/entra-*.json"
    ],
    "assembler": true
+  },
+  {
+   "nom": "entra-splunk",
+   "depot": "splunk/attack_data",
+   "commit": "eb3ab7424aaa4bd7ac8e97fd0af6c1d29944d23c",
+   "fichiers": [
+    "datasets/attack_techniques/T1078.004/azure_ad_service_principal_authentication/azure_ad_service_principal_authentication.log",
+    "datasets/attack_techniques/T1078.004/azuread/azure-audit.log",
+    "datasets/attack_techniques/T1078.004/azuread_pws/azure-audit.log",
+    "datasets/attack_techniques/T1078/azure_ad_multiple_appids_and_useragents_auth/azure_ad_multiple_appids_and_useragents_auth.log",
+    "datasets/attack_techniques/T1098.001/azure_ad_federated_identity_credential/azure-audit.log",
+    "datasets/attack_techniques/T1098.001/azure_ad_service_principal_credentials/azure-audit.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_admin_consent/azure_ad_admin_consent.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_assign_global_administrator/azure-audit.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_assign_privileged_role/azure-audit.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_bypass_admin_consent/azure_ad_bypass_admin_consent.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_pim_role_activated/azure-audit.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_privileged_graph_perm_assigned/azure_ad_privileged_graph_perm_assigned.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_privileged_role_serviceprincipal/azure-audit.log",
+    "datasets/attack_techniques/T1098.003/azure_ad_spn_privesc/azure_ad_spn_privesc.log",
+    "datasets/attack_techniques/T1098.005/azure_ad_register_new_mfa_method/azure_ad_register_new_mfa_method.log",
+    "datasets/attack_techniques/T1098.005/azure_ad_suspicious_device_registration/azure_ad_suspicious_device_registration.log",
+    "datasets/attack_techniques/T1098/azure_ad_add_serviceprincipal_owner/azure-audit.log",
+    "datasets/attack_techniques/T1098/azure_ad_enable_and_reset/azure-audit.log",
+    "datasets/attack_techniques/T1098/azure_ad_guest_user_type_changed_to_member/azure-audit.log",
+    "datasets/attack_techniques/T1098/azure_ad_set_immutableid/azure-audit.log",
+    "datasets/attack_techniques/T1110.001/azure_ad_high_number_of_failed_authentications_for_user/azuread.log",
+    "datasets/attack_techniques/T1110.001/azure_ad_successful_authentication_from_different_ips/azuread.log",
+    "datasets/attack_techniques/T1110.003/azure_ad_distributed_spray/azure_ad_distributed_spray.log",
+    "datasets/attack_techniques/T1110.003/azuread_highrisk/azure-audit.log",
+    "datasets/attack_techniques/T1110.003/password_spraying_azuread/azuread_signin.log",
+    "datasets/attack_techniques/T1136.003/azure_ad_add_service_principal/azure-audit.log",
+    "datasets/attack_techniques/T1136.003/azure_ad_external_guest_user_invited/azure-audit.log",
+    "datasets/attack_techniques/T1136.003/azure_ad_multiple_service_principals_created/azure_ad_multiple_service_principals_created.log",
+    "datasets/attack_techniques/T1185/azure_ad_concurrent_sessions_from_different_ips/azuread.log",
+    "datasets/attack_techniques/T1528/azure_ad_user_consent_blocked/azure_ad_user_consent_blocked.log",
+    "datasets/attack_techniques/T1528/azure_ad_user_consent_declined/azure_ad_user_consent_declined.log",
+    "datasets/attack_techniques/T1528/azure_ad_user_consent_granted/azure_ad_user_consent_granted.log",
+    "datasets/attack_techniques/T1556.006/azure_ad_new_mfa_method_registered_for_user/azuread.log",
+    "datasets/attack_techniques/T1556.006/azure_ad_temporary_access_pass/azure-audit.log",
+    "datasets/attack_techniques/T1556/azuread/azure-audit.log",
+    "datasets/attack_techniques/T1562/azuread_disable_blockconsent_for_riskapps/azuread_disable_blockconsent_for_riskapps.log",
+    "datasets/attack_techniques/T1621/azure_ad_multiple_denied_mfa_requests/azure_ad_multiple_denied_mfa_requests.log",
+    "datasets/attack_techniques/T1621/azuread/azure-audit.log"
+   ],
+   "licence": "Apache-2.0",
+   "lfs": true
+  },
+  {
+   "nom": "entra-elastic",
+   "depot": "elastic/integrations",
+   "commit": "122cdb53384b421adabb166d490a8638ec4fc32b",
+   "fichiers": [
+    "packages/azure/data_stream/signinlogs/_dev/test/pipeline/*.log",
+    "packages/azure/data_stream/auditlogs/_dev/test/pipeline/*.log",
+    "packages/azure/data_stream/identity_protection/_dev/test/pipeline/*.log"
+   ],
+   "licence": "Elastic License 2.0"
+  },
+  {
+   "nom": "entra-sekoia-formats",
+   "depot": "SEKOIA-IO/intake-formats",
+   "commit": "3266f046d251d39946eec0d67de0d85449f39a79",
+   "fichiers": [
+    "Azure/azure-ad/tests/*.json"
+   ],
+   "licence": "voir le dépôt"
+  },
+  {
+   "nom": "entra-tired",
+   "depot": "tired-labs/techniques",
+   "commit": "c3e848d4efd9d9d54c1ebb3a033264ebcf2f3b5f",
+   "fichiers": [
+    "reports/trr0031/azr/logs/federation_changes.json",
+    "reports/trr0032/azr/logs/signinlog_malicious_signing_cert.json"
+   ]
+  },
+  {
+   "nom": "entra-josh",
+   "depot": "MSJosh/documentation",
+   "commit": "dba173274dc6aa5c9114265b3718e7c7294de2c7",
+   "fichiers": [
+    "Sentinel/Entra ID/AADNON.json",
+    "Sentinel/Entra ID/Signinlogs.json"
+   ]
+  },
+  {
+   "nom": "entra-jostuffl",
+   "depot": "jostuffl/AzureSentinel_Stuff",
+   "commit": "4561feea9cd2b37d25fb53883c5f1538996cc2cd",
+   "fichiers": [
+    "Data Connectors/Entra/*.json"
+   ]
+  },
+  {
+   "nom": "entra-demisto",
+   "depot": "demisto/content",
+   "commit": "37e22e7477265bbd050da809ed079a1cd2662008",
+   "fichiers": [
+    "Packs/AzureActiveDirectory/Integrations/AzureADIdentityProtection/test_data/*.json"
+   ]
   }
  ]
 }
