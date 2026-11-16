@@ -10,6 +10,11 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.20.0** : **onglet « 4. Éléments masqués » : copier et renommer**.
+  - Clic droit sur un élément : **Copier la valeur**, **Copier le jeton**, **Renommer le jeton…**. Ctrl+C copie la valeur de la ligne choisie. Avant, rien ne pouvait être copié depuis cette liste.
+  - **Renommer** marche pour tous les éléments, y compris ceux détectés automatiquement (IP, e-mails, machines…) : `[IP_PUB_1]` peut devenir `[PASSERELLE]`. La valeur devient un terme de la conversation avec ce jeton (visible dans l'onglet 3). Si l'IA connaissait déjà l'ancien jeton, la ligne « Changement de jeton » le lui annonce à la prochaine copie, et ses réponses avec l'ancien comme avec le nouveau jeton se restaurent.
+  - Correction : un terme ajouté avec son jeton dans l'onglet 3 n'avait aucun effet si la même valeur était aussi détectée automatiquement (une IP, une adresse e-mail…) : la détection automatique passait avant. Désormais votre terme et son jeton l'emportent, y compris sur une partie de la valeur (« acme.fr » dans « jean@acme.fr »).
+
 - **v1.19.0** : **les lignes très longues sont de nouveau entièrement visibles**. Au lieu d'être coupées après 3 000 caractères, elles sont découpées à l'écran en morceaux d'environ 1 000 caractères (de préférence après une virgule ou une accolade), affichés en retrait sous le début de la ligne. Vous pouvez donc vérifier tout ce qui a été masqué, au survol comme à gauche et à droite :
   - les deux zones sont découpées aux mêmes endroits : elles gardent le même nombre de lignes et défilent ensemble ;
   - le découpage n'existe qu'à l'écran : « Copier pour l'IA », Ctrl+C sur une sélection et la sauvegarde donnent le texte d'origine, sans retours à la ligne ajoutés ;
