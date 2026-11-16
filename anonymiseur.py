@@ -42,11 +42,12 @@ DEPOT = "https://github.com/Some0neElseIsHere/IA-Anonymiser"
 API_DERNIERE = "https://api.github.com/repos/Some0neElseIsHere/IA-Anonymiser/releases/latest"
 DELAI_MS = 250
 SAUVEGARDE_MS = 15000
-GROS_TEXTE = 300_000
+GROS_TEXTE = 300_000  # au-delà (caractères), calcul par étapes et pas de retour à la ligne automatique
 # Au-delà de LIGNE_MAX caractères, une ligne est découpée à l'écran en morceaux d'environ SEGMENT
-# caractères, en retrait sous le premier : des morceaux qui tiennent presque dans la largeur de la zone.
+# caractères, en retrait sous le premier. Mesuré sur 6 Mo dont une ligne de 3 Mo : morceaux de 1 000
+# caractères, 9 s jusqu'au texte anonymisé ; de 200, 18 s (Tk gère mal le grand nombre de lignes).
 LIGNE_MAX = 3000
-SEGMENT = 200  # au-delà (caractères), le calcul se fait par étapes avec son avancement
+SEGMENT = 1000
 THEME_MS = 4000
 
 PALETTES = {
@@ -332,9 +333,9 @@ class Zone(ttk.Frame):
         for m in re.finditer(r"[^\n]{%d,}" % (LIGNE_MAX + 1), contenu):
             debut, fin = m.span()
             pos = debut + SEGMENT
-            while pos < fin - 50:
-                meilleure = max(contenu.rfind(c, pos - 120, pos) for c in ",} ;|")
-                coupure = meilleure + 1 if meilleure > pos - 120 else pos
+            while pos < fin - 100:
+                meilleure = max(contenu.rfind(c, pos - 200, pos) for c in ",} ;|")
+                coupure = meilleure + 1 if meilleure > pos - 200 else pos
                 coupures.append(coupure)
                 pos = coupure + SEGMENT
         return coupures
