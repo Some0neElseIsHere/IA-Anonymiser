@@ -10,6 +10,11 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.19.0** : **les lignes très longues sont de nouveau entièrement visibles**. Au lieu d'être coupées après 3 000 caractères, elles sont découpées à l'écran en morceaux d'environ 1 000 caractères (de préférence après une virgule ou une accolade), affichés en retrait sous le début de la ligne. Vous pouvez donc vérifier tout ce qui a été masqué, au survol comme à gauche et à droite :
+  - les deux zones sont découpées aux mêmes endroits : elles gardent le même nombre de lignes et défilent ensemble ;
+  - le découpage n'existe qu'à l'écran : « Copier pour l'IA », Ctrl+C sur une sélection et la sauvegarde donnent le texte d'origine, sans retours à la ligne ajoutés ;
+  - au-delà de 300 000 caractères, pas de retour à la ligne automatique (une barre de défilement horizontale apparaît) : avec, Tk mettait 17 à 22 s à afficher 6 Mo.
+
 - **v1.18.1** : **plus de blocage avec un journal aux lignes très longues** (JSON d'un export Entra ID ou de l'API Graph sur une seule ligne, par exemple). L'affichage d'une ligne de plusieurs Mo figeait la fenêtre indéfiniment, y compris à chaque démarrage tant que la conversation restait ouverte. Mesures sur la machine Windows de test avec 6 Mo dont une ligne de 3 Mo :
   - **démarrage avec cette conversation ouverte** : fenêtre affichée en 1 s, texte anonymisé en 11 s, avec l'avancement affiché. Avant : fenêtre figée, test arrêté au bout de 11 minutes ;
   - les lignes de plus de 3 000 caractères sont **coupées à l'écran seulement** (« … [2 900 000 caractères de plus, non affichés] ») ; le texte complet est bien anonymisé, copié pour l'IA et enregistré. Un bandeau le signale. Dans cet aperçu, le texte ne se modifie pas directement : Effacer, Coller, Ouvrir ou Ctrl+V (qui ajoute à la fin) ;
