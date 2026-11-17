@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<title>Rapport d&#x27;anonymisation : Incident AD</title><style>
+body { font-family: "Segoe UI", system-ui, sans-serif; color: #1b1b1b; max-width: 1000px; margin: 32px auto;
+       padding: 0 24px; line-height: 1.5; }
+h1 { font-size: 22px; margin-bottom: 4px; }
+h2 { font-size: 16px; margin-top: 32px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+.meta { color: #5f6368; margin-top: 0; }
+.avertissement { background: #fff4e5; border-left: 4px solid #e65100; padding: 10px 14px; margin: 16px 0; }
+.synthese { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 4px; }
+.carte { border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 14px; min-width: 120px; }
+.carte .n { font-size: 24px; font-weight: 600; }
+.carte .l { color: #5f6368; font-size: 13px; }
+.carte.alerte-carte { border-color: #e57373; background: #fdecea; }
+.carte.alerte-carte .n { color: #b71c1c; }
+.types { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.puce { background: #eef3fb; border-radius: 12px; padding: 2px 10px; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+th { background: #f5f5f7; }
+table.triable th { cursor: pointer; user-select: none; white-space: nowrap; }
+table.triable th:after { content: " ↕"; color: #b0b0b0; }
+table.triable th.asc:after { content: " ▲"; color: #1b1b1b; }
+table.triable th.desc:after { content: " ▼"; color: #1b1b1b; }
+.filtre { width: 100%; box-sizing: border-box; padding: 7px 10px; margin: 8px 0; border: 1px solid #ccc;
+          border-radius: 6px; font-size: 14px; }
+.clair { color: #8a8a8a; }
+.fuite td { background: #fdecea; }
+.fuite .statut { color: #b71c1c; font-weight: 600; }
+.alerte { color: #b71c1c; font-weight: 600; }
+.note { color: #5f6368; font-size: 12px; }
+code, pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; }
+td code { word-break: break-all; }
+pre { background: #f7f7f8; border: 1px solid #e5e5e5; padding: 12px; white-space: pre-wrap; word-break: break-word;
+      margin-top: 6px; }
+pre .jeton { background: #d2f0dc; color: #0f5132; border-radius: 3px; }
+pre .fuite-texte { background: #ffcdd2; color: #8b0000; font-weight: 600; outline: 1px solid #e57373; }
+details { border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+details > summary { cursor: pointer; font-weight: 600; }
+details.avec-fuite { border-color: #e57373; }
+.empreinte { color: #5f6368; font-size: 12px; word-break: break-all; margin: 6px 0 0; }
+.boutons { margin: 8px 0; }
+.boutons button { font: inherit; font-size: 13px; padding: 4px 10px; margin-right: 6px; cursor: pointer; }
+@media print {
+  body { margin: 0; max-width: none; padding: 0; font-size: 12px; }
+  .filtre, .boutons, table.triable th:after { display: none; }
+  details { border: none; padding: 0; }
+  details > summary { list-style: none; }
+  pre { page-break-inside: auto; }
+  tr, .carte { page-break-inside: avoid; }
+  h2 { page-break-after: avoid; }
+  .avertissement, .fuite td, pre .jeton, pre .fuite-texte, .carte.alerte-carte {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style></head><body>
+<h1>Rapport d&#x27;anonymisation : Incident AD</h1>
+<p class="meta">Généré le 2026-11-17 08:22:43 par runnervmm7ud1\runneradmin, avec IA-Anonymiser dev</p>
+<div class="avertissement">Document confidentiel : ce rapport contient les valeurs d&#x27;origine des éléments masqués (noms, adresses, secrets…). Conservez-le dans un emplacement sécurisé et ne le transmettez qu&#x27;aux personnes autorisées.</div>
+<h2>Synthèse</h2>
+<div class="synthese"><div class="carte"><div class="n">18</div><div class="l">éléments masqués</div></div><div class="carte"><div class="n">3</div><div class="l">envois à l&#x27;IA</div></div><div class="carte"><div class="n">0</div><div class="l">envoyés en clair par erreur</div></div><div class="carte"><div class="n">0</div><div class="l">laissés en clair volontairement</div></div></div>
+<div class="types"><span class="puce">Nom de machine ou de domaine : 4</span><span class="puce">Compte (DOMAINE\utilisateur, profil) : 4</span><span class="puce">Terme de la conversation : 2</span><span class="puce">Secret (mot de passe, clé, jeton) : 2</span><span class="puce">Motif : Tickets : 1</span><span class="puce">Adresse IP locale (privée) : 1</span><span class="puce">Motif : Postes : 1</span><span class="puce">DN Active Directory / LDAP : 1</span><span class="puce">Téléphone : 1</span><span class="puce">Terme permanent : 1</span></div>
+<h2>Conversation</h2><table>
+<tr><th>Nom</th><td>Incident AD</td></tr>
+<tr><th>Créée le</th><td>2026-11-17 08:22:25</td></tr>
+<tr><th>Dernière activité</th><td>2026-11-17 08:22:43</td></tr>
+<tr><th>Envois à l&#x27;IA enregistrés</th><td>3</td></tr>
+<tr><th>Éléments envoyés en clair par erreur</th><td>0</td></tr>
+<tr><th>Termes masqués de la conversation</th><td>2</td></tr>
+<tr><th>Jetons personnalisés de la conversation</th><td>Sophie Bernard → [VICTIME]</td></tr>
+<tr><th>Domaines publics connus laissés lisibles</th><td>non</td></tr>
+</table>
+<h2>Réglages au moment de l&#x27;export</h2><table>
+<tr><th>Types détectés automatiquement</th><td>E-mail, Téléphone, IBAN, Carte bancaire, N° de sécurité sociale, Adresse MAC, Adresse IP locale (privée), Adresse IP publique, Nom de machine ou de domaine, Secret (mot de passe, clé, jeton), Compte (DOMAINE\utilisateur, profil), DN Active Directory / LDAP, SID Windows, Tenant Entra ID (nom, identifiant), Localisation (GPS, emplacement nommé)</td></tr>
+<tr><th>Termes permanents</th><td>1</td></tr>
+<tr><th>Motifs personnalisés</th><td>2</td></tr>
+<tr><th>Consigne ajoutée pour l&#x27;IA</th><td>oui</td></tr>
+</table>
+<h2>Éléments envoyés à l&#x27;IA</h2>
+<input id="filtre" class="filtre" type="search" placeholder="Filtrer le tableau (jeton, valeur, type…)">
+<table id="elements" class="triable"><thead><tr><th>Jeton</th><th>Valeur d&#x27;origine</th><th>Type</th><th>1er envoi</th><th>Nb d&#x27;envois</th><th>Statut</th></tr></thead><tbody>
+<tr><td><code>[REF_1]</code></td><td><code>INC-2026-5120</code></td><td>Motif : Tickets</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[NOM_1]</code></td><td><code>Acme Industries</code></td><td>Terme permanent</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué · renommé en [ENTREPRISE] à l&#x27;envoi 2</td></tr>
+<tr><td><code>[FQDN_1]</code></td><td><code>dc01.acme-industries.local</code></td><td>Nom de machine ou de domaine</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[COMPTE_1]</code></td><td><code>ACME\svc-backup</code></td><td>Compte (DOMAINE\utilisateur, profil)</td><td data-tri="1">1</td><td>2</td><td class="statut">masqué</td></tr>
+<tr><td><code>[IP_privée_1]</code></td><td><code>10.20.40.17</code></td><td>Adresse IP locale (privée)</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[REF_2]</code></td><td><code>PC-0815</code></td><td>Motif : Postes</td><td data-tri="1">1</td><td>2</td><td class="statut">masqué</td></tr>
+<tr><td><code>[VICTIME]</code></td><td><code>Sophie Bernard</code></td><td>Terme de la conversation</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[DN_1]</code></td><td><code>DC=acme-industries,DC=local</code></td><td>DN Active Directory / LDAP</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[COMPTE_2]</code></td><td><code>deploy</code></td><td>Compte (DOMAINE\utilisateur, profil)</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[SECRET_1]</code></td><td><code>Ghx7!q2Lm</code></td><td>Secret (mot de passe, clé, jeton)</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[FQDN_2]</code></td><td><code>repo.acme-industries.local</code></td><td>Nom de machine ou de domaine</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[COMPTE_3]</code></td><td><code>slefevre</code></td><td>Compte (DOMAINE\utilisateur, profil)</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[FQDN_3]</code></td><td><code>sql01.acme-industries.local</code></td><td>Nom de machine ou de domaine</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[COMPTE_4]</code></td><td><code>paie_app</code></td><td>Compte (DOMAINE\utilisateur, profil)</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[FQDN_4]</code></td><td><code>sql01</code></td><td>Nom de machine ou de domaine</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[SECRET_2]</code></td><td><code>Paie#2026!</code></td><td>Secret (mot de passe, clé, jeton)</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[NOM_2]</code></td><td><code>Marc Lefèvre</code></td><td>Terme de la conversation</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[TEL_1]</code></td><td><code>+33 6 98 76 54 32</code></td><td>Téléphone</td><td data-tri="1">1</td><td>1</td><td class="statut">masqué</td></tr>
+<tr><td><code>[ENTREPRISE]</code></td><td><code>Acme Industries</code></td><td>Terme permanent</td><td data-tri="2">2</td><td>2</td><td class="statut">masqué</td></tr>
+</tbody></table>
+<p class="note">Cliquez sur un en-tête pour trier. « 1er envoi » : premier envoi à l&#x27;IA contenant le jeton ; « Nb d&#x27;envois » : nombre d&#x27;envois qui le contiennent.</p>
+<h2>Textes envoyés à l&#x27;IA</h2>
+<div class="boutons"><button id="tout-ouvrir" type="button">Tout déplier</button><button id="tout-fermer" type="button">Tout replier</button></div>
+<details><summary>Envoi 1, le 2026-11-17 08:22:37 · 24 jeton(s)</summary>
+<p class="empreinte">SHA-256 : e7f02d065953b3127d9da32a9d738badca8b387ba73c72bee11dbd6fb0373336 · 1533 caractères</p>
+<pre>Consigne : dans ce texte, les données confidentielles sont remplacées par des jetons entre crochets, comme <span class="jeton">[NOM_1]</span>, <span class="jeton">[IP_privée_2]</span> ou [CLIENT]. Le nom du jeton indique ce qu&#x27;il remplace (adresse IP interne ou publique, compte, machine…). Un même jeton désigne toujours le même élément dans toute notre conversation. Reprends les jetons exactement tels quels, y compris dans les commandes, scripts et exemples de code : ne les modifie pas, ne les traduis pas, ne les remplace pas par des valeurs inventées ou des exemples génériques, et ne cherche pas à deviner les vraies valeurs. Si une ligne « Changement de jeton » apparaît, utilise le nouveau nom à partir de là.
+
+=== <span class="jeton">[REF_1]</span> - Compte de service compromis - <span class="jeton">[NOM_1]</span> ===
+2026-11-11 07:58:02 <span class="jeton">[FQDN_1]</span> Security 4625 Logon failure: <span class="jeton">[COMPTE_1]</span> from <span class="jeton">[IP_privée_1]</span> (WS <span class="jeton">[REF_2]</span>)
+2026-11-11 07:59:31 <span class="jeton">[FQDN_1]</span> Directory 5136 Object modified: CN=<span class="jeton">[VICTIME]</span>,OU=Comptabilite,<span class="jeton">[DN_1]</span>
+2026-11-11 08:01:12 <span class="jeton">[REF_2]</span> PowerShell 4104 Invoke-WebRequest -Uri https://<span class="jeton">[COMPTE_2]</span>:<span class="jeton">[SECRET_1]</span>@<span class="jeton">[FQDN_2]</span>/sync.ps1 -OutFile C:\Users\<span class="jeton">[COMPTE_3]</span>\AppData\Local\Temp\sync.ps1
+2026-11-11 08:02:40 <span class="jeton">[FQDN_3]</span> MSSQL Login succeeded for &#x27;<span class="jeton">[COMPTE_4]</span>&#x27; Server=<span class="jeton">[FQDN_4]</span>;User Id=<span class="jeton">[COMPTE_4]</span>;Password=<span class="jeton">[SECRET_2]</span>;
+2026-11-11 08:05:44 srv-files02 smbd user <span class="jeton">[COMPTE_3]</span> copied /home/<span class="jeton">[COMPTE_3]</span>/exports/salaires_2026.csv
+2026-11-11 08:10:00 helpdesk Ticket opened by <span class="jeton">[NOM_2]</span> (<span class="jeton">[TEL_1]</span>), asset <span class="jeton">[REF_2]</span>
+--- doit rester en clair ---
+NT AUTHORITY\SYSTEM, HKLM\SYSTEM\CurrentControlSet, java.lang.NullPointerException, report.pdf, S-1-5-18
+</pre>
+</details>
+<details><summary>Envoi 2, le 2026-11-17 08:22:42 · 3 jeton(s)</summary>
+<p class="empreinte">SHA-256 : e7df48018c0dc1855378bfee881f285a0a0322d1f8ead8fa2c240dadc2a1420e · 816 caractères</p>
+<pre>Consigne : dans ce texte, les données confidentielles sont remplacées par des jetons entre crochets, comme <span class="jeton">[NOM_1]</span>, <span class="jeton">[IP_privée_2]</span> ou [CLIENT]. Le nom du jeton indique ce qu&#x27;il remplace (adresse IP interne ou publique, compte, machine…). Un même jeton désigne toujours le même élément dans toute notre conversation. Reprends les jetons exactement tels quels, y compris dans les commandes, scripts et exemples de code : ne les modifie pas, ne les traduis pas, ne les remplace pas par des valeurs inventées ou des exemples génériques, et ne cherche pas à deviner les vraies valeurs. Si une ligne « Changement de jeton » apparaît, utilise le nouveau nom à partir de là.
+
+Changement de jeton : <span class="jeton">[NOM_1]</span> s&#x27;appelle désormais <span class="jeton">[ENTREPRISE]</span>. C&#x27;est le même élément.
+
+Suite : <span class="jeton">[ENTREPRISE]</span> confirme. <span class="jeton">[COMPTE_1]</span> bloqué sur <span class="jeton">[REF_2]</span>.</pre>
+</details>
+<details><summary>Envoi 3, le 2026-11-17 08:22:43 · 1 jeton(s)</summary>
+<p class="empreinte">SHA-256 : c46524308682190a24df764a7b17c2d042fa503c7cecd68efc045fa4b699522f · 690 caractères</p>
+<pre>Consigne : dans ce texte, les données confidentielles sont remplacées par des jetons entre crochets, comme <span class="jeton">[NOM_1]</span>, <span class="jeton">[IP_privée_2]</span> ou [CLIENT]. Le nom du jeton indique ce qu&#x27;il remplace (adresse IP interne ou publique, compte, machine…). Un même jeton désigne toujours le même élément dans toute notre conversation. Reprends les jetons exactement tels quels, y compris dans les commandes, scripts et exemples de code : ne les modifie pas, ne les traduis pas, ne les remplace pas par des valeurs inventées ou des exemples génériques, et ne cherche pas à deviner les vraies valeurs. Si une ligne « Changement de jeton » apparaît, utilise le nouveau nom à partir de là.
+
+Et <span class="jeton">[ENTREPRISE]</span> encore.</pre>
+</details>
+<p class="meta">Les textes envoyés à l&#x27;IA sont reproduits tels quels, anonymisés. Leurs empreintes SHA-256 permettent de vérifier qu&#x27;ils n&#x27;ont pas été modifiés depuis leur envoi.</p>
+<script>
+(function () {
+  var table = document.getElementById("elements"), filtre = document.getElementById("filtre");
+  function cle(cellule) {
+    var t = (cellule.getAttribute("data-tri") || cellule.textContent).trim();
+    return /^-?\d+$/.test(t) ? parseInt(t, 10) : t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+  if (table) {
+    var titres = table.tHead.rows[0].cells;
+    Array.prototype.forEach.call(titres, function (th, i) {
+      th.addEventListener("click", function () {
+        var desc = th.classList.contains("asc");
+        Array.prototype.forEach.call(titres, function (x) { x.classList.remove("asc", "desc"); });
+        th.classList.add(desc ? "desc" : "asc");
+        var lignes = Array.prototype.slice.call(table.tBodies[0].rows);
+        lignes.sort(function (a, b) {
+          var x = cle(a.cells[i]), y = cle(b.cells[i]);
+          var r = (typeof x === "number" && typeof y === "number") ? x - y : String(x).localeCompare(String(y), undefined, {numeric: true});
+          return desc ? -r : r;
+        });
+        lignes.forEach(function (l) { table.tBodies[0].appendChild(l); });
+      });
+    });
+  }
+  if (filtre && table) {
+    filtre.addEventListener("input", function () {
+      var q = filtre.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      Array.prototype.forEach.call(table.tBodies[0].rows, function (l) {
+        var t = l.textContent.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        l.style.display = t.indexOf(q) >= 0 ? "" : "none";
+      });
+    });
+  }
+  function tous(ouvrir) {
+    Array.prototype.forEach.call(document.querySelectorAll("details"), function (d) {
+      if (ouvrir) { d.setAttribute("data-avant", d.open ? "1" : ""); d.open = true; }
+      else if (d.hasAttribute("data-avant")) { d.open = !!d.getAttribute("data-avant"); }
+    });
+  }
+  window.addEventListener("beforeprint", function () { tous(true); });
+  window.addEventListener("afterprint", function () { tous(false); });
+  var o = document.getElementById("tout-ouvrir"), f = document.getElementById("tout-fermer");
+  if (o) o.addEventListener("click", function () { tous(true); });
+  if (f) f.addEventListener("click", function () {
+    Array.prototype.forEach.call(document.querySelectorAll("details"), function (d) { d.open = false; });
+  });
+})();
+</script>
+</body></html>

@@ -1,0 +1,59 @@
+Journal de 6.0 Mo, 110621 lignes, 16076 éléments masqués
+   0.46 s  coller 6 Mo dans la zone source
+   0.51 s    stockage.sauver_conversations
+   0.43 s    source.surligner
+   0.31 s    sortie.ecrire (avec surlignage)
+   0.26 s    remplir_elements
+   0.04 s    stockage.sauver_conversations
+  13.62 s  actualiser (total, par étapes)
+   0.00 s    interface bloquée au plus 2.47 s d'affilée
+   0.49 s    source.surligner
+   0.39 s    sortie.ecrire (avec surlignage)
+   0.25 s    remplir_elements
+   1.34 s  actualiser une 2e fois (rien n'a changé)
+   0.04 s    stockage.sauver_conversations
+   0.17 s  sauvegarder
+   0.05 s    stockage.sauver_conversations
+   0.10 s  sauvegarder une 2e fois (rien n'a changé)
+   0.26 s    remplir_elements
+   1.14 s    stockage.sauver_conversations
+   1.70 s  texte_pour_ia
+   0.21 s    stockage.sauver_conversations
+   0.51 s    source.surligner
+   0.41 s    sortie.ecrire (avec surlignage)
+   0.26 s    remplir_elements
+   0.25 s    remplir_elements
+   1.63 s    stockage.sauver_conversations
+   2.24 s  copier pendant le calcul
+   0.04 s  défiler au milieu
+   0.22 s  onglet 4
+   0.13 s  onglet 1
+   0.00 s    source.surligner
+   0.08 s    sortie.ecrire (avec surlignage)
+   0.02 s    remplir_elements
+   0.33 s  passer à une autre conversation
+   0.46 s    source.surligner
+   0.34 s    sortie.ecrire (avec surlignage)
+   0.25 s    remplir_elements
+   1.90 s  revenir à la conversation de 6 Mo
+
+Phase 2 : journal de 6.0 Mo, plus longue ligne 2.9 Mo, 17396 éléments masqués
+   0.34 s  coller (dont une ligne JSON de 3 Mo)  (interface bloquée au plus 0.00 s)
+  18.73 s  anonymiser  (interface bloquée au plus 0.00 s)
+   0.00 s  défiler au début (la longue ligne)  (interface bloquée au plus 0.00 s)
+   0.38 s  défiler à la fin  (interface bloquée au plus 0.00 s)
+  19.82 s  Ctrl+V d'une ligne de plus puis recalcul  (interface bloquée au plus 0.00 s)
+   0.05 s  sauvegarder  (interface bloquée au plus 0.00 s)
+     source.ecrire : 2 appel(s), 0.55 s au total, 0.31 s au plus
+     avancer_calcul : 142 appel(s), 35.61 s au total, 1.58 s au plus
+     actualiser : 3 appel(s), 0.34 s au total, 0.17 s au plus
+     source.surligner : 2 appel(s), 0.69 s au total, 0.39 s au plus
+     sortie.surligner : 2 appel(s), 0.64 s au total, 0.32 s au plus
+     sortie.ecrire : 2 appel(s), 0.83 s au total, 0.44 s au plus
+     remplir_elements : 2 appel(s), 0.53 s au total, 0.27 s au plus
+     afficher_resultat : 2 appel(s), 2.13 s au total, 1.14 s au plus
+
+Phase 3 : relance avec la conversation de 6.0 Mo ouverte
+   1.59 s  création de la fenêtre (chargement et déchiffrement inclus)
+  18.56 s  premier affichage
+  18.56 s  jusqu'au texte anonymisé (interface bloquée au plus 0.00 s)

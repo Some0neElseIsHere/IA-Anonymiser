@@ -1,0 +1,4 @@
+OK     relance_avec_gros_journal
+OK     effacer_toutes
+OK     fin
+fenêtres simulées : [('askyesno', ('Delete all conversations', 'Delete the 5 conversation(s), pinned ones included?\n\nTheir texts, the AI answers and the token-to-value mappings will be erased: older answers can no longer be restored. This cannot be undone.')), ('askyesno', ('Delete all conversations', 'Delete the 5 conversation(s), pinned ones included?\n\nTheir texts, the AI answers and the token-to-value mappings will be erased: older answers can no longer be restored. This cannot be undone.'))]
