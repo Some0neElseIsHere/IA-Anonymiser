@@ -1548,6 +1548,25 @@ class Application:
         self.message(self.t("msg_conversation_creee", c=self.conv.nom))
         self.sauvegarder()
 
+    def effacer_toutes_conversations(self, parent=None):
+        """Supprime toutes les conversations, dans le fichier ET dans la fenêtre. Avant, seul le fichier était
+        supprimé : la sauvegarde automatique (toutes les 15 s) le réécrivait aussitôt avec les mêmes conversations."""
+        t = self.t
+        if not messagebox.askyesno(t("effacer_tout_titre"), t("effacer_tout_question", n=len(self.conversations)),
+                                   icon="warning", parent=parent or self.root):
+            return
+        self.annuler_calcul()
+        stockage.effacer_conversations()
+        self.numero = 1
+        nouvelle = Conversation(t("nom_conversation", n=self.numero), t.langue)
+        nouvelle.domaines_publics = self.options.domaines_publics
+        nouvelle.types = set(self.options.types)
+        self.conversations, self.courante = [nouvelle], 0
+        self.charger_zones()
+        self.onglets.select(0)
+        self.sauvegarder()
+        self.message(t("opt_effacees"))
+
     def changer_conversation(self):
         selection = self.arbre_conv.selection()
         if not selection or selection[0] == self.conv.id:
@@ -2311,8 +2330,7 @@ class Application:
                   justify="left").pack(anchor="w", padx=(int(28 * e), 0), pady=(2, 8))
 
         def effacer():
-            stockage.effacer_conversations()
-            self.message(t("opt_effacees"))
+            self.effacer_toutes_conversations(fen)
 
         ttk.Button(o, text=t("opt_effacer_conversations"), command=effacer).pack(
             anchor="w", padx=(int(28 * e), 0))

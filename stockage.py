@@ -234,7 +234,10 @@ def charger_conversations(dossier=None):
 
 
 def effacer_conversations(dossier=None):
-    try:
-        os.remove(chemin_conversations(dossier))
-    except OSError:
-        pass
+    chemin = chemin_conversations(dossier)
+    _DERNIERES_SAUVEGARDES.pop(chemin, None)
+    for fichier in (chemin, chemin + ".tmp"):
+        try:
+            os.remove(fichier)
+        except OSError:
+            pass

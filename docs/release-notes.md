@@ -10,6 +10,8 @@ Pour mettre à jour, remplacez simplement l'ancien exe : vos réglages et vos co
 
 ### Nouveautés de cette version
 
+- **v1.21.1** : **« Supprimer toutes les conversations » supprime vraiment** (Options → Général, anciennement « Effacer les conversations enregistrées »). Le bouton effaçait le fichier, mais les conversations restaient ouvertes dans la fenêtre et la sauvegarde automatique (toutes les 15 s) le réécrivait aussitôt : rien ne semblait supprimé. Désormais, après confirmation, toutes les conversations, épinglées comprises, sont supprimées de la fenêtre et du disque ; une conversation vide prend leur place.
+
 - **v1.21.0** : **journaux Entra ID complets**, testés sur 117 nouveaux fichiers réels ou de test (journaux d'un tenant de recherche de Splunk, tests d'Elastic, de Sekoia, de Sentinel, de TIRED Labs…) et sur leurs équivalents en export du portail (JSON et CSV). Valeurs qui passaient en clair, désormais masquées :
   - **nouveau type « Tenant Entra ID »** (`[TENANT_1]`) : nom du tenant (`homeTenantName`, colonne « Home tenant name ») et identifiant (`homeTenantId`, `resourceTenantId`, `tenantId`, `/tenants/…` dans `resourceId`). Le nom est ensuite masqué partout où il réapparaît, par exemple dans le nom d'une stratégie d'accès conditionnel ;
   - **nouveau type « Localisation »** (`[LIEU_1]`) : coordonnées GPS (`latitude`, `longitude`) et emplacements nommés (`networkNames` : « Siège Lyon »). La ville et le pays restent lisibles ;

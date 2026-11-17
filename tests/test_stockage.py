@@ -9,6 +9,16 @@ import stockage  # noqa: E402
 
 
 class Stockage(unittest.TestCase):
+    def test_effacer_puis_resauvegarder(self):
+        with tempfile.TemporaryDirectory() as d:
+            donnees = {"conversations": [{"nom": "secret"}]}
+            stockage.sauver_conversations(donnees, d)
+            stockage.effacer_conversations(d)
+            self.assertIsNone(stockage.charger_conversations(d))
+            # la même sauvegarde après effacement est bien écrite (l'empreinte mémorisée est oubliée)
+            self.assertTrue(stockage.sauver_conversations({"conversations": []}, d))
+            self.assertEqual(stockage.charger_conversations(d), {"conversations": []})
+
     def test_sauvegarde_inutile_evitee(self):
         with tempfile.TemporaryDirectory() as d:
             donnees = {"conversations": [{"nom": "x", "source": "a" * 100_000}]}

@@ -892,6 +892,24 @@ def lancer():
         app.quitter()
 
     # ------------------------------------------------------------------ phase 3
+    def effacer_toutes():
+        """Options → Supprimer toutes les conversations : la fenêtre ET le fichier, même après la sauvegarde auto."""
+        verifier(len(app.conversations) > 1, "pas assez de conversations pour le test")
+        REPONSES["askyesno"] = False  # « Non » : rien ne change
+        avant = len(app.conversations)
+        app.effacer_toutes_conversations()
+        verifier(len(app.conversations) == avant, "conversations supprimées malgré « Non »")
+        REPONSES["askyesno"] = True
+        app.effacer_toutes_conversations()
+        racine.update()
+        verifier(len(app.conversations) == 1 and not app.source.lire() and not app.moteur.valide,
+                 f"il reste {len(app.conversations)} conversation(s) dans la fenêtre")
+        verifier(len(app.arbre_conv.get_children("")) >= 1 and app.conv.nom, "liste des conversations")
+        app.sauvegarder()  # la sauvegarde automatique ne doit pas les faire revenir
+        donnees = anonymiseur.stockage.charger_conversations()
+        noms = [c.get("nom") for c in donnees["conversations"]] if donnees else []
+        verifier(len(noms) == 1 and "sophie" not in json.dumps(donnees).lower(), f"fichier : {noms}")
+
     def relance_avec_gros_journal():
         """Relance avec la conversation de 6 Mo ouverte : c'est le cas qui fige l'application au démarrage."""
         debut = time.perf_counter()
@@ -915,7 +933,7 @@ def lancer():
             verifier_ancienne_reponse, anglais_et_sombre, anglais_jetons, verifier_anglais, fermer_conversation,
             tres_gros_log, gros_log, defilement_jumele, ouvrir_fichiers, options_conversation, colonne_reduite, elements_copier_renommer, quitter_phase1],
         2: [relance, relance_restauration, verifier_relance_restauration, journal_lignes_longues, fin],
-        3: [relance_avec_gros_journal, fin],
+        3: [relance_avec_gros_journal, effacer_toutes, fin],
     }[PHASE]
 
     def suivante(i=0):
